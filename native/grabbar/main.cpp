@@ -113,6 +113,8 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     cfg.textSize           = makeShared<Config::Values::CIntValue>("plugin:grabbar:text_size", "Title text size", 11);
     cfg.shellGraceMs       = makeShared<Config::Values::CIntValue>("plugin:grabbar:shell_grace_ms", "How long hidden windows wait for the shell service to come back before they are returned", GRABBAR_GRACE_MS);
     cfg.snapLock           = makeShared<Config::Values::CBoolValue>("plugin:grabbar:snap_lock", "Snap the window into a screen-edge zone when a drag is released near an edge", true);
+    cfg.tabs               = makeShared<Config::Values::CBoolValue>("plugin:grabbar:tabs", "Enable browser-like window tabs (drop one window onto another)", true);
+    cfg.tabMinWidth        = makeShared<Config::Values::CIntValue>("plugin:grabbar:tabMinWidth", "Minimum width of a tab segment in logical pixels", 120);
     cfg.textFont           = makeShared<Config::Values::CStringValue>("plugin:grabbar:text_font", "Title font family", "Sans");
     cfg.barColor           = makeShared<Config::Values::CColorValue>("plugin:grabbar:bar_color", "Strip color for the focused window", 0xff2a2f36);
     cfg.inactiveBarColor   = makeShared<Config::Values::CColorValue>("plugin:grabbar:inactive_bar_color", "Strip color for unfocused windows", 0xff20242a);
@@ -122,7 +124,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     const std::vector<SP<Config::Values::IValue>> VALUES = {cfg.enabled,  cfg.buttonsLeft, cfg.barHeight,        cfg.buttonSize, cfg.padding,    cfg.textSize,
                                                             cfg.textFont, cfg.barColor,    cfg.inactiveBarColor, cfg.textColor,  cfg.hoverColor, cfg.closeHoverColor,
-                                                            cfg.shellGraceMs, cfg.snapLock};
+                                                            cfg.shellGraceMs, cfg.snapLock, cfg.tabs, cfg.tabMinWidth};
     for (const auto& v : VALUES)
         HyprlandAPI::addConfigValueV2(PHANDLE, v);
 

@@ -8,6 +8,7 @@
 // to the same live window produces ACTION_STALE.
 
 #include "globals.hpp"
+#include "tabs.hpp"
 
 #include <hyprland/src/desktop/view/Window.hpp>
 #include <hyprland/src/helpers/math/Math.hpp>
@@ -96,6 +97,20 @@ class CGrabbarBackend {
     bool                isMaximized(PHLWINDOW w) const;
     bool                isMinimizable(PHLWINDOW w, std::string& why) const;
 
+    // tab groups (browser-like window tabs)
+    eActionStatus       joinTabs(const std::string& source, const std::string& host, std::string& err);
+    eActionStatus       activateTab(uint64_t group, int index, std::string& err);
+    eActionStatus       activateTabByToken(const std::string& token, std::string& err);
+    eActionStatus       detachTab(const std::string& token, std::string& err);
+    eActionStatus       ungroupTabs(uint64_t group, std::string& err);
+    eActionStatus       closeAllTabs(uint64_t group, bool confirm, std::string& err);
+    void                requestGroupClose(const std::string& hostToken); // closeAllRequested, or close directly without a shell
+    const TabStore&     tabs() const { return m_tabs; }
+    std::string         tabsListJson();
+    void                setDragging(bool dragging) { m_dragging = dragging; }
+    bool                dragging() const { return m_dragging; }
+    void                setSnapZone(const std::string& zone) { m_snapZone = zone; }
+
     std::string         statusText(bool json) const;
 
     // compositor events
@@ -131,6 +146,9 @@ class CGrabbarBackend {
     void                                   handleReveal();
     std::unordered_map<std::string, STrackedWindow> m_windows; // token -> tracked
     std::unordered_map<uintptr_t, std::string>      m_tokenByWindow;
+    TabStore                                        m_tabs;
+    bool                                            m_dragging = false; // a title/tab drag is in progress (snap.status)
+    std::string                                     m_snapZone = "none";
 
     PHLWORKSPACE                           ownedWorkspace(PHLMONITOR mon, bool create);
     bool                                   onOwnedWorkspace(PHLWINDOW w) const;
@@ -138,6 +156,10 @@ class CGrabbarBackend {
     bool                                   returnWindow(STrackedWindow& t, PHLWORKSPACE dest, bool focus, std::string& err);
     SWindowOrigin                          captureOrigin(PHLWINDOW w) const;
     void                                   forgetWindow(const std::string& token);
+    bool                                   hideOwned(STrackedWindow& t, std::string& err); // native hide (no shell round-trip)
+    eActionStatus                          closeOne(const std::string& token, std::string& err); // raw close, no tab-host prompt
+    void                                   broadcastTabs();
+    std::string                            snapStatusJson() const;
 
     // protocol
     void                                   send(SGrabbarClient* c, const std::string& type, const Fields& fields);
