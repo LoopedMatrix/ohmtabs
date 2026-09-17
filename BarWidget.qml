@@ -113,9 +113,8 @@ BarWidget {
       onPressed: function(button) {
         if (button === Qt.RightButton) { root.openSettings(); return }
         if (button === Qt.MiddleButton) { if (root.service && root.count > 0) root.service.restoreAll(); return }
-        // With the Windows-style side panel on, the widget toggles it; the
-        // drawer stays the fallback so the restore entry point never vanishes.
-        if (root.sidePanelEnabled) { sidePanel.toggle(); return }
+        // The taskbar panel appears on its own when windows are minimized, so
+        // the widget opens the drawer for the detail view instead.
         root.openDrawer()
       }
     }
@@ -127,6 +126,8 @@ BarWidget {
     id: sidePanel
     shell: root.bar ? root.bar.shell : null
     service: root.service
-    autoOpen: root.sidePanelEnabled
+    panelEnabled: root.sidePanelEnabled
+    panelPosition: root.settings ? String(root.settings.panelPosition || "bottom") : "bottom"
+    panelAutoHide: root.settings ? root.settings.panelAutoHide !== false : true
   }
 }

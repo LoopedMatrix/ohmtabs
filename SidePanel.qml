@@ -3,20 +3,20 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 
-// SidePanel — the Windows-style minimized-window bar for Grabbar.
+// SidePanel — the Windows-style minimized-window taskbar for Grabbar.
 //
-// A left-edge panel that lists every minimized window and is the restore
-// entry point for them. Like the bar widget it registers itself as a restore
-// host, so its presence is what lets the service declare restore access.
+// A run of window buttons along one screen edge: click a button to restore
+// that window. Like the bar widget it registers itself as a restore host, so
+// its presence is what lets the service declare restore access.
 //
-// Loaded by BarWidget.qml, which passes `shell` and `service` explicitly
-// (no reliance on dynamic scope). Colours come from the Omarchy palette the
-// same way Panel.qml does, so it follows theme switches for free.
+// Position is configurable (left / right / bottom) and it can auto-hide. When
+// parked, the surface stays mapped and slides just past its screen edge,
+// leaving a few pixels on screen to catch the pointer — the same approach
+// Omarchy's own bar uses. Parking beats unmapping because the surface,
+// bindings and glyph textures stay alive, so revealing is only a margin
+// change rather than a rebuild.
 //
-// Behaviour:
-//   * shown when there is at least one minimized window and the setting is on
-//   * hides itself when the list empties
-//   * Escape dismisses; Up/Down/Enter navigate and restore
+// Colours come from the Omarchy bar palette, so it follows theme switches.
 Item {
   id: root
 
@@ -24,63 +24,51 @@ Item {
   property var service: null
   property string serviceName: "tech.greyforge.grabbar"
 
-  // Visible only while the panel is open. The host toggles this.
-  property bool opened: false
+  // ---- settings (from this plugin's shell.json entry) ----
+  property bool panelEnabled: true
+  property string panelPosition: "bottom"    // "left" | "right" | "bottom"
+  property bool panelAutoHide: true
+
+  // ---- state ----
+  property bool hovered: false
   property int selectedIndex: -1
+
+  readonly property bool vertical: panelPosition === "left" || panelPosition === "right"
+  readonly property int panelSize: vertical ? 268 : 46
+  // Pixels of the parked surface left on screen so the pointer can find it.
+  readonly property int revealSliver: 4
 
   readonly property var rows: (service && service.rows) ? service.rows : []
   readonly property int count: rows.length
-  readonly property string notice: service ? String(service.notice || "") : ""
 
-  readonly property color background: Color.menu.background
-  readonly property color foreground: Color.menu.text
-  readonly property color border: Color.menu.border
-  readonly property color selectedBackground: Color.menu.selectedBackground
-  readonly property color selectedText: Color.menu.selectedText
+  // Nothing to show -> no surface at all, and no stray edge strip either.
+  readonly property bool live: panelEnabled && count > 0
+  // Auto-hide parks it while the pointer is away and nothing is selected.
+  readonly property bool parked: panelAutoHide && !hovered && selectedIndex < 0
+
+  // ---- palette (bar surfaces: it lives on a screen edge) ----
+  readonly property color background: Color.bar.background
+  readonly property color foreground: Color.bar.text
+  readonly property color hoverFill: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.14)
+  readonly property color activeFill: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.22)
   readonly property color muted: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.55)
-  readonly property int cornerRadius: Style.cornerRadius
+  readonly property color urgent: Color.urgent
+  readonly property int radius: Style.cornerRadius
   readonly property string fontFamily: Style.font.menuFamily
-  readonly property int panelWidth: 280
-  readonly property int rowHeight: Style.space(46)
+  readonly property int buttonLength: vertical ? root.panelSize : 184
 
-  // The panel is open AND has something to show.
-  readonly property bool shown: opened && count > 0
-
-  // Open by itself when the first window is minimized, hide when the list
-  // empties. Deliberately keyed to the 0 -> N transition so that closing the
-  // panel by hand while windows are still minimized leaves it closed.
-  property bool autoOpen: true
-  property int lastCount: 0
-
-  onCountChanged: {
-    if (count === 0) {
-      root.opened = false
-      root.selectedIndex = -1
-    } else if (root.lastCount === 0 && root.autoOpen) {
-      root.opened = true
-    }
-    root.lastCount = count
-  }
-
-  function toggle() { root.opened = !root.opened }
-  function open() { root.opened = true }
-  function close() { root.opened = false; root.selectedIndex = -1 }
-
-  function dismiss() {
-    root.close()
-    if (shell && typeof shell.hide === "function") shell.hide(serviceName)
-  }
+  // ------------------------------------------------------------- behaviour
 
   function restoreRow(row, original) {
     if (!service || !row) return
     service.restore(row.token, original ? "original" : "current", "")
-    if (root.count <= 1) root.close()
+    root.selectedIndex = -1
   }
 
   function restoreAll() {
     if (!service) return
     service.restoreAll()
-    root.close()
+    root.selectedIndex = -1
   }
 
   function move(delta) {
@@ -90,6 +78,20 @@ Item {
     if (next >= root.count) next = 0
     root.selectedIndex = next
   }
+
+  function dismiss() { root.selectedIndex = -1 }
+
+  // Park after a short grace period so a diagonal pointer path across the
+  // panel does not make it flicker away.
+  Timer {
+    id: hideDelay
+    interval: 260
+    repeat: false
+    onTriggered: root.hovered = false
+  }
+
+  // Last window restored -> drop any selection so nothing lingers.
+  onCountChanged: if (count === 0) root.selectedIndex = -1
 
   // ------------------------------------------------------ restore-host wiring
 
@@ -109,142 +111,99 @@ Item {
 
   PanelWindow {
     id: panel
-    visible: root.shown
+    visible: root.live
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "grabbar-side-panel"
-    WlrLayershell.keyboardFocus: root.shown ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.namespace: "grabbar-taskbar"
+    WlrLayershell.keyboardFocus: root.selectedIndex >= 0 ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
-    // Left edge, full height, only as wide as the panel so clicks elsewhere
-    // still reach the windows underneath.
-    anchors { top: true; bottom: true; left: true }
-    implicitWidth: root.panelWidth
-
-    Item {
-      id: keyCatcher
-      anchors.fill: parent
-      focus: root.shown
-      Keys.onPressed: function(event) {
-        if (event.key === Qt.Key_Escape) { root.dismiss(); event.accepted = true; return }
-        if (event.key === Qt.Key_Down || event.key === Qt.Key_J) { root.move(1); event.accepted = true }
-        else if (event.key === Qt.Key_Up || event.key === Qt.Key_K) { root.move(-1); event.accepted = true }
-        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-          if (root.selectedIndex >= 0 && root.selectedIndex < root.count)
-            root.restoreRow(root.rows[root.selectedIndex], event.modifiers & Qt.ShiftModifier)
-          event.accepted = true
-        }
-        else if (event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier)) { root.restoreAll(); event.accepted = true }
-      }
+    // Anchoring follows the position; parking is a negative margin along the
+    // edge it is anchored to, so the surface slides out of view while a sliver
+    // of it stays on screen.
+    anchors {
+      top: root.vertical
+      bottom: root.vertical || root.panelPosition === "bottom"
+      left: root.panelPosition === "left" || root.panelPosition === "bottom"
+      right: root.panelPosition === "right" || root.panelPosition === "bottom"
     }
 
+    margins {
+      bottom: root.parked && root.panelPosition === "bottom" ? -(root.panelSize - root.revealSliver) : 0
+      left: root.parked && root.panelPosition === "left" ? -(root.panelSize - root.revealSliver) : 0
+      right: root.parked && root.panelPosition === "right" ? -(root.panelSize - root.revealSliver) : 0
+    }
+
+    implicitWidth: root.vertical ? root.panelSize : 0
+    implicitHeight: root.vertical ? 0 : root.panelSize
+
     Rectangle {
-      id: card
+      id: surface
       anchors.fill: parent
       color: root.background
-      radius: root.cornerRadius
-      border.color: root.border
+      border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.14)
       border.width: 1
 
-      Column {
+      MouseArea {
+        id: panelArea
         anchors.fill: parent
-        anchors.margins: Style.space(8)
-        spacing: Style.space(4)
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        onEntered: { hideDelay.stop(); root.hovered = true }
+        onExited: hideDelay.restart()
+      }
 
-        Item {
-          id: header
-          width: parent.width
-          height: Style.space(30)
-
-          Text {
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.count + " minimized"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            font.weight: Font.Medium
+      Item {
+        id: keyCatcher
+        anchors.fill: parent
+        focus: root.selectedIndex >= 0
+        Keys.onPressed: function(event) {
+          if (event.key === Qt.Key_Escape) { root.dismiss(); event.accepted = true; return }
+          if (event.key === Qt.Key_Down || event.key === Qt.Key_Right || event.key === Qt.Key_J) { root.move(1); event.accepted = true }
+          else if (event.key === Qt.Key_Up || event.key === Qt.Key_Left || event.key === Qt.Key_K) { root.move(-1); event.accepted = true }
+          else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (root.selectedIndex >= 0 && root.selectedIndex < root.count)
+              root.restoreRow(root.rows[root.selectedIndex], event.modifiers & Qt.ShiftModifier)
+            event.accepted = true
           }
-          PillButton {
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            label: "Restore all"
-            onActivated: root.restoreAll()
-          }
+          else if (event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier)) { root.restoreAll(); event.accepted = true }
         }
+      }
 
-        Text {
-          width: parent.width
-          visible: root.notice !== ""
-          text: root.notice
-          color: root.muted
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          wrapMode: Text.WordWrap
-        }
+      // "Restore all" sits at the far end of the strip, out of the button run.
+      RestoreAllButton {
+        id: allButton
+        visible: root.count > 1
+        horizontal: root.vertical
+        anchors.right: root.vertical ? undefined : parent.right
+        anchors.bottom: root.vertical ? parent.bottom : undefined
+        anchors.rightMargin: root.vertical ? 0 : 6
+        anchors.bottomMargin: root.vertical ? 6 : 0
+        onActivated: root.restoreAll()
+      }
 
-        ListView {
-          id: list
-          width: parent.width
-          height: parent.height - header.height - (root.notice !== "" ? Style.space(18) : 0) - Style.space(4)
-          clip: true
-          model: root.rows
-          currentIndex: root.selectedIndex
+      ListView {
+        id: list
+        orientation: root.vertical ? ListView.Vertical : ListView.Horizontal
+        anchors.fill: parent
+        anchors.margins: 5
+        anchors.rightMargin: (!root.vertical && allButton.visible) ? allButton.width + 12 : 5
+        anchors.bottomMargin: (root.vertical && allButton.visible) ? allButton.height + 12 : 5
+        spacing: 4
+        clip: true
+        model: root.rows
+        currentIndex: root.selectedIndex
 
-          delegate: Rectangle {
-            id: row
-            required property var modelData
-            required property int index
-            width: list.width
-            height: root.rowHeight
-            radius: root.cornerRadius
-            color: index === root.selectedIndex || rowArea.containsMouse ? root.selectedBackground : "transparent"
-
-            MouseArea {
-              id: rowArea
-              anchors.fill: parent
-              hoverEnabled: true
-              acceptedButtons: Qt.LeftButton | Qt.RightButton
-              onEntered: root.selectedIndex = row.index
-              onClicked: function(m) { root.restoreRow(row.modelData, m.button === Qt.RightButton) }
-            }
-
-            Row {
-              anchors.fill: parent
-              anchors.leftMargin: Style.space(8)
-              anchors.rightMargin: Style.space(8)
-              spacing: Style.space(8)
-
-              Column {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - restorePill.width - Style.space(8)
-                spacing: 1
-                Text {
-                  width: parent.width
-                  text: row.modelData.label || row.modelData.title || row.modelData.class || "Window"
-                  elide: Text.ElideRight
-                  color: row.index === root.selectedIndex ? root.selectedText : root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
-                }
-                Text {
-                  width: parent.width
-                  text: (row.modelData.status === "failed" ? "Could not restore — try again · " : "") + (row.modelData.origin || "")
-                  elide: Text.ElideRight
-                  color: root.muted
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                }
-              }
-
-              PillButton {
-                id: restorePill
-                anchors.verticalCenter: parent.verticalCenter
-                label: row.modelData.status === "failed" ? "Retry" : "Restore"
-                onActivated: root.restoreRow(row.modelData, false)
-              }
-            }
-          }
+        delegate: TaskButton {
+          required property var modelData
+          required property int index
+          entry: modelData
+          selected: index === root.selectedIndex
+          horizontal: root.vertical
+          length: root.buttonLength
+          thickness: root.panelSize - 10
+          onActivated: function(original) { root.restoreRow(modelData, original) }
+          onHovered: root.selectedIndex = index
         }
       }
     }
@@ -252,29 +211,132 @@ Item {
 
   // ------------------------------------------------------------ components
 
-  component PillButton: Rectangle {
-    id: pill
-    property string label: ""
-    signal activated()
-    width: pillText.implicitWidth + Style.space(14)
-    height: Style.space(22)
-    radius: root.cornerRadius
-    color: pillArea.containsMouse ? root.selectedBackground : "transparent"
-    border.color: root.border
-    border.width: 1
-    Text {
-      id: pillText
-      anchors.centerIn: parent
-      text: pill.label
-      color: pillArea.containsMouse ? root.selectedText : root.foreground
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
+  // A taskbar button: app badge, elided title, origin line when there is room,
+  // and an urgent marker. Left click restores here, right click to the
+  // original workspace.
+  component TaskButton: Rectangle {
+    id: btn
+    property var entry: null
+    property bool selected: false
+    property bool horizontal: false
+    property real length: 184
+    property real thickness: 36
+
+    signal activated(bool original)
+    signal hovered()
+
+    readonly property bool failed: entry ? entry.status === "failed" : false
+    readonly property bool urgent: entry ? !!entry.urgent : false
+    readonly property string title: entry ? String(entry.label || entry.title || entry.class || "Window") : "Window"
+    readonly property string where: entry ? String(entry.origin || "") : ""
+    readonly property string badge: {
+      var c = entry ? String(entry.class || entry.title || "?") : "?"
+      return c.length ? c.charAt(0).toUpperCase() : "?"
     }
+
+    width: btn.horizontal ? btn.length : (btn.parent ? btn.parent.width : 0)
+    height: btn.horizontal ? (btn.parent ? btn.parent.height : 0) : btn.thickness
+    radius: root.radius
+    color: btn.selected ? root.activeFill : (btnArea.containsMouse ? root.hoverFill : "transparent")
+
+    Behavior on color { ColorAnimation { duration: 110 } }
+
     MouseArea {
-      id: pillArea
+      id: btnArea
       anchors.fill: parent
       hoverEnabled: true
-      onClicked: function(m) { m.accepted = true; pill.activated() }
+      acceptedButtons: Qt.LeftButton | Qt.RightButton
+      onEntered: btn.hovered()
+      onClicked: function(m) { btn.activated(m.button === Qt.RightButton) }
+    }
+
+    Row {
+      anchors.fill: parent
+      anchors.leftMargin: 7
+      anchors.rightMargin: 7
+      spacing: 7
+
+      // App badge: the class initial in a tinted tile, standing in for an icon.
+      Rectangle {
+        anchors.verticalCenter: parent.verticalCenter
+        width: 20
+        height: 20
+        radius: 5
+        color: (btn.urgent || btn.failed) ? root.urgent : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18)
+        Text {
+          anchors.centerIn: parent
+          text: btn.badge
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: 11
+          font.weight: Font.DemiBold
+        }
+      }
+
+      Column {
+        anchors.verticalCenter: parent.verticalCenter
+        width: parent.width - 20 - 7
+        spacing: 0
+
+        Text {
+          width: parent.width
+          text: btn.title
+          elide: Text.ElideRight
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: 12
+        }
+        Text {
+          width: parent.width
+          visible: btn.where !== "" && !btn.horizontal
+          text: btn.failed ? "Could not restore — click to retry" : btn.where
+          elide: Text.ElideRight
+          color: root.muted
+          font.family: root.fontFamily
+          font.pixelSize: 10
+        }
+      }
+    }
+  }
+
+  // The "restore every minimized window" affordance at the strip's end.
+  component RestoreAllButton: Rectangle {
+    id: all
+    property bool horizontal: false
+    signal activated()
+
+    width: all.horizontal ? (allText.implicitWidth + 34) : (all.parent ? all.parent.width - 10 : 0)
+    height: all.horizontal ? (all.parent ? all.parent.height - 10 : 26) : 26
+    radius: root.radius
+    color: allArea.containsMouse ? root.hoverFill : "transparent"
+    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
+    border.width: 1
+
+    Row {
+      anchors.centerIn: parent
+      spacing: 6
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: "⤢"
+        color: root.muted
+        font.family: root.fontFamily
+        font.pixelSize: 11
+      }
+      Text {
+        id: allText
+        anchors.verticalCenter: parent.verticalCenter
+        text: "Restore all"
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: 11
+      }
+    }
+
+    MouseArea {
+      id: allArea
+      anchors.fill: parent
+      hoverEnabled: true
+      onClicked: function(m) { m.accepted = true; all.activated() }
     }
   }
 }

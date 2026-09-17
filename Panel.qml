@@ -556,6 +556,20 @@ Item {
           onChosen: function(i) { if (service) service.saveSettings({ sidePanel: i === 0 }) }
         }
         SettingRow {
+          label: "Panel position"
+          hint: "Which screen edge the minimized-window strip sits on"
+          options: ["Bottom", "Left", "Right"]
+          current: root.settings.panelPosition === "left" ? 1 : (root.settings.panelPosition === "right" ? 2 : 0)
+          onChosen: function(i) { if (service) service.saveSettings({ panelPosition: i === 0 ? "bottom" : (i === 1 ? "left" : "right") }) }
+        }
+        SettingRow {
+          label: "Panel auto-hide"
+          hint: "Parked off the edge until the pointer reaches it"
+          options: ["On", "Off"]
+          current: root.settings.panelAutoHide ? 0 : 1
+          onChosen: function(i) { if (service) service.saveSettings({ panelAutoHide: i === 0 }) }
+        }
+        SettingRow {
           label: "Control size"
           hint: "Standard 34 px strip · Large 46 px strip, applied immediately"
           options: ["Standard", "Large"]

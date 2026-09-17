@@ -493,7 +493,9 @@ function normalizeSettings(raw) {
     tabGroups: BOOL_OPTIONS[r.tabGroups] || false,
     // On by default: the side panel is the Windows-style restore UI. Anything
     // other than an explicit off value keeps it enabled.
-    sidePanel: (r.sidePanel === false || r.sidePanel === "0" || r.sidePanel === "off" || r.sidePanel === "false") ? false : true
+    sidePanel: (r.sidePanel === false || r.sidePanel === "0" || r.sidePanel === "off" || r.sidePanel === "false") ? false : true,
+    panelPosition: (r.panelPosition === "left" || r.panelPosition === "right" || r.panelPosition === "bottom") ? r.panelPosition : "bottom",
+    panelAutoHide: (r.panelAutoHide === false || r.panelAutoHide === "0" || r.panelAutoHide === "off" || r.panelAutoHide === "false") ? false : true
   }
 }
 
