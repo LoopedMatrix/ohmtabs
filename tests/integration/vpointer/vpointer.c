@@ -3,11 +3,17 @@
 // Hyprland test session; never point it at the live desktop.
 //
 //   vpointer WIDTH HEIGHT cmd [cmd...]
-//   cmds: move X Y | down | up | click X Y | dblclick X Y | rclick X Y | mclick X Y
+//   cmds: cursor X Y | move X Y | down | up | click X Y | dblclick X Y | rclick X Y | mclick X Y
 //         drag X1 Y1 X2 Y2 [steps] | sleep MS
 //         drag X1 Y1 X2 Y2 [STEPS] | sleep MS
 //
 // Coordinates are absolute logical pixels of the target output.
+//
+// Hyprland 0.56 ignores zwlr_virtual_pointer_v1.motion_absolute (the cursor
+// never moves), so motion is injected as *relative* deltas from a position the
+// caller seeds with `cursor X Y` -- normally the output of `hyprctl cursorpos`.
+// Every gesture should start with a `cursor` command so the tracked position
+// cannot drift when the compositor clamps at an output edge.
 
 #include <linux/input-event-codes.h>
 #include <stdio.h>
@@ -24,6 +30,7 @@ static struct zwlr_virtual_pointer_manager_v1*  mgr  = NULL;
 static struct zwlr_virtual_pointer_v1*          ptr  = NULL;
 static struct wl_display*                       dpy  = NULL;
 static uint32_t                                 W = 0, H = 0;
+static double                                   curX = 0, curY = 0;
 
 static void onGlobal(void* d, struct wl_registry* r, uint32_t name, const char* iface, uint32_t ver) {
     (void)d;
@@ -58,7 +65,13 @@ static void moveTo(double x, double y) {
         x = 0;
     if (y < 0)
         y = 0;
-    zwlr_virtual_pointer_v1_motion_absolute(ptr, nowMs(), (uint32_t)x, (uint32_t)y, W, H);
+    if (x > (double)W - 1)
+        x = (double)W - 1;
+    if (y > (double)H - 1)
+        y = (double)H - 1;
+    zwlr_virtual_pointer_v1_motion(ptr, nowMs(), wl_fixed_from_double(x - curX), wl_fixed_from_double(y - curY));
+    curX = x;
+    curY = y;
     zwlr_virtual_pointer_v1_frame(ptr);
     settle(15);
 }
@@ -99,7 +112,11 @@ int main(int argc, char** argv) {
     int i = 3;
     while (i < argc) {
         const char* cmd = argv[i++];
-        if (!strcmp(cmd, "move") && i + 1 < argc) {
+        if (!strcmp(cmd, "cursor") && i + 1 < argc) {
+            curX = atof(argv[i]);
+            curY = atof(argv[i + 1]);
+            i += 2;
+        } else if (!strcmp(cmd, "move") && i + 1 < argc) {
             moveTo(atof(argv[i]), atof(argv[i + 1]));
             i += 2;
         } else if (!strcmp(cmd, "down")) {

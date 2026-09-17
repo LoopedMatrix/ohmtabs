@@ -21,6 +21,9 @@ g++ -std=c++20 -Wall -Wno-unused-parameter -I native/grabbar \
 bash tests/unit/run_tabs_test.sh
 python3 -m py_compile helpers/grabbar-journal helpers/grabbar_backend.py
 bash -n bin/grabbar tests/integration/*.sh
+# The virtual-pointer tool drives real drags in the nested scenarios; without it
+# those tests silently no-op'ed, so build it as part of the suite.
+bash tests/integration/vpointer/build.sh
 if command -v qmllint >/dev/null 2>&1; then
   # Host modules (qs.Commons, qs.Ui, Quickshell.*) are not resolvable offline;
   # only syntax-level problems are reported.
