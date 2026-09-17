@@ -490,7 +490,10 @@ function normalizeSettings(raw) {
     showOnHover: BOOL_OPTIONS[r.showOnHover] || false,
     controlSize: r.controlSize === "large" ? "large" : "standard",
     excludedClasses: classes,
-    tabGroups: BOOL_OPTIONS[r.tabGroups] || false
+    tabGroups: BOOL_OPTIONS[r.tabGroups] || false,
+    // On by default: the side panel is the Windows-style restore UI. Anything
+    // other than an explicit off value keeps it enabled.
+    sidePanel: (r.sidePanel === false || r.sidePanel === "0" || r.sidePanel === "off" || r.sidePanel === "false") ? false : true
   }
 }
 

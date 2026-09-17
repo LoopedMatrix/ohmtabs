@@ -229,8 +229,8 @@ test("originLabel and statusSummary", () => {
 
 test("normalizeSettings validates and bounds; readOwnEntry finds the plugin entry", () => {
   const s = M.normalizeSettings({ enabled: false, buttonsLeft: true, controlSize: "huge", excludedClasses: ["chromium", "bad class; rm", "chromium", 42] })
-  assert.deepStrictEqual(s, { enabled: false, buttonsLeft: true, controlSize: "standard", excludedClasses: ["chromium", "badclassrm", "42"] })
-  assert.deepStrictEqual(M.normalizeSettings(null), { enabled: true, buttonsLeft: false, controlSize: "standard", excludedClasses: [] })
+  assert.deepStrictEqual(s, { enabled: false, buttonsLeft: true, showOnHover: false, controlSize: "standard", excludedClasses: ["chromium", "badclassrm", "42"], tabGroups: false, sidePanel: true })
+  assert.deepStrictEqual(M.normalizeSettings(null), { enabled: true, buttonsLeft: false, showOnHover: false, controlSize: "standard", excludedClasses: [], tabGroups: false, sidePanel: true })
   const doc = JSON.stringify({ bar: { layout: { left: [{ id: "x" }], right: [{ id: "tech.greyforge.grabbar", controlSize: "large", excludedClasses: ["foot"] }] } } })
   assert.deepStrictEqual(M.readOwnEntry(doc, "tech.greyforge.grabbar"), { controlSize: "large", excludedClasses: ["foot"] })
   assert.strictEqual(M.readOwnEntry(doc, "nope"), null)

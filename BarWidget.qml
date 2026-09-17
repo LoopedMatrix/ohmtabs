@@ -23,6 +23,8 @@ BarWidget {
   readonly property int count: service ? Number(service.minimizedCount || 0) : 0
   readonly property bool attention: !!(service && service.attention)
   readonly property string attentionReason: service ? String(service.attentionReason || "") : ""
+  readonly property var settings: (service && service.settings) ? service.settings : null
+  readonly property bool sidePanelEnabled: settings ? settings.sidePanel !== false : false
   readonly property string glyph: String.fromCodePoint(0xF05B2)   // nf-md-window_restore: a window stack
   property bool pulse: false
 
@@ -111,8 +113,20 @@ BarWidget {
       onPressed: function(button) {
         if (button === Qt.RightButton) { root.openSettings(); return }
         if (button === Qt.MiddleButton) { if (root.service && root.count > 0) root.service.restoreAll(); return }
+        // With the Windows-style side panel on, the widget toggles it; the
+        // drawer stays the fallback so the restore entry point never vanishes.
+        if (root.sidePanelEnabled) { sidePanel.toggle(); return }
         root.openDrawer()
       }
     }
+  }
+
+  // The minimized-window side panel. It registers itself as a restore host,
+  // so mounting it here is what lets the service declare restore access.
+  SidePanel {
+    id: sidePanel
+    shell: root.bar ? root.bar.shell : null
+    service: root.service
+    autoOpen: root.sidePanelEnabled
   }
 }

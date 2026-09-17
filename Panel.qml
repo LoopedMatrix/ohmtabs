@@ -549,6 +549,13 @@ Item {
           onChosen: function(i) { if (service) service.saveSettings({ showOnHover: i === 1 }) }
         }
         SettingRow {
+          label: "Minimized windows"
+          hint: "Side panel: a Windows-style bar on the left, shown when a window is minimized"
+          options: ["Side panel", "Drawer"]
+          current: root.settings.sidePanel ? 0 : 1
+          onChosen: function(i) { if (service) service.saveSettings({ sidePanel: i === 0 }) }
+        }
+        SettingRow {
           label: "Control size"
           hint: "Standard 34 px strip · Large 46 px strip, applied immediately"
           options: ["Standard", "Large"]
