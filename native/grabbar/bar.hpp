@@ -108,6 +108,7 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     void                       handleUpEvent(Event::SCallbackInfo& info);
     void                       startDrag();
     void                       endDrag();
+    void                       snapToZone();
     void                       activate(eGrabbarButton b, const std::string& token);
     void                       renderTitle(const Vector2D& bufferSize, float scale, int maxWidth);
     SP<Render::ITexture>       glyph(eGrabbarButton b, bool maximized, int size, const CHyprColor& color);

@@ -40,7 +40,7 @@ struct SGlobalState {
     struct {
         SP<Config::Values::CColorValue>  barColor, inactiveBarColor, textColor, hoverColor, closeHoverColor;
         SP<Config::Values::CIntValue>    barHeight, textSize, buttonSize, padding, shellGraceMs;
-        SP<Config::Values::CBoolValue>   enabled, buttonsLeft, showOnHover;
+        SP<Config::Values::CBoolValue>   enabled, buttonsLeft, showOnHover, snapLock;
         SP<Config::Values::CStringValue> textFont;
     } config;
 
