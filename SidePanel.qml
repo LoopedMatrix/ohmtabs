@@ -36,6 +36,7 @@ Item {
   property bool panelEnabled: true
   property string panelPosition: "bottom"    // "left" | "right" | "bottom"
   property bool panelAutoHide: true
+  property bool panelIcons: true       // draw resolved app icons; off -> letter tile
 
   // ---- state ----
   property bool hovered: false
@@ -96,6 +97,56 @@ Item {
   readonly property int radius: Style.cornerRadius
   readonly property string fontFamily: Style.font.menuFamily
   readonly property int buttonLength: vertical ? root.panelSize : 184
+
+  // ------------------------------------------------- app-icon resolution
+  //
+  // The minimized-window buttons show the app's real icon (Windows-taskbar
+  // style) instead of a class-initial tile. Resolution ladder, in order:
+  //   1. resolved theme icon  — DesktopEntries.heuristicLookup(class), then
+  //      Quickshell.iconPath(entry.icon, true). heuristicLookup matches by
+  //      desktop-entry id OR StartupWMClass, so a window class that differs
+  //      from the entry id still resolves (org.gnome.Nautilus vs nautilus,
+  //      brave-browser, flatpak ids with dots) — the same lookup Omarchy's
+  //      own AppLibrary / NotificationCard rely on.
+  //   2. generic executable    — Quickshell.iconPath("application-x-executable", true).
+  //   3. ""                    — the caller keeps the existing letter tile.
+  // iconPath's `check=true` returns "" for unknown names instead of Qt's
+  // missing-texture placeholder.
+  readonly property int iconSize: 20        // logical px, inside the 26px tile
+  readonly property int flyoutIconSize: 16  // per-window flyout row icon
+
+  // Monitors here are 1.25x (DP-1) and 1x (DP-2). sourceSize is handed to the
+  // icon provider as its requestedSize, so raster icons are fetched at the
+  // panel's device pixel ratio and stay crisp on the hidpi monitor; SVG theme
+  // icons rasterize at the requested size too, so the same multiplier keeps
+  // them crisp at any scale.
+  readonly property real iconDpr: {
+    var d = 0
+    try { d = Screen.devicePixelRatio } catch (e) {}
+    return d > 1 ? d : 1
+  }
+
+  // class string -> resolved icon source ("" = nothing resolved). Resolved
+  // ONCE per class and cached in this JS map: the row list re-evaluates as
+  // windows minimize/restore, DesktopEntries can reorder its values when an
+  // app starts (Omarchy's Menu.qml guards against the same reorder), and
+  // re-resolving per frame would be wasteful. Empty results are cached too so
+  // unknown classes are not re-probed on every re-evaluation. (The scan runs
+  // at shell startup, so by the time a window is minimized it is populated.)
+  property var iconCache: ({})
+
+  function resolveIcon(cls) {
+    var key = String(cls || "")
+    if (key === "") return ""
+    var cached = root.iconCache[key]
+    if (cached !== undefined) return cached
+    var path = ""
+    var entry = DesktopEntries.heuristicLookup(key)
+    if (entry && entry.icon) path = Quickshell.iconPath(String(entry.icon), true)
+    if (path === "") path = Quickshell.iconPath("application-x-executable", true)
+    root.iconCache[key] = path
+    return path
+  }
 
   // ------------------------------------------------------------- behaviour
 
@@ -450,6 +501,13 @@ Item {
       var c = btn.first ? String(btn.first.class || btn.first.title || "?") : "?"
       return c.length ? c.charAt(0).toUpperCase() : "?"
     }
+    // Resolved app icon for this button's representative window — the group's
+    // first member, so a grouped button shows one icon exactly like a grouped
+    // Windows taskbar button (the count chip still rides the corner). "" when
+    // icons are disabled or nothing resolves -> the letter tile shows instead.
+    readonly property string iconSource: root.panelIcons
+      ? root.resolveIcon(btn.first ? String(btn.first.class || "") : "")
+      : ""
 
     width: btn.horizontal ? btn.length : (btn.parent ? btn.parent.width : 0)
     height: btn.horizontal ? (btn.parent ? btn.parent.height : 0) : btn.thickness
@@ -491,9 +549,10 @@ Item {
       anchors.rightMargin: 8
       spacing: 8
 
-      // App tile: the class initial in a rounded tile, standing in for an
-      // icon. A second sliver peeks out behind it and a count chip rides its
-      // corner when the button is a group.
+      // App tile: the app's real icon (Windows-taskbar style), with the
+      // class-initial letter as the fallback when no icon resolves. A second
+      // sliver peeks out behind it and a count chip rides its corner when the
+      // button is a group.
       Item {
         id: tileBox
         anchors.verticalCenter: parent.verticalCenter
@@ -505,8 +564,21 @@ Item {
           anchors.fill: parent
           radius: 7
           color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
+          Image {
+            id: tileIcon
+            anchors.centerIn: parent
+            width: root.iconSize
+            height: root.iconSize
+            sourceSize.width: Math.round(root.iconSize * root.iconDpr)
+            sourceSize.height: Math.round(root.iconSize * root.iconDpr)
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            visible: btn.iconSource !== ""
+            source: btn.iconSource
+          }
           Text {
             anchors.centerIn: parent
+            visible: btn.iconSource === ""
             text: btn.badge
             color: root.foreground
             font.family: root.fontFamily
@@ -597,6 +669,14 @@ Item {
     required property int index
     property var entry: modelData
     readonly property bool failed: frow.entry ? frow.entry.status === "failed" : false
+    readonly property string badge: {
+      var c = frow.entry ? String(frow.entry.class || frow.entry.title || "?") : "?"
+      return c.length ? c.charAt(0).toUpperCase() : "?"
+    }
+    // Same resolve-and-cache ladder as the button; "" -> the letter tile.
+    readonly property string iconSource: root.panelIcons
+      ? root.resolveIcon(frow.entry ? String(frow.entry.class || "") : "")
+      : ""
 
     width: 248
     height: 40
@@ -604,11 +684,45 @@ Item {
     color: frowArea.containsMouse ? root.hoverFill : "transparent"
     Behavior on color { ColorAnimation { duration: 90 } }
 
-    Column {
+    // 16px app icon for the window, letter tile as fallback.
+    Item {
+      id: rowIconBox
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
-      anchors.right: parent.right
       anchors.leftMargin: 10
+      width: 16
+      height: 16
+      Image {
+        id: rowIcon
+        anchors.fill: parent
+        sourceSize.width: Math.round(root.flyoutIconSize * root.iconDpr)
+        sourceSize.height: Math.round(root.flyoutIconSize * root.iconDpr)
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        visible: frow.iconSource !== ""
+        source: frow.iconSource
+      }
+      Rectangle {
+        anchors.fill: parent
+        radius: 4
+        color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
+        visible: frow.iconSource === ""
+        Text {
+          anchors.centerIn: parent
+          text: frow.badge
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: 9
+          font.weight: Font.DemiBold
+        }
+      }
+    }
+
+    Column {
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: rowIconBox.right
+      anchors.right: parent.right
+      anchors.leftMargin: 8
       anchors.rightMargin: 10
       spacing: 1
 
