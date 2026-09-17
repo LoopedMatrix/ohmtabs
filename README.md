@@ -126,7 +126,17 @@ Settings live in the plugin's `shell.json` entry (edit through **Settings**, or 
 | `sidePanel` | bool | `true` | Windows-style taskbar (`true`) vs the in-bar drawer only (`false`). |
 | `panelPosition` | `"bottom"` \| `"left"` \| `"right"` | `"bottom"` | Screen edge the taskbar sits on. |
 | `panelAutoHide` | bool | `true` | Park the taskbar off the edge until the pointer reaches it. |
-| `tabGroups` | bool | `false` | *Reserved* — tab groups are in development (see [Roadmap](#roadmap)). |
+| `tabGroups` | bool | `false` | If `true`, the bar accepts window-tab grouping: dropping one window onto another hosts a tab group, alt-tab cycles within the group's tabs while the pointer is over them (and otherwise falls through), and closing a group with more than one window asks before closing all of them. The tab strip itself is drawn by the native backend on the host window's title strip; the shell side is the IPC + the close-all confirm prompt. |
+
+### Tab groups
+
+When `tabGroups: true` is set on the bar's layout entry:
+
+- **Dropping a window onto another** makes the target the *host* and turns the dragged window into a tab in the host's group. The host's native title strip gains the tab strip (drawn natively). The shell keeps the group state and the list of tab titles; the visual strip is the backend's.
+- **Alt-tab behavior** changes while the pointer is over the host's tab strip: alt-tab cycles within the group's tabs instead of the global cycle. Once the pointer leaves the tab area, alt-tab falls back to the normal global alt-tab. This is a shell-side decision communicated to the backend; the backend honors it when the pointer is over the tab strip.
+- **Closing a group** with more than one window triggers a confirm prompt: "are you sure you want to close all N windows?" with the tab titles listed, like a browser. Yes closes all the group's windows; Cancel/Escape dismisses the prompt with no action. There is no focus steal from the rest of the shell for the prompt.
+- The `tabGroups` setting is off by default. Until it is turned on explicitly in the bar's layout entry, the tab verbs are not wired and nothing about the panel changes.
+- The close-all prompt is a theme-matched popup built on the shell's `PopupCard` UI component, so it inherits the user's theme rather than being a separate-styled card. It lists the tab titles and offers **Cancel** and **Close all**; Escape dismisses it with no action.
 
 Unknown keys are ignored; invalid values fall back to the default. Values are validated in [`GrabbarModel.js`](GrabbarModel.js) (`normalizeSettings`).
 
@@ -247,7 +257,6 @@ Omarchy creates one bar per monitor, and the taskbar panel doesn't bind a screen
 ## Roadmap (in development)
 
 - **Windows-style snap-lock** — dragging a window to a screen edge snaps it into a tiled/locked position (native).
-- **Browser-like tab groups** — dropping a window onto another makes the target the *host* and adds a tab strip to its bar; alt-tab cycles within the tabs while the pointer is over those windows and otherwise falls through to normal alt-tab; closing a group asks "are you sure you want to close all the windows?" like a browser, with a future tab-save feature. (`tabGroups` is the reserved setting.)
 - **Live verification harness** — `tests/integration/live-verify.sh` to run the qualification checks against the real desktop.
 
 ## Documentation
@@ -259,6 +268,7 @@ Omarchy creates one bar per monitor, and the taskbar panel doesn't bind a screen
 - [docs/QUALIFICATION.md](docs/QUALIFICATION.md) — the test suite and nested rig
 - [docs/AUTOLOAD.md](docs/AUTOLOAD.md) — autoload and the recovery journal
 - [docs/UPSTREAM.md](docs/UPSTREAM.md) — lineage and upstream differences
+- [docs/USAGE.md](docs/USAGE.md) — usage and configuration
 - [docs/RELEASE-SAFETY.md](docs/RELEASE-SAFETY.md) — release checklist
 - [CHANGELOG.md](CHANGELOG.md) — version history
 - [CONTRIBUTING.md](CONTRIBUTING.md) / [SECURITY.md](SECURITY.md)
