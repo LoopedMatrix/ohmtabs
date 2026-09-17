@@ -21,6 +21,7 @@
 #include <hyprland/src/helpers/signal/Signal.hpp>
 
 #include "globals.hpp"
+#include "snapfx.hpp"
 
 #define private public
 #include <hyprland/src/managers/input/InputManager.hpp>
@@ -65,6 +66,10 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     void                               renderPass(PHLMONITOR, float const& a);
     CBox                               assignedBoxGlobal();
 
+    bool                               isDragging() const { return m_dragging; }
+    SnapFx::State&                     snapFx() { return m_snapFx; }
+    const SnapFx::State&               snapFx() const { return m_snapFx; }
+
     WP<CGrabbarDeco>                   m_self;
 
   private:
@@ -92,6 +97,9 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     bool                       m_dragging     = false;
     bool                       m_cancelledDown = false;
 
+    SnapFx::State              m_snapFx;            // snap glow/flash state machine
+    Time::steady_tp            m_snapFxLastTick = Time::steadyNow();
+
     PHLANIMVAR<CHyprColor>     m_realBarColor;
 
     CHyprSignalListener        m_mouseButtonCallback;
@@ -108,10 +116,19 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     void                       handleUpEvent(Event::SCallbackInfo& info);
     void                       startDrag();
     void                       endDrag();
-    void                       snapToZone();
+    bool                       snapToZone();
+    void                       updateSnapPreview();
+    void                       snapFxTick();
     void                       activate(eGrabbarButton b, const std::string& token);
     void                       renderTitle(const Vector2D& bufferSize, float scale, int maxWidth);
     SP<Render::ITexture>       glyph(eGrabbarButton b, bool maximized, int size, const CHyprColor& color);
 
     friend class CGrabbarPassElement;
 };
+
+// Compositor glue for the snap effect (defined in snapfx.cpp).
+namespace SnapFx {
+    CHyprColor glowColor(PHLWINDOW w);
+    CHyprColor blendFrameColor(const CHyprColor& base, const CHyprColor& accent, double intensity);
+    std::string statusJson();
+}

@@ -1098,6 +1098,11 @@ void CGrabbarBackend::handleLine(SGrabbarClient* c, const std::string& line) {
         return;
     }
 
+    if (type == "snap.status") {
+        send(c, "snapStatus", {{"json", SnapFx::statusJson()}});
+        return;
+    }
+
     if (type == "snapshot") {
         for (const auto& [_, t] : m_windows)
             sendWindow(c, t, "snapshot");
@@ -1232,6 +1237,7 @@ void CGrabbarBackend::applyTheme(const Fields& f) {
     set("textColor", t.textColor);
     set("hoverColor", t.hoverColor);
     set("closeHoverColor", t.closeHoverColor);
+    set("snapGlowColor", t.snapGlowColor);
     if (const auto FONT = field(f, "textFont"); !FONT.empty())
         t.textFont = FONT == "reset" ? std::optional<std::string>{} : std::optional<std::string>{FONT.substr(0, 64)};
     g_pGlobalState->glyphCache.clear();

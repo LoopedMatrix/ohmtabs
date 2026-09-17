@@ -13,7 +13,7 @@ CXXFLAGS += -shared -fPIC -std=c++2b -Wno-c++11-narrowing -Wall -Wno-unused-para
 INCLUDES = `pkg-config --cflags pixman-1 libdrm hyprland libinput libudev wayland-server xkbcommon`
 LIBS =
 
-SRC = main.cpp backend.cpp bar.cpp pass.cpp
+SRC = main.cpp backend.cpp bar.cpp pass.cpp snapfx.cpp
 TARGET = grabbar.so
 
 all: $(TARGET)

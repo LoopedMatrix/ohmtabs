@@ -38,9 +38,9 @@ struct SGlobalState {
     uint32_t                      nobarRuleIdx = 0;
 
     struct {
-        SP<Config::Values::CColorValue>  barColor, inactiveBarColor, textColor, hoverColor, closeHoverColor;
-        SP<Config::Values::CIntValue>    barHeight, textSize, buttonSize, padding, shellGraceMs;
-        SP<Config::Values::CBoolValue>   enabled, buttonsLeft, showOnHover, snapLock;
+        SP<Config::Values::CColorValue>  barColor, inactiveBarColor, textColor, hoverColor, closeHoverColor, snapGlowColor;
+        SP<Config::Values::CIntValue>    barHeight, textSize, buttonSize, padding, shellGraceMs, snapGlowMs;
+        SP<Config::Values::CBoolValue>   enabled, buttonsLeft, showOnHover, snapLock, snapGlow, snapPreview;
         SP<Config::Values::CStringValue> textFont;
     } config;
 
@@ -48,7 +48,7 @@ struct SGlobalState {
     // They take precedence over the config values above while set, so the
     // strip follows the desktop theme without edits to hyprland.lua.
     struct {
-        std::optional<uint64_t>  barColor, inactiveBarColor, textColor, hoverColor, closeHoverColor;
+        std::optional<uint64_t>  barColor, inactiveBarColor, textColor, hoverColor, closeHoverColor, snapGlowColor;
         std::optional<std::string> textFont;
         std::optional<bool>      buttonsLeft, showOnHover;
         std::optional<int>       barHeight, buttonSize;

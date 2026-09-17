@@ -1,4 +1,5 @@
 #include "bar.hpp"
+#include "snapfx.hpp"
 
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/desktop/state/FocusState.hpp>
@@ -394,7 +395,12 @@ void CGrabbarDeco::handleUpEvent(Event::SCallbackInfo& info) {
 
     if (m_dragging) {
         endDrag();
-        snapToZone();
+        m_snapFx.glowEnabled = g_pGlobalState->config.snapGlow->value();
+        if (snapToZone())
+            m_snapFx.flash(std::clamp<int>(g_pGlobalState->config.snapGlowMs->value(), 0, 5000));
+        m_snapFx.setZone(SnapFx::ZoneResult{}); // clear the drag preview glow
+        m_snapFxLastTick = Time::steadyNow();
+        damageEntire();
     }
 
     m_dragPending = false;
@@ -414,7 +420,12 @@ void CGrabbarDeco::onMouseMove(Vector2D coords) {
         damageEntire();
     }
 
-    if (!m_dragPending || m_dragging)
+    if (m_dragging) {
+        updateSnapPreview();
+        return;
+    }
+
+    if (!m_dragPending)
         return;
 
     static auto PDRAGTHRESHOLD = CConfigValue<Config::INTEGER>("binds:drag_threshold");
@@ -508,17 +519,76 @@ void CGrabbarDeco::endDrag() {
 // snapped window is ordinary floating geometry, so the next drag is a plain
 // move again: releasing away from an edge leaves the window where it was
 // dropped, which is how a snap is undone.
-void CGrabbarDeco::snapToZone() {
+bool CGrabbarDeco::snapToZone() {
     if (!g_pGlobalState->config.snapLock->value())
-        return;
+        return false;
+
+    const auto PWINDOW = m_window.lock();
+    if (!validMapped(PWINDOW) || !PWINDOW->m_isFloating)
+        return false;
+
+    // A tiled window was detached when the drag started (startDrag), so by
+    // the time a drag ends it is floating; if it is not, the drag never
+    // really moved and there is nothing to snap.
+    auto MON = PWINDOW->m_monitor.lock();
+    if (!MON)
+        MON = Desktop::focusState()->monitor();
+    if (!MON)
+        return false;
+
+    const CBox FRAME = MON->logicalBox();
+    CBox       AREA  = MON->logicalBoxMinusReserved();
+    if (AREA.w <= 0 || AREA.h <= 0)
+        AREA = FRAME;
+
+    const auto P = g_pInputManager->getMouseCoordsInternal();
+
+    // Zone decision shared with the drag preview (updateSnapPreview) so the
+    // preview and the release-time snap can never disagree about where the
+    // pointer would land.
+    const auto R = SnapFx::decideZone(P.x, P.y, {FRAME.x, FRAME.y, FRAME.w, FRAME.h}, {AREA.x, AREA.y, AREA.w, AREA.h});
+
+    switch (R.zone) {
+        case SnapFx::Zone::CornerTL:
+        case SnapFx::Zone::CornerTR:
+        case SnapFx::Zone::CornerBL:
+        case SnapFx::Zone::CornerBR: {
+            const CBox target = {R.target.x, R.target.y, R.target.w, R.target.h};
+            (void)Config::Actions::resize(target.size(), false, PWINDOW);
+            (void)Config::Actions::move(target.pos(), false, PWINDOW);
+            return true;
+        }
+        case SnapFx::Zone::Left:
+        case SnapFx::Zone::Right: {
+            const CBox target = {R.target.x, R.target.y, R.target.w, R.target.h};
+            (void)Config::Actions::resize(target.size(), false, PWINDOW);
+            (void)Config::Actions::move(target.pos(), false, PWINDOW);
+            return true;
+        }
+        case SnapFx::Zone::Top: {
+            // Top edge means maximize: same typed call as the Maximize button and
+            // the title double-click, so it shares their validation and reporting.
+            std::string err;
+            g_pBackend->setMaximized(m_pressToken, true, err);
+            return true;
+        }
+        default:
+            // A bottom edge alone does nothing: the window stays where it was dropped.
+            return false;
+    }
+}
+
+// While a drag is in progress, track the snap zone under the pointer and drive
+// the frame-edge glow. Uses the same decideZone() as snapToZone(), so the
+// preview and the release-time snap can never disagree.
+void CGrabbarDeco::updateSnapPreview() {
+    m_snapFx.glowEnabled    = g_pGlobalState->config.snapGlow->value();
+    m_snapFx.previewEnabled = g_pGlobalState->config.snapPreview->value();
 
     const auto PWINDOW = m_window.lock();
     if (!validMapped(PWINDOW) || !PWINDOW->m_isFloating)
         return;
 
-    // A tiled window was detached when the drag started (startDrag), so by
-    // the time a drag ends it is floating; if it is not, the drag never
-    // really moved and there is nothing to snap.
     auto MON = PWINDOW->m_monitor.lock();
     if (!MON)
         MON = Desktop::focusState()->monitor();
@@ -531,63 +601,22 @@ void CGrabbarDeco::snapToZone() {
         AREA = FRAME;
 
     const auto P = g_pInputManager->getMouseCoordsInternal();
+    const auto R = SnapFx::decideZone(P.x, P.y, {FRAME.x, FRAME.y, FRAME.w, FRAME.h}, {AREA.x, AREA.y, AREA.w, AREA.h});
 
-    // Trigger thresholds in logical pixels. An edge zone is narrow so a
-    // window released just short of the edge still lands where the pointer
-    // is; a corner is the intersection of two such zones. Corners are tested
-    // first, so a corner drag yields a quarter tile rather than the top
-    // edge's maximize or a half.
-    constexpr double EDGE = 24.0;
-
-    const bool nearLeft   = P.x - FRAME.x <= EDGE;
-    const bool nearRight  = (FRAME.x + FRAME.w) - P.x <= EDGE;
-    const bool nearTop    = P.y - FRAME.y <= EDGE;
-    const bool nearBottom = (FRAME.y + FRAME.h) - P.y <= EDGE;
-
-    const bool cornerTL = nearTop && nearLeft;
-    const bool cornerTR = nearTop && nearRight;
-    const bool cornerBL = nearBottom && nearLeft;
-    const bool cornerBR = nearBottom && nearRight;
-
-    if (cornerTL || cornerTR || cornerBL || cornerBR) {
-        CBox target = AREA;
-        target.w /= 2.0;
-        target.h /= 2.0;
-        if (cornerTR || cornerBR)
-            target.x += target.w;
-        if (cornerBL || cornerBR)
-            target.y += target.h;
-        (void)Config::Actions::resize(target.size(), false, PWINDOW);
-        (void)Config::Actions::move(target.pos(), false, PWINDOW);
-        return;
+    if (R.zone != m_snapFx.zone()) {
+        m_snapFx.setZone(R);
+        m_snapFxLastTick = Time::steadyNow();
+        damageEntire();
     }
+}
 
-    if (nearLeft) {
-        CBox target = AREA;
-        target.w /= 2.0;
-        (void)Config::Actions::resize(target.size(), false, PWINDOW);
-        (void)Config::Actions::move(target.pos(), false, PWINDOW);
-        return;
-    }
-
-    if (nearRight) {
-        CBox target = AREA;
-        target.x += target.w / 2.0;
-        target.w /= 2.0;
-        (void)Config::Actions::resize(target.size(), false, PWINDOW);
-        (void)Config::Actions::move(target.pos(), false, PWINDOW);
-        return;
-    }
-
-    if (nearTop) {
-        // Top edge means maximize: same typed call as the Maximize button and
-        // the title double-click, so it shares their validation and reporting.
-        std::string err;
-        g_pBackend->setMaximized(m_pressToken, true, err);
-        return;
-    }
-
-    // A bottom edge alone does nothing: the window stays where it was dropped.
+// Advance the glow/flash animation from wall-clock elapsed time. Driven from
+// renderPass; the render loop keeps running while the state is animating.
+void CGrabbarDeco::snapFxTick() {
+    const auto   NOW = Time::steadyNow();
+    const double DT  = std::clamp(std::chrono::duration<double, std::milli>(NOW - m_snapFxLastTick).count(), 0.0, 100.0);
+    m_snapFxLastTick = NOW;
+    m_snapFx.tick(DT);
 }
 
 // `token` was captured at press and re-validated at release: the action
@@ -673,6 +702,17 @@ void CGrabbarDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
 
     CHyprColor color = m_realBarColor->value();
     color.a *= a;
+
+    // Snap effect: light the frame edge up in the theme accent while a drag is
+    // in a snap zone, and flash+decay on a successful snap. Blended here so the
+    // glow shares the strip's rounding/clipping and can never leak the frame.
+    m_snapFx.glowEnabled = g_pGlobalState->config.snapGlow->value();
+    snapFxTick();
+    if (const double k = m_snapFx.intensity(); k > 0.0) {
+        color = SnapFx::blendFrameColor(color, SnapFx::glowColor(PWINDOW), k);
+        if (m_snapFx.animating())
+            damageEntire();
+    }
 
     if (HEIGHT < 1) {
         m_lastHeight = HEIGHT;
