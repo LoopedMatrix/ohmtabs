@@ -160,6 +160,7 @@ function createState() {
   return {
     entries: [],      // minimized rows, newest first
     windows: {},      // token -> latest snapshot
+    groups: {},       // tab groups: host token -> { host, members[], active }
     sequence: 0,
     backend: { epoch: "", sessionId: "", connected: false, minimizeEnabled: false, suspended: true },
     restoreHost: false
@@ -170,6 +171,7 @@ function cloneState(state) {
   var next = createState()
   next.entries = (state.entries || []).map(function (e) { return Object.assign({}, e, { origin: Object.assign({}, e.origin || {}) }) })
   next.windows = Object.assign({}, state.windows || {})
+  next.groups = cloneGroups(state.groups || {})
   next.sequence = state.sequence || 0
   next.backend = Object.assign({}, state.backend || {})
   next.restoreHost = !!state.restoreHost
@@ -534,6 +536,210 @@ function statusSummary(state) {
   return { minimized: minimized, prepared: prepared, failed: failed, recovered: recovered, total: list.length }
 }
 
+// ---------------------------------------------------------- tab groups
+
+// A tab group is a host window plus the windows dropped onto it, rendered as
+// a tab strip on the host's bar. The host token is the group's key and is
+// always members[0]; `active` indexes the currently shown tab. A group is
+// only meaningful while it holds at least two windows (host + one or more
+// dropped windows), so it dissolves the moment it drops to a single window —
+// and removing the host always dissolves it, because the host owns the strip.
+
+// decision 2: alt-tab cycles inside a group only while the pointer is over the
+// host's tab strip; anywhere else the caller falls through to the compositor's
+// normal alt-tab. This sentinel can never collide with a real token.
+var TAB_CYCLE_FALLTHROUGH = "__fallthrough__"
+
+function cloneGroups(groups) {
+  var out = {}
+  var src = groups || {}
+  for (var k in src) {
+    var g = src[k]
+    if (!g || !g.host) continue
+    var members = Array.isArray(g.members) ? g.members : []
+    out[k] = { host: g.host, members: members.slice(), active: clampInt(g.active, 0, members.length - 1, 0) }
+  }
+  return out
+}
+
+function findGroupByHost(state, token) {
+  var groups = (state && state.groups) || {}
+  return groups[token] || null
+}
+
+// The group a token belongs to as either host or member, if any.
+function findGroupByMember(state, token) {
+  var groups = (state && state.groups) || {}
+  for (var k in groups) {
+    var g = groups[k]
+    if (g && g.members && g.members.indexOf(token) !== -1) return g
+  }
+  return null
+}
+
+function createGroup(state, hostToken) {
+  if (!isToken(hostToken)) return { state: state, ok: false, reason: "invalid" }
+  if (findGroupByHost(state, hostToken)) return { state: state, ok: false, reason: "duplicate" }
+  // A window that is already a tab elsewhere cannot own a strip of its own.
+  if (findGroupByMember(state, hostToken)) return { state: state, ok: false, reason: "grouped" }
+  var next = cloneState(state)
+  next.groups[hostToken] = { host: hostToken, members: [hostToken], active: 0 }
+  return { state: next, ok: true }
+}
+
+function removeGroup(state, hostToken) {
+  if (!isToken(hostToken)) return { state: state, ok: false, reason: "invalid" }
+  if (!findGroupByHost(state, hostToken)) return { state: state, ok: false, reason: "missing" }
+  var next = cloneState(state)
+  delete next.groups[hostToken]
+  return { state: next, ok: true }
+}
+
+function addMember(state, hostToken, memberToken) {
+  if (!isToken(hostToken) || !isToken(memberToken)) return { state: state, ok: false, reason: "invalid" }
+  if (hostToken === memberToken) return { state: state, ok: false, reason: "same" }
+  var memberGroup = findGroupByMember(state, memberToken)
+  // A window already in a strip cannot be dropped again; a host window is its
+  // own strip and cannot become someone else's tab.
+  if (memberGroup) return { state: state, ok: false, reason: memberGroup.host === memberToken ? "host" : "grouped" }
+  var hostGroup = findGroupByMember(state, hostToken)
+  if (hostGroup && hostGroup.host !== hostToken) return { state: state, ok: false, reason: "grouped" }
+
+  var next = cloneState(state)
+  var group = next.groups[hostToken]
+  if (!group) {
+    // decision 1: dropping a window onto a host with no group creates one,
+    // and the host's bar gains a strip.
+    group = { host: hostToken, members: [hostToken], active: 0 }
+    next.groups[hostToken] = group
+  }
+  group.members.push(memberToken)
+  return { state: next, ok: true }
+}
+
+// Removing the host dissolves the whole group; removing the last dropped
+// window dissolves it too, because a lone host is no longer a tab group.
+function removeMember(state, token) {
+  if (!isToken(token)) return { state: state, ok: false, reason: "invalid" }
+  var next = cloneState(state)
+  if (next.groups[token]) { delete next.groups[token]; return { state: next, ok: true } }
+
+  var hostToken = null, idx = -1
+  for (var k in next.groups) {
+    var g = next.groups[k]
+    idx = g.members.indexOf(token)
+    if (idx !== -1) { hostToken = k; break }
+  }
+  if (hostToken === null) return { state: state, ok: false, reason: "missing" }
+  var group = next.groups[hostToken]
+  group.members.splice(idx, 1)
+  if (group.members.length < 2) {
+    delete next.groups[hostToken]
+  } else {
+    if (group.active > idx) group.active -= 1
+    else if (group.active === idx) group.active = Math.min(idx, group.members.length - 1)
+    if (group.active >= group.members.length) group.active = group.members.length - 1
+  }
+  return { state: next, ok: true }
+}
+
+// Drag a tab from one strip to another. The source group may dissolve if the
+// tab was its only dropped window; a host window itself is never moved this
+// way (that is a remove, which dissolves the group).
+function moveMember(state, token, newHostToken) {
+  if (!isToken(token) || !isToken(newHostToken)) return { state: state, ok: false, reason: "invalid" }
+  if (token === newHostToken) return { state: state, ok: false, reason: "same" }
+  if (findGroupByHost(state, token)) return { state: state, ok: false, reason: "host" }
+  var source = findGroupByMember(state, token)
+  if (!source) return { state: state, ok: false, reason: "missing" }
+  if (source.host === newHostToken) return { state: state, ok: false, reason: "same" }
+  // A tab can only be dropped onto a host window, never onto another tab.
+  var dest = findGroupByMember(state, newHostToken)
+  if (dest && dest.host !== newHostToken) return { state: state, ok: false, reason: "grouped" }
+
+  var next = cloneState(state)
+  var from = next.groups[source.host]
+  var idx = from.members.indexOf(token)
+  from.members.splice(idx, 1)
+  if (from.members.length < 2) {
+    delete next.groups[source.host]
+  } else {
+    if (from.active > idx) from.active -= 1
+    else if (from.active === idx) from.active = Math.min(idx, from.members.length - 1)
+    if (from.active >= from.members.length) from.active = from.members.length - 1
+  }
+  var to = next.groups[newHostToken]
+  if (!to) {
+    to = { host: newHostToken, members: [newHostToken], active: 0 }
+    next.groups[newHostToken] = to
+  }
+  to.members.push(token)
+  return { state: next, ok: true }
+}
+
+function getActiveMember(state, hostToken) {
+  var group = findGroupByHost(state, hostToken)
+  if (!group) return ""
+  return group.members[group.active] || ""
+}
+
+function setActiveMember(state, hostToken, memberToken) {
+  if (!isToken(hostToken) || !isToken(memberToken)) return { state: state, ok: false, reason: "invalid" }
+  var group = findGroupByHost(state, hostToken)
+  if (!group) return { state: state, ok: false, reason: "missing" }
+  var idx = group.members.indexOf(memberToken)
+  if (idx === -1) return { state: state, ok: false, reason: "missing" }
+  if (group.active === idx) return { state: state, ok: true }
+  var next = cloneState(state)
+  next.groups[hostToken].active = idx
+  return { state: next, ok: true }
+}
+
+// decision 2 (pure): the next tab for alt-tab. With the pointer over the
+// host's strip, wrap around in the requested direction; with the pointer
+// anywhere else, hand control back to the compositor. `direction` is "prev"
+// (or -1) for backwards, anything else advances forwards.
+function cycleTab(members, activeIndex, direction, pointerInside) {
+  var list = Array.isArray(members) ? members : []
+  if (list.length < 2 || !pointerInside) return TAB_CYCLE_FALLTHROUGH
+  var idx = clampInt(activeIndex, 0, list.length - 1, 0)
+  var delta = (direction === "prev" || direction === "up" || direction === -1 || direction === "-1") ? -1 : 1
+  idx = (idx + delta + list.length) % list.length
+  return list[idx]
+}
+
+function isTabCycleFallthrough(value) {
+  return value === TAB_CYCLE_FALLTHROUGH
+}
+
+// decision 3: closing a group only needs a prompt when it actually holds more
+// than one window; a lone host can be closed without asking.
+function needsCloseConfirmation(state, hostToken) {
+  var group = findGroupByHost(state, hostToken)
+  if (!group) return false
+  return group.members.length > 1
+}
+
+// Future tab-save feature: a JSON-safe snapshot of one group. No caller yet —
+// this is the designated hook so the save feature has a stable serialization
+// shape to build on.
+function tabSaveSnapshot(state, hostToken) {
+  var group = findGroupByHost(state, hostToken)
+  if (!group) return null
+  return { host: group.host, members: group.members.slice(), active: group.active }
+}
+
+function listGroups(state) {
+  var groups = (state && state.groups) || {}
+  var out = []
+  for (var k in groups) {
+    var g = groups[k]
+    if (!g || !g.host) continue
+    out.push({ host: g.host, members: g.members.slice(), active: g.active })
+  }
+  return out
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PLUGIN_ID: PLUGIN_ID, PROTOCOL: PROTOCOL, JOURNAL_SCHEMA: JOURNAL_SCHEMA, JOURNAL_MAX_BYTES: JOURNAL_MAX_BYTES,
@@ -546,6 +752,11 @@ if (typeof module !== "undefined" && module.exports) {
     finishRestore: finishRestore, updateTitle: updateTitle, removeDead: removeDead,
     toJournal: toJournal, parseJournal: parseJournal, reconcile: reconcile,
     restoreDestination: restoreDestination, clampBox: clampBox, originLabel: originLabel, rowsWithOrdinals: rowsWithOrdinals,
-    statusSummary: statusSummary, normalizeSettings: normalizeSettings, readOwnEntry: readOwnEntry
+    statusSummary: statusSummary, normalizeSettings: normalizeSettings, readOwnEntry: readOwnEntry,
+    TAB_CYCLE_FALLTHROUGH: TAB_CYCLE_FALLTHROUGH,
+    createGroup: createGroup, removeGroup: removeGroup, addMember: addMember, removeMember: removeMember,
+    moveMember: moveMember, getActiveMember: getActiveMember, setActiveMember: setActiveMember,
+    cycleTab: cycleTab, isTabCycleFallthrough: isTabCycleFallthrough, needsCloseConfirmation: needsCloseConfirmation,
+    tabSaveSnapshot: tabSaveSnapshot, listGroups: listGroups, findGroupByHost: findGroupByHost, findGroupByMember: findGroupByMember
   }
 }

@@ -436,6 +436,7 @@ Item {
   function openDrawer() { root.openOverlay({ view: "drawer" }) }
 
   function statusJson() {
+    var groups = Model.listGroups(root.model)
     return JSON.stringify({
       schema: 1,
       plugin: root.pluginId,
@@ -450,7 +451,8 @@ Item {
       minimized: root.minimizedCount,
       failed: root.failedCount,
       recovered: root.recoveredCount,
-      entries: root.model.entries.map(function(e) { return { token: e.token, status: e.status, class: e.class, origin: e.origin.workspaceName || e.origin.workspace, recovered: !!e.recovered } })
+      entries: root.model.entries.map(function(e) { return { token: e.token, status: e.status, class: e.class, origin: e.origin.workspaceName || e.origin.workspace, recovered: !!e.recovered } }),
+      tabGroups: { count: groups.length, groups: groups }
     })
   }
 
@@ -604,6 +606,81 @@ Item {
 
   function openSettings() { root.openOverlay({ view: "settings" }) }
 
+  // --------------------------------------------------------- tab groups
+
+  // Tab-group changes are in-memory UI state: they never enter the recovery
+  // journal, so updating the model and republishing is enough (no persist).
+  function commitTabs(state) {
+    root.model = state
+    root.publish()
+  }
+
+  function groupCreate(hostToken) {
+    if (!Model.isToken(hostToken)) return "invalid"
+    var r = Model.createGroup(root.model, hostToken)
+    if (!r.ok) return r.reason || "refused"
+    root.commitTabs(r.state)
+    return "ok"
+  }
+
+  function groupRemove(hostToken) {
+    if (!Model.isToken(hostToken)) return "invalid"
+    var r = Model.removeGroup(root.model, hostToken)
+    if (!r.ok) return r.reason || "missing"
+    root.commitTabs(r.state)
+    return "ok"
+  }
+
+  function groupAddMember(hostToken, memberToken) {
+    if (!Model.isToken(hostToken) || !Model.isToken(memberToken)) return "invalid"
+    var r = Model.addMember(root.model, hostToken, memberToken)
+    if (!r.ok) return r.reason || "refused"
+    root.commitTabs(r.state)
+    return "ok"
+  }
+
+  function groupRemoveMember(token) {
+    if (!Model.isToken(token)) return "invalid"
+    var r = Model.removeMember(root.model, token)
+    if (!r.ok) return r.reason || "missing"
+    root.commitTabs(r.state)
+    return "ok"
+  }
+
+  function groupActivate(hostToken, memberToken) {
+    if (!Model.isToken(hostToken) || !Model.isToken(memberToken)) return "invalid"
+    var r = Model.setActiveMember(root.model, hostToken, memberToken)
+    if (!r.ok) return r.reason || "missing"
+    if (r.state !== root.model) root.commitTabs(r.state)
+    return "ok"
+  }
+
+  // decision 2: alt-tab within the group while the pointer is over the host's
+  // strip; "fallthrough" tells the caller to hand alt-tab back to the compositor.
+  function groupCycle(hostToken, direction, pointerInside) {
+    if (!Model.isToken(hostToken)) return "invalid"
+    var group = Model.findGroupByHost(root.model, hostToken)
+    if (!group) return "unknown"
+    var next = Model.cycleTab(group.members, group.active, direction, pointerInside)
+    if (Model.isTabCycleFallthrough(next)) return "fallthrough"
+    return root.groupActivate(hostToken, next)
+  }
+
+  // decision 3: closing a group that holds more than one window must be
+  // confirmed first; groupCloseForce is the post-prompt path.
+  function groupClose(hostToken, force) {
+    if (!Model.isToken(hostToken)) return "invalid"
+    var group = Model.findGroupByHost(root.model, hostToken)
+    if (!group) return "unknown"
+    if (!force && Model.needsCloseConfirmation(root.model, hostToken)) return "needs-confirm"
+    var members = group.members.slice()
+    // The strip goes away now, even if the compositor later refuses one of the
+    // closes; the user has already chosen to close the whole group.
+    root.commitTabs(Model.removeGroup(root.model, hostToken).state)
+    for (var i = 0; i < members.length; i++) root.closeWindow(members[i])
+    return "closing"
+  }
+
   // --------------------------------------------------------- lifecycle
 
   Component.onCompleted: {
@@ -710,5 +787,13 @@ Item {
     function disable(): string { return root.disable() }
     function enable(): string { return root.enable() }
     function ping(): string { return root.backendConnected ? "connected" : "disconnected" }
+    function groupCreate(token: string): string { return root.groupCreate(token) }
+    function groupRemove(token: string): string { return root.groupRemove(token) }
+    function groupAddMember(hostToken: string, memberToken: string): string { return root.groupAddMember(hostToken, memberToken) }
+    function groupRemoveMember(token: string): string { return root.groupRemoveMember(token) }
+    function groupActivate(hostToken: string, memberToken: string): string { return root.groupActivate(hostToken, memberToken) }
+    function groupCycle(hostToken: string, direction: string, pointerInside: string): string { return root.groupCycle(hostToken, direction, Model.flag(pointerInside)) }
+    function groupClose(token: string): string { return root.groupClose(token, false) }
+    function groupCloseForce(token: string): string { return root.groupClose(token, true) }
   }
 }

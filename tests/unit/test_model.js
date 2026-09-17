@@ -245,4 +245,141 @@ test("updateTitle refreshes a row in place without reordering", () => {
   assert.strictEqual(next.entries[0].token, "g100-2")
 })
 
+// ------------------------------------------------------------- tab groups
+
+test("tab group lifecycle: create, add, dissolve on last member", () => {
+  let s = M.createState()
+  let r = M.createGroup(s, "g1-1")
+  assert.ok(r.ok)
+  assert.strictEqual(r.state.groups["g1-1"].members.length, 1)
+  assert.strictEqual(M.getActiveMember(r.state, "g1-1"), "g1-1")
+  r = M.addMember(r.state, "g1-1", "g1-2")
+  assert.ok(r.ok)
+  assert.deepStrictEqual(r.state.groups["g1-1"].members, ["g1-1", "g1-2"])
+  assert.strictEqual(M.getActiveMember(r.state, "g1-1"), "g1-1", "active stays on the host")
+  r = M.removeMember(r.state, "g1-2")
+  assert.ok(r.ok)
+  assert.strictEqual(r.state.groups["g1-1"], undefined, "last dropped member leaving dissolves the group")
+})
+
+test("addMember auto-creates a group when dropping onto a host", () => {
+  const r = M.addMember(M.createState(), "g1-1", "g1-2")
+  assert.ok(r.ok)
+  assert.strictEqual(r.state.groups["g1-1"].host, "g1-1")
+  assert.deepStrictEqual(r.state.groups["g1-1"].members, ["g1-1", "g1-2"])
+})
+
+test("host removal dissolves the whole group", () => {
+  let s = M.addMember(M.createState(), "g1-1", "g1-2").state
+  s = M.addMember(s, "g1-1", "g1-3").state
+  const r = M.removeMember(s, "g1-1")
+  assert.ok(r.ok)
+  assert.deepStrictEqual(r.state.groups, {})
+  assert.strictEqual(M.findGroupByMember(r.state, "g1-2"), null)
+})
+
+test("move member between groups; source dissolves when emptied", () => {
+  let s = M.addMember(M.createState(), "g1-1", "g1-2").state
+  s = M.addMember(s, "g1-9", "g1-10").state
+  const r = M.moveMember(s, "g1-2", "g1-9")
+  assert.ok(r.ok)
+  assert.strictEqual(r.state.groups["g1-1"], undefined, "source had only the host left")
+  assert.deepStrictEqual(r.state.groups["g1-9"].members, ["g1-9", "g1-10", "g1-2"])
+})
+
+test("move member keeps a multi-member source group alive", () => {
+  let s = M.addMember(M.createState(), "g1-1", "g1-2").state
+  s = M.addMember(s, "g1-1", "g1-3").state
+  s = M.addMember(s, "g1-9", "g1-10").state
+  const r = M.moveMember(s, "g1-2", "g1-9")
+  assert.ok(r.ok)
+  assert.deepStrictEqual(r.state.groups["g1-1"].members, ["g1-1", "g1-3"])
+  assert.deepStrictEqual(r.state.groups["g1-9"].members, ["g1-9", "g1-10", "g1-2"])
+})
+
+test("active member get/set and index shift after a removal before it", () => {
+  let s = M.addMember(M.createState(), "g1-1", "g1-2").state
+  s = M.addMember(s, "g1-1", "g1-3").state
+  let r = M.setActiveMember(s, "g1-1", "g1-3")
+  assert.ok(r.ok)
+  assert.strictEqual(M.getActiveMember(r.state, "g1-1"), "g1-3")
+  r = M.removeMember(r.state, "g1-2")
+  assert.strictEqual(r.state.groups["g1-1"].active, 1)
+  assert.strictEqual(M.getActiveMember(r.state, "g1-1"), "g1-3")
+})
+
+test("removing the active member falls back to a valid tab", () => {
+  let s = M.addMember(M.createState(), "g1-1", "g1-2").state
+  s = M.addMember(s, "g1-1", "g1-3").state
+  s = M.setActiveMember(s, "g1-1", "g1-2").state
+  const r = M.removeMember(s, "g1-2")
+  assert.strictEqual(r.state.groups["g1-1"].active, 1)
+  assert.strictEqual(M.getActiveMember(r.state, "g1-1"), "g1-3", "the tab that slid into the slot becomes active")
+})
+
+test("cycleTab wraps in both directions and falls through outside the strip", () => {
+  const members = ["g1-1", "g1-2", "g1-3"]
+  assert.strictEqual(M.cycleTab(members, 0, "next", true), "g1-2")
+  assert.strictEqual(M.cycleTab(members, 2, "next", true), "g1-1", "wraps forward")
+  assert.strictEqual(M.cycleTab(members, 0, "prev", true), "g1-3", "wraps backward")
+  assert.strictEqual(M.cycleTab(members, 1, "prev", true), "g1-1")
+  assert.strictEqual(M.cycleTab(members, 0, "next", false), M.TAB_CYCLE_FALLTHROUGH, "pointer outside the strip")
+  assert.strictEqual(M.cycleTab(["g1-1"], 0, "next", true), M.TAB_CYCLE_FALLTHROUGH, "single window has nothing to cycle")
+  assert.ok(M.isTabCycleFallthrough(M.cycleTab(members, 0, "prev", false)))
+})
+
+test("needsCloseConfirmation at its boundaries", () => {
+  let s = M.createState()
+  assert.strictEqual(M.needsCloseConfirmation(s, "g1-1"), false, "unknown group")
+  s = M.createGroup(s, "g1-1").state
+  assert.strictEqual(M.needsCloseConfirmation(s, "g1-1"), false, "lone host")
+  s = M.addMember(s, "g1-1", "g1-2").state
+  assert.strictEqual(M.needsCloseConfirmation(s, "g1-1"), true, "two windows")
+  s = M.addMember(s, "g1-1", "g1-3").state
+  assert.strictEqual(M.needsCloseConfirmation(s, "g1-1"), true, "three windows")
+})
+
+test("invalid and unknown tokens are refused across the group API", () => {
+  const s = M.createState()
+  assert.strictEqual(M.createGroup(s, "nope").ok, false)
+  assert.strictEqual(M.createGroup(s, null).reason, "invalid")
+  assert.strictEqual(M.removeGroup(s, "g1-1").reason, "missing")
+  assert.strictEqual(M.addMember(s, "g1-1", "bad").reason, "invalid")
+  assert.strictEqual(M.addMember(s, "g1-1", "g1-1").reason, "same")
+  assert.strictEqual(M.removeMember(s, "g1-99").reason, "missing")
+  assert.strictEqual(M.moveMember(s, "g1-99", "g1-1").reason, "missing")
+  assert.strictEqual(M.setActiveMember(s, "g1-1", "g1-2").reason, "missing")
+  assert.strictEqual(M.getActiveMember(s, "g1-1"), "")
+  assert.strictEqual(M.tabSaveSnapshot(s, "g1-1"), null)
+  assert.strictEqual(M.listGroups(s).length, 0)
+})
+
+test("duplicate membership and host-as-tab are refused", () => {
+  let s = M.addMember(M.createState(), "g1-1", "g1-2").state
+  assert.strictEqual(M.addMember(s, "g1-1", "g1-2").reason, "grouped")
+  assert.strictEqual(M.createGroup(s, "g1-1").reason, "duplicate")
+  assert.strictEqual(M.addMember(s, "g1-9", "g1-1").reason, "host", "a host cannot be another group's tab")
+  assert.strictEqual(M.moveMember(s, "g1-1", "g1-9").reason, "host", "a host cannot be dragged like a tab")
+  s = M.addMember(s, "g1-9", "g1-10").state
+  assert.strictEqual(M.moveMember(s, "g1-2", "g1-10").reason, "grouped", "a tab cannot be dropped onto another tab")
+})
+
+test("tabSaveSnapshot returns a JSON-safe copy (future save hook)", () => {
+  let s = M.createGroup(M.createState(), "g1-1").state
+  s = M.addMember(s, "g1-1", "g1-2").state
+  s = M.setActiveMember(s, "g1-1", "g1-2").state
+  const snap = M.tabSaveSnapshot(s, "g1-1")
+  assert.deepStrictEqual(snap, { host: "g1-1", members: ["g1-1", "g1-2"], active: 1 })
+  assert.deepStrictEqual(M.listGroups(s), [snap])
+})
+
+test("group operations never mutate the input state", () => {
+  const s = M.addMember(M.createState(), "g1-1", "g1-2").state
+  const before = JSON.stringify(s.groups)
+  M.removeMember(s, "g1-2")
+  M.addMember(s, "g1-1", "g1-3")
+  M.moveMember(s, "g1-2", "g1-9")
+  assert.strictEqual(JSON.stringify(s.groups), before)
+})
+
 console.log("test_model: " + passed + " passed")
