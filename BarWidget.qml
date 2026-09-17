@@ -23,7 +23,11 @@ BarWidget {
   readonly property int count: service ? Number(service.minimizedCount || 0) : 0
   readonly property bool attention: !!(service && service.attention)
   readonly property string attentionReason: service ? String(service.attentionReason || "") : ""
-  readonly property var settings: (service && service.settings) ? service.settings : null
+  // The Omarchy bar owns this property: Bar.qml's injectProps()/applySettingsDelta()
+  // assign to it directly ("if ('settings' in item) item.settings = settings"). It
+  // must stay WRITABLE — declaring `settings` readonly makes every settings write
+  // throw TypeError: Cannot assign to read-only property, inside the bar's reload.
+  property var settings: (service && service.settings) ? service.settings : null
   readonly property bool sidePanelEnabled: settings ? settings.sidePanel !== false : false
   readonly property string glyph: String.fromCodePoint(0xF05B2)   // nf-md-window_restore: a window stack
   property bool pulse: false
