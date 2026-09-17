@@ -39,8 +39,8 @@ struct SGlobalState {
 
     struct {
         SP<Config::Values::CColorValue>  barColor, inactiveBarColor, textColor, hoverColor, closeHoverColor, snapGlowColor;
-        SP<Config::Values::CIntValue>    barHeight, textSize, buttonSize, padding, shellGraceMs, snapGlowMs;
-        SP<Config::Values::CBoolValue>   enabled, buttonsLeft, showOnHover, snapLock, snapGlow, snapPreview;
+        SP<Config::Values::CIntValue>    barHeight, textSize, buttonSize, padding, shellGraceMs, snapGlowMs, tabMinWidth;
+        SP<Config::Values::CBoolValue>   enabled, buttonsLeft, showOnHover, snapLock, snapGlow, snapPreview, tabs;
         SP<Config::Values::CStringValue> textFont;
     } config;
 

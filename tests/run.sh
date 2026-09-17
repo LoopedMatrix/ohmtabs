@@ -17,6 +17,8 @@ python3 tests/unit/test_protocol.py
 g++ -std=c++20 -Wall -Wno-unused-parameter -I native/grabbar \
   native/grabbar/tests/test_snapfx.cpp -o /tmp/grabbar-test_snapfx
 /tmp/grabbar-test_snapfx
+# Window-tab model (TabStore): pure logic, no Hyprland, compiled with -Werror.
+bash tests/unit/run_tabs_test.sh
 python3 -m py_compile helpers/grabbar-journal helpers/grabbar_backend.py
 bash -n bin/grabbar tests/integration/*.sh
 if command -v qmllint >/dev/null 2>&1; then
