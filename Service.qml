@@ -286,6 +286,7 @@ Item {
         break
       case "event":
         if (msg.kind === "backendStopping") root.say("Grabbar's native backend is stopping" + (Number(msg.restored) > 0 ? "; your windows were restored" : ""))
+        else if (msg.event === "tabs.closeAllRequested") root.onCloseAllRequested(msg)
         break
       case "pong":
         break
@@ -492,6 +493,32 @@ Item {
   property var settingsWriter: null   // function(patch) -> bool, registered by the bar widget
   readonly property var settings: Model.normalizeSettings(fileSettings || mirrorSettings || {})
 
+  // --------------------------------------------------------------- tab groups
+  //
+  // Tab-group IPC is opt-in. Until the user sets `tabGroups: true` in their
+  // bar layout entry, the shell keeps the minimized-window UX it already has
+  // and silently ignores the tab verbs (unknown-command handling in onLine
+  // below is what makes that safe when the native side has not implemented
+  // them yet). Starting the feature must not, by itself, change the panel's
+  // appearance or behavior for an existing install.
+  readonly property bool tabGroupsEnabled: root.settings && root.settings.tabGroups === true
+  readonly property var tabGroups: root.tabGroupsEnabled ? Model.listGroups(root.model) : []
+
+  // Popup-card prompt for "close all N windows in this group?". It is created
+  // lazily and reused; accepting runs tabsCloseAll, cancel/escape dismisses
+  // with no action. The popup is a PopupCard (qs.Ui) created at runtime via
+  // Qt.createComponent so it inherits the user's theme rather than another
+  // inline ad-hoc card. The property is untyped (`var`) because PopupCard is
+  // not knowable to the QML engine at parse time on all installs; we reach it
+  // through its Catalog-exposed API (open, contentItem, requestPopout,
+  // releasePopout).
+  property var closeAllPopup: null
+  property bool closeAllPending: false
+  property int closeAllGroup: -1
+  property string closeAllTitle: ""
+  property var closeAllTitles: []
+  signal closeAllConfirmed(int group)
+
   FileView {
     id: shellConfigFile
     path: root.home + "/.config/omarchy/shell.json"
@@ -679,6 +706,241 @@ Item {
     root.commitTabs(Model.removeGroup(root.model, hostToken).state)
     for (var i = 0; i < members.length; i++) root.closeWindow(members[i])
     return "closing"
+  }
+
+  // --------------------------------------------------------- shell-side tab API
+  //
+  // These are the wrappers the bar widget and the panel talk through. They all
+  // go through the existing `send(type, fields)` path (same transport everything
+  // else on this service uses), and they only do real work when
+  // `tabGroupsEnabled` is true. If the native backend has not implemented a tab
+  // verb yet, `send` returns false and the wrapper returns an error string
+  // without logging spam; if the backend replies with `{"error":"..."}` we
+  // surface that as an error too. Unknown/unsupported replies are treated as
+  // "not yet" rather than as failures, so a partial native build does not noisy
+  // the console or break the UI.
+
+  function tabsList() {
+    if (!root.tabGroupsEnabled) return { ok: false, error: "tabGroups is off" }
+    var ok = root.send("tabs.list", {})
+    // When the backend has not implemented tabs.list yet, send() returns false
+    // (no socket / not connected) OR the backend may reply with an error or no
+    // reply at all. In either case we do not spam the log; we just report the
+    // situation as an error-ish result.
+    if (!ok) return { ok: false, error: "backend unreachable" }
+    return { ok: true, note: "requested" }
+  }
+
+  function tabsJoin(source, host) {
+    if (!root.tabGroupsEnabled) return { ok: false, error: "tabGroups is off" }
+    if (!Model.isToken(source) || !Model.isToken(host)) return { ok: false, error: "invalid token" }
+    var ok = root.send("tabs.join", { source: source, host: host })
+    if (!ok) return { ok: false, error: "backend unreachable" }
+    return { ok: true, note: "requested" }
+  }
+
+  function tabsActivate(group, index) {
+    if (!root.tabGroupsEnabled) return { ok: false, error: "tabGroups is off" }
+    if (!Model.isToken(group)) return { ok: false, error: "invalid group" }
+    if (!Number.isInteger(index) || index < 0) return { ok: false, error: "invalid index" }
+    var ok = root.send("tabs.activate", { group: group, index: index })
+    if (!ok) return { ok: false, error: "backend unreachable" }
+    return { ok: true, note: "requested" }
+  }
+
+  function tabsDetach(token) {
+    if (!root.tabGroupsEnabled) return { ok: false, error: "tabGroups is off" }
+    if (!Model.isToken(token)) return { ok: false, error: "invalid token" }
+    var ok = root.send("tabs.detach", { token: token })
+    if (!ok) return { ok: false, error: "backend unreachable" }
+    return { ok: true, note: "requested" }
+  }
+
+  function tabsUngroup(group) {
+    if (!root.tabGroupsEnabled) return { ok: false, error: "tabGroups is off" }
+    if (!Model.isToken(group)) return { ok: false, error: "invalid group" }
+    var ok = root.send("tabs.ungroup", { group: group })
+    if (!ok) return { ok: false, error: "backend unreachable" }
+    return { ok: true, note: "requested" }
+  }
+
+  // tabsCloseAll is the user-confirmed path: the prompt has already been shown
+  // and accepted, so we send the command with confirm:true and do not prompt
+  // again. The backend owns actually closing the windows; we just remove the
+  // in-memory group so the panel stops showing it.
+  function tabsCloseAll(group) {
+    if (!root.tabGroupsEnabled) return { ok: false, error: "tabGroups is off" }
+    if (!Model.isToken(group)) return { ok: false, error: "invalid group" }
+    root.commitTabs(Model.removeGroup(root.model, group).state)
+    var ok = root.send("tabs.closeAll", { group: group, confirm: true })
+    if (!ok) return { ok: false, error: "backend unreachable" }
+    return { ok: true, note: "requested" }
+  }
+
+  // --------------------------------------------------------- close-all prompt
+
+  // Show the theme-matched "close all N windows in this group?" popup. `group`
+  // is the host token; `titles` is a short list of the tab titles to list in
+  // the body. If a popup is already open for another group it is dismissed
+  // first (only one prompt at a time). The popup uses the stock PopupCard
+  // (qs.Ui), anchored on the service item and re-parented to the shell's bar so
+  // it inherits the user's theme.
+
+  function showCloseAllPrompt(group, titles) {
+    if (!root.tabGroupsEnabled) return
+    if (!Model.isToken(group) || !Array.isArray(titles)) return
+    var count = titles.length | 0
+    if (count <= 0) return
+    root.dismissCloseAllPrompt()
+    var popup = root.closeAllPopup
+    if (!popup || popup.status !== "alive") {
+      var c = Qt.createComponent("/usr/share/omarchy/shell/Ui/PopupCard.qml", root)
+      if (!c || c.status !== "ready") {
+        console.warn("grabbar: cannot load PopupCard for close-all prompt")
+        return
+      }
+      popup = c.createObject(root, { "anchorItem": root, "bar": root })
+      if (!popup) { console.warn("grabbar: PopupCard createObject failed"); return }
+      var content = closeAllPopupContent.createObject(popup)
+      if (!content) { console.warn("grabbar: close-all content createObject failed"); return }
+      popup.triggerMode = "click"
+      popup.open = true
+      root.closeAllPopup = popup
+    }
+    popup.anchorItem = root
+    popup.open = true
+    root.closeAllPending = true
+    root.closeAllGroup = group
+    root.closeAllTitle = closeAllPromptBody(count, titles)
+    root.closeAllTitles = titles
+  }
+
+  // PopupCard's body is its contentItem (default property alias). One shared
+  // component instance is re-parented into whichever popup is currently open.
+  Component {
+    id: closeAllPopupContent
+    Column {
+      id: body
+      anchors.fill: parent
+      anchors.margins: Style.spacing.popupPadding
+      spacing: Style.space(6)
+      Text {
+        width: parent.width
+        text: root.closeAllTitle
+        wrapMode: Text.WordWrap
+        color: Color.popups.text
+        font.family: Style.font.bodyFamily
+        font.pixelSize: Style.font.body
+        font.weight: Font.Medium
+      }
+      Item { width: 1; height: Style.space(4) }
+      Repeater {
+        id: titleList
+        width: parent.width
+        model: root.closeAllTitles
+        delegate: Text {
+          width: parent.width
+          text: "• " + (modelData || "")
+          elide: Text.ElideRight
+          wrapMode: Text.WordWrap
+          color: Color.popups.muted
+          font.family: Style.font.bodyFamily
+          font.pixelSize: Style.font.caption
+        }
+      }
+      Item { width: 1; height: Style.space(2) }
+      Row {
+        anchors.horizontalCenter: parent.horizontalCenter
+        spacing: Style.space(8)
+        Rectangle {
+          id: cancelBtn
+          property string label: "Cancel"
+          width: cancelText.implicitWidth + Style.space(16)
+          height: Style.space(28)
+          radius: Style.cornerRadius
+          color: cancelArea.containsMouse ? Color.popups.selectedBackground : Color.popups.background
+          border.color: Color.popups.border
+          border.width: 1
+          Text {
+            id: cancelText
+            anchors.centerIn: parent
+            text: cancelBtn.label
+            color: cancelArea.containsMouse ? Color.popups.selectedText : Color.popups.text
+            font.family: Style.font.bodyFamily
+            font.pixelSize: Style.font.caption
+          }
+          MouseArea {
+            id: cancelArea
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: root.dismissCloseAllPrompt()
+          }
+        }
+        Rectangle {
+          id: closeBtn
+          property string label: "Close all"
+          width: closeText.implicitWidth + Style.space(16)
+          height: Style.space(28)
+          radius: Style.cornerRadius
+          color: closeArea.containsMouse ? Color.accent.darken(0.1) : Color.accent
+          border.color: Color.accent
+          border.width: 1
+          Text {
+            id: closeText
+            anchors.centerIn: parent
+            text: closeBtn.label
+            color: "#ffffff"
+            font.family: Style.font.bodyFamily
+            font.pixelSize: Style.font.caption
+          }
+          MouseArea {
+            id: closeArea
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: root.runCloseAllConfirmed(root.closeAllGroup)
+          }
+        }
+      }
+    }
+  }
+
+  // Browser-like body text for the prompt.
+  function closeAllPromptBody(count, titles) {
+    var head = "Close all " + count + " window" + (count === 1 ? "" : "s") + " in this group?"
+    return head
+  }
+
+  function dismissCloseAllPrompt() {
+    var popup = root.closeAllPopup
+    if (popup && popup.status === "alive") {
+      popup.open = false
+    }
+    root.closeAllPending = false
+    root.closeAllGroup = -1
+    root.closeAllTitle = ""
+    root.closeAllTitles = []
+  }
+
+  // --------------------------------------------------------- async event handling
+
+  // Consumer for the backend's async "close all windows in this group?" event.
+  // It shows the theme-matched prompt; the user's choice flows through
+  // runCloseAllConfirmed -> tabsCloseAll (or no-op on cancel/escape).
+  function onCloseAllRequested(msg) {
+    if (!root.tabGroupsEnabled) return
+    var group = String(msg.group || "")
+    var count = parseInt(String(msg.count || "0"), 10) | 0
+    var titles = Array.isArray(msg.titles) ? msg.titles.slice(0, 12) : []
+    if (!Model.isToken(group) || count <= 0) return
+    root.showCloseAllPrompt(group, titles)
+  }
+
+  // Signal handler wired from the prompt's "Close all" button. Runs the
+  // confirmed close path; on cancel or escape nothing happens. The public
+  // surface is the signal closeAllConfirmed(int); this is the internal trampoline.
+  function runCloseAllConfirmed(group) {
+    if (!root.tabGroupsEnabled || !Model.isToken(group)) return
+    root.tabsCloseAll(group)
   }
 
   // --------------------------------------------------------- lifecycle
