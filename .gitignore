@@ -5,3 +5,5 @@ __pycache__/
 *.o
 native/upstream/
 tests/integration/vpointer/vpointer
+
+native/grabbar/tests/test_snapfx
