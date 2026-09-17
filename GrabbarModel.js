@@ -17,6 +17,7 @@ var TOKEN_RE = /^g[0-9]{1,20}-[0-9]{1,12}$/
 var REQUEST_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/
 var WORKSPACE_RE = /^[A-Za-z0-9_.:+ -]{1,64}$/
 var SESSION_RE = /^[A-Za-z0-9_]{1,128}$/
+var BOOL_OPTIONS = { "1": true, "0": false, "true": true, "false": false, "on": true, "off": false }
 // Control characters, zero-width and bidi-override marks are stripped from labels.
 var CONTROL_RE = new RegExp("[\\u0000-\\u001f\\u007f-\\u009f\\u200b-\\u200f\\u2028-\\u202e\\u2066-\\u2069]", "g")
 
@@ -486,8 +487,10 @@ function normalizeSettings(raw) {
   return {
     enabled: r.enabled === false ? false : true,
     buttonsLeft: r.buttonsLeft === true || r.buttonsLeft === "left" || r.controlsOn === "left",
+    showOnHover: BOOL_OPTIONS[r.showOnHover] || false,
     controlSize: r.controlSize === "large" ? "large" : "standard",
-    excludedClasses: classes
+    excludedClasses: classes,
+    tabGroups: BOOL_OPTIONS[r.tabGroups] || false
   }
 }
 

@@ -542,6 +542,13 @@ Item {
           onChosen: function(i) { if (service) service.saveSettings({ buttonsLeft: i === 1 }) }
         }
         SettingRow {
+          label: "Top bar on hover"
+          hint: "Strip appears only when the pointer is near the top of a window"
+          options: ["Off", "On"]
+          current: !root.settings.showOnHover ? 0 : 1
+          onChosen: function(i) { if (service) service.saveSettings({ showOnHover: i === 1 }) }
+        }
+        SettingRow {
           label: "Control size"
           hint: "Standard 34 px strip · Large 46 px strip, applied immediately"
           options: ["Standard", "Large"]

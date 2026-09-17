@@ -40,7 +40,7 @@ struct SGlobalState {
     struct {
         SP<Config::Values::CColorValue>  barColor, inactiveBarColor, textColor, hoverColor, closeHoverColor;
         SP<Config::Values::CIntValue>    barHeight, textSize, buttonSize, padding, shellGraceMs;
-        SP<Config::Values::CBoolValue>   enabled, buttonsLeft;
+        SP<Config::Values::CBoolValue>   enabled, buttonsLeft, showOnHover;
         SP<Config::Values::CStringValue> textFont;
     } config;
 
@@ -50,10 +50,13 @@ struct SGlobalState {
     struct {
         std::optional<uint64_t>  barColor, inactiveBarColor, textColor, hoverColor, closeHoverColor;
         std::optional<std::string> textFont;
-        std::optional<bool>      buttonsLeft;
+        std::optional<bool>      buttonsLeft, showOnHover;
         std::optional<int>       barHeight, buttonSize;
         std::vector<std::string> excludedClasses; // exact window class matches, from Settings
     } shell;
+
+    // "Top bar on hover" mode: bars start hidden and reveal when the pointer
+    // enters the top N px of the window's screen box. Set from Settings only.
 
     // glyph textures shared by every bar, keyed by glyph + scaled size + color
     std::map<std::string, SP<Render::ITexture>> glyphCache;

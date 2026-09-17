@@ -1244,6 +1244,8 @@ void CGrabbarBackend::applySettings(const Fields& f) {
     auto& t = g_pGlobalState->shell;
     if (const auto V = field(f, "buttonsLeft"); !V.empty())
         t.buttonsLeft = V == "reset" ? std::optional<bool>{} : std::optional<bool>{V == "1"};
+    if (const auto V = field(f, "showOnHover"); !V.empty())
+        t.showOnHover = V == "reset" ? std::optional<bool>{} : std::optional<bool>{V == "1"};
     if (const auto V = field(f, "controlSize"); !V.empty()) {
         // "standard" = 34 px strip / 32 px targets, "large" = 46 / 44 (spec §3.3).
         if (V == "large") {

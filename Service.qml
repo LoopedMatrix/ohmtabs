@@ -56,6 +56,50 @@ Item {
   property var restoreHosts: ({})
   readonly property bool restoreHost: Object.keys(restoreHosts).length > 0
 
+  // Side panel state (§5.1)
+  property bool sidePanelVisible: false
+  property var sidePanelTheme: ({})
+  signal sidePanelVisibilityChanged(bool visible)
+  signal sidePanelThemeChanged(var theme)
+
+  function registerRestoreHost(name) {
+    var next = Object.assign({}, root.restoreHosts)
+    next[String(name || "host")] = (next[String(name || "host")] || 0) + 1
+    root.restoreHosts = next
+    root.sendReady()
+  }
+  function unregisterRestoreHost(name) {
+    var key = String(name || "host")
+    var next = Object.assign({}, root.restoreHosts)
+    if (next[key] > 1) next[key] -= 1
+    else delete next[key]
+    root.restoreHosts = next
+    root.sendReady()
+  }
+
+  // Side panel restore-host registration
+  var sidePanelHosts = Object.assign({}, root.restoreHosts)
+  function registerSidePanelHost(name) {
+    if (!name) name = "side-panel"
+    var n = String(name || "side-panel")
+    var next = Object.assign({}, sidePanelHosts)
+    next[n] = (next[n] || 0) + 1
+    sidePanelHosts = next
+    root.restoreHosts = Object.assign({}, root.restoreHosts, next)
+    root.sendReady()
+  }
+  function unregisterSidePanelHost(name) {
+    var n = String(name || "side-panel")
+    var next = Object.assign({}, sidePanelHosts)
+    if (next[n] > 1) next[n] -= 1
+    else delete next[n]
+    sidePanelHosts = next
+    root.restoreHosts = Object.assign({}, root.restoreHosts, next)
+    root.sendReady()
+  }
+
+  // ---- side panel wiring ----
+
   // ----------------------------------------------------------- journal
   property string journalStatus: "loading"
   property var journalParsed: null

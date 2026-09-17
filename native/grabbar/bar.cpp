@@ -150,6 +150,10 @@ CGrabbarDeco::~CGrabbarDeco() {
 bool CGrabbarDeco::effectiveEnabled() {
     if (!g_pGlobalState->config.enabled->value() || m_hidden || !g_pBackend || g_pBackend->suspended() || g_pBackend->paused())
         return false;
+    // In "show on hover" mode the strip stays logically enabled (so it can
+    // receive input and reveal itself) even while it is visually hidden.
+    if (m_showOnHover && g_pGlobalState->shell.showOnHover && !g_pGlobalState->config.showOnHover->value())
+        return false;
     // A `nodecoration` window rule means no strip and no reserved space.
     const auto PWINDOW = m_window.lock();
     if (PWINDOW && !PWINDOW->m_ruleApplicator->decorate().valueOrDefault())
@@ -537,6 +541,18 @@ void CGrabbarDeco::draw(PHLMONITOR pMonitor, const float& a) {
     if (!ENABLED || !validMapped(m_window))
         return;
 
+    // "Top bar on hover" mode: hidden until the pointer enters the top zone.
+    bool show = true;
+    if (m_showOnHover && g_pGlobalState->shell.showOnHover) {
+        auto MOUSE = g_pInputManager->getMouseCoordsInternal();
+        auto BOX   = assignedBoxGlobal();
+        show = MOUSE.y >= BOX.y - 24 && MOUSE.y <= BOX.y + 16;
+        m_showOnHover = show;
+    }
+
+    if (!show)
+        return;
+
     auto data = CGrabbarPassElement::SBarData{this, a};
     g_pHyprRenderer->m_renderPass.add(makeUnique<CGrabbarPassElement>(data));
 }
@@ -710,6 +726,7 @@ void CGrabbarDeco::updateWindow(PHLWINDOW pWindow) {
 
 void CGrabbarDeco::onConfigReloaded() {
     m_textTex = nullptr;
+    m_showOnHover = g_pGlobalState->shell.showOnHover && g_pGlobalState->config.showOnHover && g_pGlobalState->config.showOnHover->value();
     g_pDecorationPositioner->repositionDeco(this);
     damageEntire();
 }

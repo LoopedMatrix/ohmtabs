@@ -78,6 +78,7 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     bool                       m_lastEffectiveEnabled = false;
     bool                       m_windowHasFocus       = false;
     int                        m_lastHeight           = 0;
+    bool                       m_showOnHover          = false; // reveal only when pointer is in the top zone
 
     // input state
     eGrabbarButton             m_pressedButton = BTN_NONE;
