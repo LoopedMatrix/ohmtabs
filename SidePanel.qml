@@ -3,18 +3,26 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 
-// SidePanel — the Windows-style minimized-window taskbar for Grabbar.
+// SidePanel — the Windows-11-style minimized-window taskbar for Grabbar.
 //
 // A run of window buttons along one screen edge: click a button to restore
 // that window. Like the bar widget it registers itself as a restore host, so
 // its presence is what lets the service declare restore access.
+//
+// Windows groups a taskbar entry by application, so windows of the same class
+// collapse into ONE button here too. A stacked marker plus a count chip on the
+// tile advertises the group; hovering the button pops a flyout listing each
+// member so a specific window can still be restored. Single-window buttons keep
+// the window title; grouped buttons show the app name and leave the per-window
+// titles to the flyout, the way Windows leaves them to thumbnail previews.
 //
 // Position is configurable (left / right / bottom) and it can auto-hide. When
 // parked, the surface stays mapped and slides just past its screen edge,
 // leaving a few pixels on screen to catch the pointer — the same approach
 // Omarchy's own bar uses. Parking beats unmapping because the surface,
 // bindings and glyph textures stay alive, so revealing is only a margin
-// change rather than a rebuild.
+// change rather than a rebuild. That margin change is animated so unparking
+// reads as a smooth slide instead of a pop.
 //
 // Colours come from the Omarchy bar palette, so it follows theme switches.
 Item {
@@ -41,10 +49,42 @@ Item {
   readonly property var rows: (service && service.rows) ? service.rows : []
   readonly property int count: rows.length
 
+  // Windows groups by application: fold rows of the same class into one group,
+  // ordered by their newest member so a group sits where its most recent
+  // window is. Each group carries its members (newest first) and nothing else;
+  // the button derives badge/title/attention from them so there is one source
+  // of truth for how a group reads.
+  readonly property var groups: {
+    var out = []
+    var byKey = {}
+    var list = root.rows
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i]
+      // Class is the app identity; a window without one falls back to its
+      // title so it still gets a button rather than vanishing into the crowd.
+      var key = String(r.class || r.title || "?")
+      var g = byKey[key]
+      if (!g) {
+        g = { key: key, members: [] }
+        byKey[key] = g
+        out.push(g)
+      }
+      g.members.push(r)
+    }
+    return out
+  }
+
   // Nothing to show -> no surface at all, and no stray edge strip either.
   readonly property bool live: panelEnabled && count > 0
   // Auto-hide parks it while the pointer is away and nothing is selected.
   readonly property bool parked: panelAutoHide && !hovered && selectedIndex < 0
+
+  // The group currently expanded in the hover flyout, and the button it
+  // anchored to. Kept as plain state so the flyout can be dismissed from
+  // anywhere without touching selection.
+  property var flyoutGroup: null
+  property var flyoutButton: null
+  property bool flyoutHovered: false
 
   // ---- palette (bar surfaces: it lives on a screen edge) ----
   readonly property color background: Color.bar.background
@@ -65,6 +105,14 @@ Item {
     root.selectedIndex = -1
   }
 
+  // A grouped button restores its newest member; the flyout is the route to
+  // any specific one. This mirrors Windows, where clicking a grouped taskbar
+  // button brings up the most recently used window of that app.
+  function restoreGroup(group, original) {
+    if (!group || !group.members || group.members.length === 0) return
+    root.restoreRow(group.members[0], original)
+  }
+
   function restoreAll() {
     if (!service) return
     service.restoreAll()
@@ -72,14 +120,43 @@ Item {
   }
 
   function move(delta) {
-    if (root.count === 0) return
+    var n = root.groups.length
+    if (n === 0) return
     var next = root.selectedIndex + delta
-    if (next < 0) next = root.count - 1
-    if (next >= root.count) next = 0
+    if (next < 0) next = n - 1
+    if (next >= n) next = 0
     root.selectedIndex = next
   }
 
   function dismiss() { root.selectedIndex = -1 }
+
+  // ------------------------------------------------------------ flyout
+
+  // Hovering a multi-window group expands it. Opening is immediate; closing
+  // gets a grace period so the pointer can cross the gap to the flyout without
+  // it blinking shut mid-flight.
+  function flyoutOpen(group, button) {
+    if (!group || !group.members || group.members.length < 2) return
+    flyoutHideDelay.stop()
+    root.flyoutGroup = group
+    root.flyoutButton = button
+  }
+
+  function flyoutMaybeClose() {
+    if (root.flyoutGroup) flyoutHideDelay.restart()
+  }
+
+  Timer {
+    id: flyoutHideDelay
+    interval: 240
+    repeat: false
+    onTriggered: {
+      if (!root.flyoutHovered) {
+        root.flyoutGroup = null
+        root.flyoutButton = null
+      }
+    }
+  }
 
   // Park after a short grace period so a diagonal pointer path across the
   // panel does not make it flicker away.
@@ -90,17 +167,48 @@ Item {
     onTriggered: root.hovered = false
   }
 
-  // Last window restored -> drop any selection so nothing lingers.
+  // Last window restored -> drop any selection so nothing lingers, and drop a
+  // flyout whose group just shrank below two members.
   onCountChanged: if (count === 0) root.selectedIndex = -1
+  onGroupsChanged: {
+    root.flyoutGroup = null
+    root.flyoutButton = null
+    if (root.selectedIndex >= root.groups.length) root.selectedIndex = root.groups.length - 1
+  }
 
   // ------------------------------------------------------ restore-host wiring
+
+  // The bar hosts one widget instance per monitor (Bar.qml builds a BarPanel
+  // per screen, so this file is instantiated once per monitor). Without a
+  // `screen:` binding every instance would land on the focused monitor and
+  // stack N identical surfaces there while the other monitors stay empty. The
+  // widget's own Screen attached property reports the monitor this bar lives
+  // on, so resolve its name against Quickshell's screens and fall back to the
+  // first screen, keeping exactly one panel per monitor.
+  function resolveScreen() {
+    var name = ""
+    try { name = String(Screen.name || "") } catch (e) {}
+    var screens = Quickshell.screens
+    for (var i = 0; i < screens.length; i++) {
+      var s = screens[i]
+      if (name !== "" && s && String(s.name) === name) return s
+    }
+    return (screens && screens.length) ? screens[0] : null
+  }
 
   function declareHost() {
     if (service && typeof service.registerRestoreHost === "function")
       service.registerRestoreHost("side-panel")
   }
 
-  Component.onCompleted: declareHost()
+  Component.onCompleted: {
+    panel.screen = root.resolveScreen()
+    // The enclosing window's screen can lag this widget's own completion by a
+    // tick, so re-resolve once and let a now-populated Screen.name correct the
+    // assignment rather than parking a panel on the wrong monitor.
+    Qt.callLater(function() { panel.screen = root.resolveScreen() })
+    declareHost()
+  }
   onServiceChanged: declareHost()
   Component.onDestruction: {
     if (service && typeof service.unregisterRestoreHost === "function")
@@ -120,7 +228,8 @@ Item {
 
     // Anchoring follows the position; parking is a negative margin along the
     // edge it is anchored to, so the surface slides out of view while a sliver
-    // of it stays on screen.
+    // of it stays on screen. The margin change is animated, so the reveal reads
+    // as a slide rather than a pop; parking animates the same way for symmetry.
     anchors {
       top: root.vertical
       bottom: root.vertical || root.panelPosition === "bottom"
@@ -133,6 +242,10 @@ Item {
       left: root.parked && root.panelPosition === "left" ? -(root.panelSize - root.revealSliver) : 0
       right: root.parked && root.panelPosition === "right" ? -(root.panelSize - root.revealSliver) : 0
     }
+
+    Behavior on margins.bottom { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+    Behavior on margins.left { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+    Behavior on margins.right { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
     implicitWidth: root.vertical ? root.panelSize : 0
     implicitHeight: root.vertical ? 0 : root.panelSize
@@ -162,8 +275,8 @@ Item {
           if (event.key === Qt.Key_Down || event.key === Qt.Key_Right || event.key === Qt.Key_J) { root.move(1); event.accepted = true }
           else if (event.key === Qt.Key_Up || event.key === Qt.Key_Left || event.key === Qt.Key_K) { root.move(-1); event.accepted = true }
           else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (root.selectedIndex >= 0 && root.selectedIndex < root.count)
-              root.restoreRow(root.rows[root.selectedIndex], event.modifiers & Qt.ShiftModifier)
+            if (root.selectedIndex >= 0 && root.selectedIndex < root.groups.length)
+              root.restoreGroup(root.groups[root.selectedIndex], event.modifiers & Qt.ShiftModifier)
             event.accepted = true
           }
           else if (event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier)) { root.restoreAll(); event.accepted = true }
@@ -191,7 +304,7 @@ Item {
         anchors.bottomMargin: (root.vertical && allButton.visible) ? allButton.height + 12 : 5
         spacing: 4
         clip: true
-        model: root.rows
+        model: root.groups
         currentIndex: root.selectedIndex
 
         delegate: TaskButton {
@@ -202,8 +315,92 @@ Item {
           horizontal: root.vertical
           length: root.buttonLength
           thickness: root.panelSize - 10
-          onActivated: function(original) { root.restoreRow(modelData, original) }
+          onActivated: function(original) { root.restoreGroup(modelData, original) }
           onHovered: root.selectedIndex = index
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------- flyout
+
+  // The per-window list a grouped button expands into. A separate popup so it
+  // can grow past the strip's edge instead of being clipped by it; mouse-only,
+  // so it never competes with the panel's keyboard focus.
+  PopupWindow {
+    id: flyoutWindow
+    visible: root.flyoutGroup !== null && root.flyoutGroup.members && root.flyoutGroup.members.length > 1
+    color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "grabbar-taskbar-flyout"
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+    implicitWidth: 260
+    implicitHeight: flyoutColumn.implicitHeight
+
+    // The anchor is a 1x1 point placed next to the hovered button in the
+    // panel's own coordinates, then handed to the popup machinery (which keeps
+    // it on screen). Side is chosen by position: above for a bottom strip,
+    // outside the edge for a side strip.
+    anchor {
+      id: flyoutAnchor
+      window: panel
+      edges: Edges.Top | Edges.Left
+      gravity: Edges.Top | Edges.Left
+      adjustment: PopupAdjustment.Slide
+      rect.width: 1
+      rect.height: 1
+      onAnchoring: {
+        if (!root.flyoutButton) return
+        var b = root.flyoutButton
+        var lx = 0
+        var ly = 0
+        if (root.panelPosition === "bottom") {
+          lx = 0
+          ly = -flyoutWindow.implicitHeight - 8
+        } else if (root.panelPosition === "left") {
+          lx = b.width + 8
+          ly = (b.height - flyoutWindow.implicitHeight) / 2
+        } else {
+          lx = -flyoutWindow.implicitWidth - 8
+          ly = (b.height - flyoutWindow.implicitHeight) / 2
+        }
+        var p = panel.contentItem.mapFromItem(b, lx, ly)
+        flyoutAnchor.rect.x = Math.round(p.x)
+        flyoutAnchor.rect.y = Math.round(p.y)
+      }
+    }
+
+    Rectangle {
+      id: flyoutSurface
+      anchors.fill: parent
+      radius: root.radius
+      color: root.background
+      border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
+      border.width: 1
+
+      MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        onEntered: { flyoutHideDelay.stop(); root.flyoutHovered = true }
+        onExited: { root.flyoutHovered = false; root.flyoutMaybeClose() }
+      }
+
+      Column {
+        id: flyoutColumn
+        width: 260
+        padding: 6
+        spacing: 2
+
+        Repeater {
+          model: root.flyoutGroup ? root.flyoutGroup.members : []
+          delegate: FlyoutRow {
+            required property var modelData
+            required property int index
+            entry: modelData
+          }
         }
       }
     }
@@ -211,9 +408,10 @@ Item {
 
   // ------------------------------------------------------------ components
 
-  // A taskbar button: app badge, elided title, origin line when there is room,
-  // and an urgent marker. Left click restores here, right click to the
-  // original workspace.
+  // A taskbar button: a rounded app tile carrying the class initial, an
+  // elided single-line title, a focused-window indicator and a flash for
+  // urgent or failed members. Left click restores the newest member here,
+  // right click to the original workspace.
   component TaskButton: Rectangle {
     id: btn
     property var entry: null
@@ -225,12 +423,35 @@ Item {
     signal activated(bool original)
     signal hovered()
 
-    readonly property bool failed: entry ? entry.status === "failed" : false
-    readonly property bool urgent: entry ? !!entry.urgent : false
-    readonly property string title: entry ? String(entry.label || entry.title || entry.class || "Window") : "Window"
-    readonly property string where: entry ? String(entry.origin || "") : ""
+    readonly property var members: btn.entry ? (btn.entry.members || []) : []
+    readonly property var first: btn.members.length ? btn.members[0] : null
+    readonly property int memberCount: btn.members.length
+    readonly property bool grouped: btn.memberCount > 1
+
+    readonly property bool failed: {
+      for (var i = 0; i < btn.members.length; i++)
+        if (btn.members[i].status === "failed") return true
+      return false
+    }
+    readonly property bool urgent: {
+      for (var i = 0; i < btn.members.length; i++)
+        if (btn.members[i].urgent) return true
+      return false
+    }
+    readonly property bool attention: btn.urgent || btn.failed
+
+    // Grouped buttons name the app; a lone window keeps its own title so the
+    // button still says something useful before the flyout exists.
+    readonly property string title: {
+      if (btn.first === null) return "Window"
+      if (btn.grouped) {
+        var c = String(btn.first.class || "")
+        return c ? c : String(btn.first.label || btn.first.title || "Window")
+      }
+      return String(btn.first.label || btn.first.title || btn.first.class || "Window")
+    }
     readonly property string badge: {
-      var c = entry ? String(entry.class || entry.title || "?") : "?"
+      var c = btn.first ? String(btn.first.class || btn.first.title || "?") : "?"
       return c.length ? c.charAt(0).toUpperCase() : "?"
     }
 
@@ -241,60 +462,188 @@ Item {
 
     Behavior on color { ColorAnimation { duration: 110 } }
 
+    // Urgent and failed members flash the button fill so attention cannot be
+    // missed even when the pointer is elsewhere.
+    Rectangle {
+      id: flash
+      anchors.fill: parent
+      radius: btn.radius
+      color: Qt.rgba(root.urgent.r, root.urgent.g, root.urgent.b, 0.20)
+      visible: btn.attention
+      opacity: 0
+      SequentialAnimation on opacity {
+        running: btn.attention
+        loops: Animation.Infinite
+        NumberAnimation { to: 1; duration: 420 }
+        NumberAnimation { to: 0.15; duration: 420 }
+      }
+    }
+
     MouseArea {
       id: btnArea
       anchors.fill: parent
       hoverEnabled: true
       acceptedButtons: Qt.LeftButton | Qt.RightButton
-      onEntered: btn.hovered()
+      onEntered: { btn.hovered(); if (btn.grouped) root.flyoutOpen(btn.entry, btn) }
+      onExited: { if (btn.grouped) root.flyoutMaybeClose() }
       onClicked: function(m) { btn.activated(m.button === Qt.RightButton) }
     }
 
     Row {
       anchors.fill: parent
-      anchors.leftMargin: 7
-      anchors.rightMargin: 7
-      spacing: 7
+      anchors.leftMargin: 6
+      anchors.rightMargin: 8
+      spacing: 8
 
-      // App badge: the class initial in a tinted tile, standing in for an icon.
-      Rectangle {
+      // App tile: the class initial in a rounded tile, standing in for an
+      // icon. A second sliver peeks out behind it and a count chip rides its
+      // corner when the button is a group.
+      Item {
+        id: tileBox
         anchors.verticalCenter: parent.verticalCenter
-        width: 20
-        height: 20
-        radius: 5
-        color: (btn.urgent || btn.failed) ? root.urgent : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18)
-        Text {
-          anchors.centerIn: parent
-          text: btn.badge
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: 11
-          font.weight: Font.DemiBold
+        width: 26
+        height: 26
+
+        Rectangle {
+          id: tile
+          anchors.fill: parent
+          radius: 7
+          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
+          Text {
+            anchors.centerIn: parent
+            text: btn.badge
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: 12
+            font.weight: Font.DemiBold
+          }
+        }
+
+        // A second tile peeking out behind the app tile is the "stacked
+        // papers" cue Windows draws for a grouped button. Explicit geometry
+        // (no anchors) so it can overhang the tile without fighting it.
+        Rectangle {
+          visible: btn.grouped
+          x: -3
+          y: -3
+          z: -1
+          width: 22
+          height: 22
+          radius: 7
+          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.10)
+        }
+
+        Rectangle {
+          visible: btn.grouped
+          anchors.right: tile.right
+          anchors.bottom: tile.bottom
+          anchors.rightMargin: -4
+          anchors.bottomMargin: -4
+          width: 15
+          height: 15
+          radius: 7
+          color: root.background
+          border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.30)
+          border.width: 1
+          Text {
+            anchors.centerIn: parent
+            text: String(btn.memberCount)
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: 9
+          }
         }
       }
 
-      Column {
+      Text {
         anchors.verticalCenter: parent.verticalCenter
-        width: parent.width - 20 - 7
-        spacing: 0
+        width: parent.width - tileBox.width - 6 - 8 - 8
+        text: btn.title
+        elide: Text.ElideRight
+        color: btn.failed ? root.urgent : root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: 12
+      }
+    }
 
-        Text {
-          width: parent.width
-          text: btn.title
-          elide: Text.ElideRight
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: 12
-        }
-        Text {
-          width: parent.width
-          visible: btn.where !== "" && !btn.horizontal
-          text: btn.failed ? "Could not restore — click to retry" : btn.where
-          elide: Text.ElideRight
-          color: root.muted
-          font.family: root.fontFamily
-          font.pixelSize: 10
-        }
+    // Focused-window indicator: a short rounded bar that lengthens and
+    // brightens when this button is selected, like the running-app marker
+    // under a Windows taskbar icon. Selection (hover or keyboard) is the
+    // closest thing to focus a minimized-only list has.
+    Rectangle {
+      id: indicator
+      radius: 2
+      // Horizontal strip: a bar under the tile; vertical strip: a bar along
+      // the leading (inner) edge. Size and anchoring follow the orientation
+      // with plain bindings so nothing can fall out of sync at runtime.
+      width: btn.horizontal ? (btn.selected ? 18 : 10) : 3
+      height: btn.horizontal ? 3 : (btn.selected ? 18 : 10)
+      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, btn.selected ? 0.95 : 0.45)
+
+      anchors.horizontalCenter: btn.horizontal ? tileBox.horizontalCenter : undefined
+      anchors.bottom: btn.horizontal ? parent.bottom : undefined
+      anchors.bottomMargin: btn.horizontal ? 2 : undefined
+      anchors.verticalCenter: btn.horizontal ? undefined : tileBox.verticalCenter
+      anchors.left: btn.horizontal ? undefined : parent.left
+      anchors.leftMargin: btn.horizontal ? undefined : 2
+
+      Behavior on color { ColorAnimation { duration: 110 } }
+      Behavior on width { NumberAnimation { duration: 110 } }
+      Behavior on height { NumberAnimation { duration: 110 } }
+    }
+  }
+
+  // One row in the group flyout: the window's own title plus its origin, so
+  // the detail the collapsed button dropped is still one click away.
+  component FlyoutRow: Rectangle {
+    id: frow
+    required property var modelData
+    required property int index
+    property var entry: modelData
+    readonly property bool failed: frow.entry ? frow.entry.status === "failed" : false
+
+    width: 248
+    height: 40
+    radius: root.radius
+    color: frowArea.containsMouse ? root.hoverFill : "transparent"
+    Behavior on color { ColorAnimation { duration: 90 } }
+
+    Column {
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.leftMargin: 10
+      anchors.rightMargin: 10
+      spacing: 1
+
+      Text {
+        width: parent.width
+        text: frow.entry ? String(frow.entry.label || frow.entry.title || frow.entry.class || "Window") : ""
+        elide: Text.ElideRight
+        color: frow.failed ? root.urgent : root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: 12
+      }
+      Text {
+        width: parent.width
+        visible: text !== ""
+        text: frow.failed ? "Could not restore — click to retry" : (frow.entry ? String(frow.entry.origin || "") : "")
+        elide: Text.ElideRight
+        color: frow.failed ? root.urgent : root.muted
+        font.family: root.fontFamily
+        font.pixelSize: 10
+      }
+    }
+
+    MouseArea {
+      id: frowArea
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.LeftButton | Qt.RightButton
+      onClicked: function(m) {
+        root.restoreRow(frow.entry, m.button === Qt.RightButton)
+        root.flyoutGroup = null
+        root.flyoutButton = null
       }
     }
   }
