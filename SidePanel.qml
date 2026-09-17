@@ -331,9 +331,6 @@ Item {
     id: flyoutWindow
     visible: root.flyoutGroup !== null && root.flyoutGroup.members && root.flyoutGroup.members.length > 1
     color: "transparent"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "grabbar-taskbar-flyout"
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     implicitWidth: 260
     implicitHeight: flyoutColumn.implicitHeight
