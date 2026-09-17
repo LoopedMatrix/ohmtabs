@@ -392,8 +392,10 @@ void CGrabbarDeco::handleUpEvent(Event::SCallbackInfo& info) {
             Log::logger->log(Log::DEBUG, "[grabbar] release outside target: cancelled");
     }
 
-    if (m_dragging)
+    if (m_dragging) {
         endDrag();
+        snapToZone();
+    }
 
     m_dragPending = false;
 }
@@ -489,6 +491,103 @@ void CGrabbarDeco::endDrag() {
     g_pKeybindManager->changeMouseBindMode(MBIND_INVALID);
     m_dragging = false;
     Log::logger->log(Log::DEBUG, "[grabbar] drag ended");
+}
+
+// ------------------------------------------------------------- snap lock
+
+// Windows-style snap-lock on drag release. The zone is decided exactly once,
+// here at release, from the pointer's position, so the compositor sees at
+// most one resize+move (or one maximize) per drag. Nothing is issued per
+// mouse-movement event while the pointer travels, which is why there is no
+// throttle loop to tune: the release-time decision is inherently rate-limited
+// to one transaction per drag.
+//
+// Edges are detected against the monitor's full frame (the "frame" the user
+// drags toward), but the snapped geometry is sized from the work area so a
+// maximized window keeps panels' reserved space, matching setMaximized. A
+// snapped window is ordinary floating geometry, so the next drag is a plain
+// move again: releasing away from an edge leaves the window where it was
+// dropped, which is how a snap is undone.
+void CGrabbarDeco::snapToZone() {
+    if (!g_pGlobalState->config.snapLock->value())
+        return;
+
+    const auto PWINDOW = m_window.lock();
+    if (!validMapped(PWINDOW) || !PWINDOW->m_isFloating)
+        return;
+
+    // A tiled window was detached when the drag started (startDrag), so by
+    // the time a drag ends it is floating; if it is not, the drag never
+    // really moved and there is nothing to snap.
+    auto MON = PWINDOW->m_monitor.lock();
+    if (!MON)
+        MON = Desktop::focusState()->monitor();
+    if (!MON)
+        return;
+
+    const CBox FRAME = MON->logicalBox();
+    CBox       AREA  = MON->logicalBoxMinusReserved();
+    if (AREA.w <= 0 || AREA.h <= 0)
+        AREA = FRAME;
+
+    const auto P = g_pInputManager->getMouseCoordsInternal();
+
+    // Trigger thresholds in logical pixels. An edge zone is narrow so a
+    // window released just short of the edge still lands where the pointer
+    // is; a corner is the intersection of two such zones. Corners are tested
+    // first, so a corner drag yields a quarter tile rather than the top
+    // edge's maximize or a half.
+    constexpr double EDGE = 24.0;
+
+    const bool nearLeft   = P.x - FRAME.x <= EDGE;
+    const bool nearRight  = (FRAME.x + FRAME.w) - P.x <= EDGE;
+    const bool nearTop    = P.y - FRAME.y <= EDGE;
+    const bool nearBottom = (FRAME.y + FRAME.h) - P.y <= EDGE;
+
+    const bool cornerTL = nearTop && nearLeft;
+    const bool cornerTR = nearTop && nearRight;
+    const bool cornerBL = nearBottom && nearLeft;
+    const bool cornerBR = nearBottom && nearRight;
+
+    if (cornerTL || cornerTR || cornerBL || cornerBR) {
+        CBox target = AREA;
+        target.w /= 2.0;
+        target.h /= 2.0;
+        if (cornerTR || cornerBR)
+            target.x += target.w;
+        if (cornerBL || cornerBR)
+            target.y += target.h;
+        (void)Config::Actions::resize(target.size(), false, PWINDOW);
+        (void)Config::Actions::move(target.pos(), false, PWINDOW);
+        return;
+    }
+
+    if (nearLeft) {
+        CBox target = AREA;
+        target.w /= 2.0;
+        (void)Config::Actions::resize(target.size(), false, PWINDOW);
+        (void)Config::Actions::move(target.pos(), false, PWINDOW);
+        return;
+    }
+
+    if (nearRight) {
+        CBox target = AREA;
+        target.x += target.w / 2.0;
+        target.w /= 2.0;
+        (void)Config::Actions::resize(target.size(), false, PWINDOW);
+        (void)Config::Actions::move(target.pos(), false, PWINDOW);
+        return;
+    }
+
+    if (nearTop) {
+        // Top edge means maximize: same typed call as the Maximize button and
+        // the title double-click, so it shares their validation and reporting.
+        std::string err;
+        g_pBackend->setMaximized(m_pressToken, true, err);
+        return;
+    }
+
+    // A bottom edge alone does nothing: the window stays where it was dropped.
 }
 
 // `token` was captured at press and re-validated at release: the action
