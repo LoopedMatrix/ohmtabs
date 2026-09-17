@@ -197,6 +197,10 @@ void CGrabbarBackend::stop(bool restoreOwned, const char* reason) {
     if (restoreOwned)
         restored = restoreAllOwned(reason);
 
+    // Tab groups reference live windows that stop() is about to tear down; drop
+    // the model before the window registry is emptied.
+    m_tabs.clear();
+
     broadcastShell("event", {{"kind", "backendStopping"}, {"reason", reason}, {"restored", std::to_string(restored)}});
 
     for (auto& c : m_clients) {
@@ -643,7 +647,7 @@ eActionStatus CGrabbarBackend::setMaximized(const std::string& token, std::optio
     return ACTION_OK;
 }
 
-eActionStatus CGrabbarBackend::closeWindow(const std::string& token, std::string& err) {
+eActionStatus CGrabbarBackend::closeOne(const std::string& token, std::string& err) {
     auto w = resolve(token);
     if (!w) {
         err = "stale target";
@@ -655,6 +659,282 @@ eActionStatus CGrabbarBackend::closeWindow(const std::string& token, std::string
         return ACTION_FAILED;
     }
     // The window stays in the model until the compositor reports its destruction.
+    return ACTION_OK;
+}
+
+eActionStatus CGrabbarBackend::closeWindow(const std::string& token, std::string& err) {
+    // Closing a tab-group host means closing the whole group: ask the shell for
+    // the browser-like "close all N windows?" prompt instead of closing one tab.
+    if (const auto G = m_tabs.hostGroup(token); G && G->tabs.size() > 1) {
+        requestGroupClose(token);
+        return ACTION_OK;
+    }
+    return closeOne(token, err);
+}
+
+// ---------------------------------------------------------------- tab groups
+
+static std::string jsonEscape(const std::string& v) {
+    std::string out;
+    out.reserve(v.size() + 8);
+    for (unsigned char c : v) {
+        switch (c) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (c < 0x20)
+                    out += std::format("\\u{:04x}", (unsigned)c);
+                else
+                    out += (char)c;
+        }
+    }
+    return out;
+}
+
+bool CGrabbarBackend::hideOwned(STrackedWindow& t, std::string& err) {
+    auto w = t.window.lock();
+    if (!validMapped(w)) {
+        err = "stale target";
+        return false;
+    }
+    if (t.owned) {
+        err = "already hidden";
+        return false;
+    }
+    if (!isMinimizable(w, err))
+        return false;
+    if (ownedCount() >= GRABBAR_MAX_OWNED) {
+        err = "Grabbar cannot keep track of more hidden windows";
+        return false;
+    }
+
+    auto mon = w->m_monitor.lock();
+    if (!mon)
+        mon = Desktop::focusState()->monitor();
+    auto ws = ownedWorkspace(mon, true);
+    if (!ws) {
+        err = "could not prepare Grabbar's hidden workspace";
+        return false;
+    }
+
+    const bool WASMAXIMIZED = isMaximized(w);
+    if (WASMAXIMIZED)
+        (void)fullscreenWindow(Fullscreen::FSMODE_NONE, Fullscreen::FSMODE_NONE, false, w);
+
+    t.origin           = captureOrigin(w);
+    t.origin.maximized = WASMAXIMIZED;
+
+    if (t.origin.pinned)
+        (void)pinWindow(TOGGLE_ACTION_DISABLE, w);
+
+    t.transitioning = true;
+    auto r          = moveToWorkspace(ws, true, w);
+    t.transitioning = false;
+    if (!r || w->m_workspace != ws) {
+        err = r ? "window did not move" : r.error().message;
+        if (t.origin.maximized)
+            (void)fullscreenWindow(Fullscreen::FSMODE_MAXIMIZED, Fullscreen::FSMODE_MAXIMIZED, false, w);
+        if (t.origin.pinned)
+            (void)pinWindow(TOGGLE_ACTION_ENABLE, w);
+        return false;
+    }
+
+    t.owned        = true;
+    t.ownerRequest.clear();
+    return true;
+}
+
+std::string CGrabbarBackend::tabsListJson() {
+    std::string out = "{\"groups\":[";
+    bool        firstG = true;
+    for (const auto* G : m_tabs.groups()) {
+        if (!firstG)
+            out += ',';
+        firstG = false;
+        out += std::format("{{\"id\":{},\"host\":\"{}\",\"active\":{},\"tabs\":[", G->id, jsonEscape(G->tabs[G->active]), G->active);
+        for (size_t i = 0; i < G->tabs.size(); ++i) {
+            if (i)
+                out += ',';
+            auto w = resolve(G->tabs[i]);
+            out += std::format("{{\"token\":\"{}\",\"title\":\"{}\",\"active\":{}}}", jsonEscape(G->tabs[i]), jsonEscape(w ? w->m_title : ""), i == (size_t)G->active);
+        }
+        out += "]}";
+    }
+    out += "]}";
+    return out;
+}
+
+
+void CGrabbarBackend::broadcastTabs() {
+    if (m_shell)
+        send(m_shell, "tabsList", {{"json", tabsListJson()}});
+}
+
+void CGrabbarBackend::requestGroupClose(const std::string& hostToken) {
+    const auto G = m_tabs.hostGroup(hostToken);
+    if (!G || G->tabs.size() < 2) {
+        std::string err;
+        (void)closeOne(hostToken, err);
+        return;
+    }
+    std::string titles = "[";
+    for (size_t i = 0; i < G->tabs.size(); ++i) {
+        if (i)
+            titles += ',';
+        auto w = resolve(G->tabs[i]);
+        titles += std::format("\"{}\"", jsonEscape(w ? w->m_title : ""));
+    }
+    titles += "]";
+    const auto JSON = std::format("{{\"event\":\"tabs.closeAllRequested\",\"group\":{},\"count\":{},\"titles\":{}}}", G->id, G->tabs.size(), titles);
+    broadcastShell("tabsEvent", {{"json", JSON}});
+}
+
+eActionStatus CGrabbarBackend::joinTabs(const std::string& source, const std::string& host, std::string& err) {
+    auto st = tracked(source);
+    if (!resolve(source) || !resolve(host)) {
+        err = "stale target";
+        return ACTION_STALE;
+    }
+    if (source == host) {
+        err = "a window cannot join itself";
+        return ACTION_REFUSED;
+    }
+    if (m_tabs.groupOf(source) || m_tabs.groupOf(host)) {
+        err = "one of the windows is already in a tab group";
+        return ACTION_REFUSED;
+    }
+    if (st && !st->owned && !hideOwned(*st, err))
+        return ACTION_FAILED;
+    const auto R = m_tabs.join(source, host);
+    if (!R.ok) {
+        err = R.error;
+        return ACTION_REFUSED;
+    }
+    Log::logger->log(Log::INFO, "[grabbar] tab group {}: {} joined onto host {}", R.id, source, host);
+    broadcastTabs();
+    refreshBars();
+    return ACTION_OK;
+}
+
+eActionStatus CGrabbarBackend::activateTab(uint64_t group, int index, std::string& err) {
+    const auto G = m_tabs.group(group);
+    if (!G) {
+        err = "no such group";
+        return ACTION_FAILED;
+    }
+    if (index < 0 || static_cast<size_t>(index) >= G->tabs.size()) {
+        err = "bad tab index";
+        return ACTION_REFUSED;
+    }
+
+    // Convergence: the active tab is the only visible member. Restore it if it is
+    // parked and hide every OTHER member no matter what state it is in - hiding only
+    // "the previous tab" left two tabs visible whenever the previous one was on screen
+    // (it is not 'owned'), and made the call non-idempotent. Copy the member list,
+    // m_tabs.activate() below mutates the group.
+    const auto MEMBERS = G->tabs;
+    for (size_t i = 0; i < MEMBERS.size(); ++i) {
+        auto t = tracked(MEMBERS[i]);
+        if (!t)
+            continue;
+        std::string herr;
+        if (static_cast<int>(i) == index) {
+            if (t->owned && restore(MEMBERS[i], "current", "", true, herr) != ACTION_OK)
+                Log::logger->log(Log::WARN, "[grabbar] could not show tab {}: {}", MEMBERS[i], herr);
+        } else if (!t->owned && !hideOwned(*t, herr)) {
+            Log::logger->log(Log::WARN, "[grabbar] could not hide tab {}: {}", MEMBERS[i], herr);
+        }
+    }
+
+    if (!m_tabs.activate(group, index)) {
+        err = "failed to activate tab";
+        return ACTION_FAILED;
+    }
+    broadcastTabs();
+    refreshBars();
+    return ACTION_OK;
+}
+
+eActionStatus CGrabbarBackend::activateTabByToken(const std::string& token, std::string& err) {
+    const auto G = m_tabs.groupOf(token);
+    if (!G) {
+        err = "window is not in a tab group";
+        return ACTION_REFUSED;
+    }
+    for (size_t i = 0; i < G->tabs.size(); ++i)
+        if (G->tabs[i] == token)
+            return activateTab(G->id, (int)i, err);
+    err = "tab not found";
+    return ACTION_FAILED;
+}
+
+eActionStatus CGrabbarBackend::detachTab(const std::string& token, std::string& err) {
+    const auto G = m_tabs.groupOf(token);
+    if (!G) {
+        err = "window is not in a tab group";
+        return ACTION_REFUSED;
+    }
+    const bool WAS_HOST = (G->tabs[G->active] == token);
+    if (WAS_HOST) {
+        std::vector<std::string> members = G->tabs;
+        m_tabs.detach(token);
+        for (const auto& m : members)
+            if (m != token)
+                if (auto t = tracked(m); t && t->owned) {
+                    std::string herr;
+                    (void)restore(m, "current", "", false, herr);
+                }
+    } else {
+        m_tabs.detach(token);
+        if (auto t = tracked(token); t && t->owned) {
+            if (restore(token, "current", "", true, err) != ACTION_OK)
+                return ACTION_FAILED;
+        }
+    }
+    broadcastTabs();
+    refreshBars();
+    return ACTION_OK;
+}
+
+eActionStatus CGrabbarBackend::ungroupTabs(uint64_t group, std::string& err) {
+    const auto G = m_tabs.group(group);
+    if (!G) {
+        err = "no such group";
+        return ACTION_FAILED;
+    }
+    std::vector<std::string> members = G->tabs;
+    m_tabs.ungroup(group);
+    for (const auto& m : members)
+        if (auto t = tracked(m); t && t->owned) {
+            std::string herr;
+            (void)restore(m, "current", "", false, herr);
+        }
+    broadcastTabs();
+    refreshBars();
+    return ACTION_OK;
+}
+
+eActionStatus CGrabbarBackend::closeAllTabs(uint64_t group, bool confirm, std::string& err) {
+    if (!confirm) {
+        err = "closeAll requires confirm";
+        return ACTION_REFUSED;
+    }
+    const auto tokens = m_tabs.closeAll(group);
+    if (tokens.empty()) {
+        err = "no such group";
+        return ACTION_FAILED;
+    }
+    for (const auto& token : tokens) {
+        std::string cerr_;
+        (void)closeOne(token, cerr_);
+    }
+    broadcastTabs();
+    refreshBars();
     return ACTION_OK;
 }
 
@@ -759,6 +1039,23 @@ void CGrabbarBackend::onWindowClose(PHLWINDOW w) {
         broadcastShell("window", f);
     }
     forgetWindow(TOKEN);
+    // A closed/destroyed tab leaves its group (dissolves it below two members).
+    // If the closed window was the host, its hidden tabs become ordinary
+    // restored windows again.
+    if (const auto G = m_tabs.groupOf(TOKEN)) {
+        const bool WAS_HOST = (G->tabs[G->active] == TOKEN);
+        std::vector<std::string> members = G->tabs;
+        m_tabs.forget(TOKEN);
+        if (WAS_HOST)
+            for (const auto& m : members)
+                if (m != TOKEN)
+                    if (auto t = tracked(m); t && t->owned) {
+                        std::string herr;
+                        (void)restore(m, "current", "", false, herr);
+                    }
+        broadcastTabs();
+        refreshBars();
+    }
 }
 
 void CGrabbarBackend::onWindowChanged(PHLWINDOW w, const char* what) {
@@ -1093,8 +1390,51 @@ void CGrabbarBackend::handleLine(SGrabbarClient* c, const std::string& line) {
         return;
     }
 
+    if (type == "tabs") {
+        const auto VERB = field(F, "verb");
+        const auto U64  = [](const std::string& s) -> uint64_t {
+            try { return s.empty() ? 0 : std::stoull(s); } catch (...) { return 0; }
+        };
+        const auto INT = [](const std::string& s) -> int {
+            try { return s.empty() ? -1 : std::stoi(s); } catch (...) { return -1; }
+        };
+        std::string err;
+        if (VERB == "list") {
+            send(c, "tabsList", {{"json", tabsListJson()}});
+        } else if (VERB == "join") {
+            const auto st = joinTabs(field(F, "source"), field(F, "host"), err);
+            send(c, "result", {{"verb", VERB}, {"status", statusName(st)}, {"error", err}});
+        } else if (VERB == "activate") {
+            const auto st = activateTab(U64(field(F, "group")), INT(field(F, "index")), err);
+            send(c, "result", {{"verb", VERB}, {"status", statusName(st)}, {"error", err}});
+        } else if (VERB == "detach") {
+            const auto st = detachTab(field(F, "token"), err);
+            send(c, "result", {{"verb", VERB}, {"status", statusName(st)}, {"error", err}});
+        } else if (VERB == "ungroup") {
+            const auto st = ungroupTabs(U64(field(F, "group")), err);
+            send(c, "result", {{"verb", VERB}, {"status", statusName(st)}, {"error", err}});
+        } else if (VERB == "closeAll") {
+            const auto CF = field(F, "confirm");
+            const auto st = closeAllTabs(U64(field(F, "group")), CF == "1" || CF == "true" || CF == "yes", err);
+            send(c, "result", {{"verb", VERB}, {"status", statusName(st)}, {"error", err}});
+        } else {
+            send(c, "error", {{"reason", "unknown-tabs-verb"}, {"verb", VERB}});
+        }
+        return;
+    }
+
+    if (type == "snap") {
+        send(c, "snapStatus", {{"json", SnapFx::statusJson()}});
+        return;
+    }
+
     if (type == "status") {
         send(c, "status", {{"json", statusText(true)}});
+        return;
+    }
+
+    if (type == "snap.status") {
+        send(c, "snapStatus", {{"json", SnapFx::statusJson()}});
         return;
     }
 
@@ -1232,6 +1572,7 @@ void CGrabbarBackend::applyTheme(const Fields& f) {
     set("textColor", t.textColor);
     set("hoverColor", t.hoverColor);
     set("closeHoverColor", t.closeHoverColor);
+    set("snapGlowColor", t.snapGlowColor);
     if (const auto FONT = field(f, "textFont"); !FONT.empty())
         t.textFont = FONT == "reset" ? std::optional<std::string>{} : std::optional<std::string>{FONT.substr(0, 64)};
     g_pGlobalState->glyphCache.clear();

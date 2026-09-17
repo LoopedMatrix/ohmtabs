@@ -113,6 +113,14 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     cfg.textSize           = makeShared<Config::Values::CIntValue>("plugin:grabbar:text_size", "Title text size", 11);
     cfg.shellGraceMs       = makeShared<Config::Values::CIntValue>("plugin:grabbar:shell_grace_ms", "How long hidden windows wait for the shell service to come back before they are returned", GRABBAR_GRACE_MS);
     cfg.snapLock           = makeShared<Config::Values::CBoolValue>("plugin:grabbar:snap_lock", "Snap the window into a screen-edge zone when a drag is released near an edge", true);
+    // Snap glow / flash (feat/snap-glow): drag preview + release flash.
+    cfg.snapGlow           = makeShared<Config::Values::CBoolValue>("plugin:grabbar:snap_glow", "Light up the window frame while a drag is in a snap zone and flash on snap", true);
+    cfg.snapGlowColor      = makeShared<Config::Values::CColorValue>("plugin:grabbar:snap_glow_color", "Accent colour for the snap glow and flash (0 = active border colour)", 0x00000000);
+    cfg.snapGlowMs         = makeShared<Config::Values::CIntValue>("plugin:grabbar:snap_glow_ms", "How long the snap flash decays, in milliseconds", 260);
+    cfg.snapPreview        = makeShared<Config::Values::CBoolValue>("plugin:grabbar:snap_preview", "Reserved: translucent snap-zone preview while dragging (not yet rendered)", true);
+    cfg.tabs               = makeShared<Config::Values::CBoolValue>("plugin:grabbar:tabs", "Enable browser-like window tabs (drop one window onto another)", true);
+    cfg.tabMinWidth        = makeShared<Config::Values::CIntValue>("plugin:grabbar:tabMinWidth", "Minimum width of a tab segment in logical pixels", 120);
+
     cfg.textFont           = makeShared<Config::Values::CStringValue>("plugin:grabbar:text_font", "Title font family", "Sans");
     cfg.barColor           = makeShared<Config::Values::CColorValue>("plugin:grabbar:bar_color", "Strip color for the focused window", 0xff2a2f36);
     cfg.inactiveBarColor   = makeShared<Config::Values::CColorValue>("plugin:grabbar:inactive_bar_color", "Strip color for unfocused windows", 0xff20242a);
@@ -122,7 +130,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     const std::vector<SP<Config::Values::IValue>> VALUES = {cfg.enabled,  cfg.buttonsLeft, cfg.barHeight,        cfg.buttonSize, cfg.padding,    cfg.textSize,
                                                             cfg.textFont, cfg.barColor,    cfg.inactiveBarColor, cfg.textColor,  cfg.hoverColor, cfg.closeHoverColor,
-                                                            cfg.shellGraceMs, cfg.snapLock};
+                                                            cfg.shellGraceMs, cfg.snapLock, cfg.snapGlow, cfg.snapGlowColor, cfg.snapGlowMs, cfg.snapPreview, cfg.tabs, cfg.tabMinWidth};
     for (const auto& v : VALUES)
         HyprlandAPI::addConfigValueV2(PHANDLE, v);
 

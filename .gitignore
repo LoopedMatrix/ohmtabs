@@ -5,3 +5,6 @@ __pycache__/
 *.o
 native/upstream/
 tests/integration/vpointer/vpointer
+# compiled native unit-test binaries
+native/grabbar/tests/test_snapfx
+tests/unit/tabs_store_test

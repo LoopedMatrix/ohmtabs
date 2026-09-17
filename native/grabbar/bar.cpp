@@ -1,4 +1,5 @@
 #include "bar.hpp"
+#include "snapfx.hpp"
 
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/desktop/state/FocusState.hpp>
@@ -61,6 +62,12 @@ namespace {
     std::string textFontValue() {
         const auto& S = g_pGlobalState->shell;
         return S.textFont.value_or(g_pGlobalState->config.textFont->value());
+    }
+    bool tabsValue() {
+        return g_pGlobalState->config.tabs->value();
+    }
+    int tabMinWidthValue() {
+        return std::clamp<int>(g_pGlobalState->config.tabMinWidth->value(), 48, 640);
     }
 }
 
@@ -233,6 +240,130 @@ eGrabbarButton CGrabbarDeco::buttonAt(const Vector2D& rel) {
     return BTN_NONE;
 }
 
+// -------------------------------------------------------------- window tabs
+
+std::vector<STabBox> CGrabbarDeco::layoutTabs(double barW, double barH) {
+    m_tabBoxes.clear();
+    if (!tabsValue())
+        return m_tabBoxes;
+
+    const auto PWINDOW = m_window.lock();
+    if (!validMapped(PWINDOW))
+        return m_tabBoxes;
+
+    const auto TOKEN = g_pBackend->tokenFor(PWINDOW);
+    const auto G     = g_pBackend->tabs().hostGroup(TOKEN);
+    if (!G || G->tabs.size() < 2)
+        return m_tabBoxes;
+
+    const int  SIZE = buttonSizeValue();
+    const int  PAD  = std::clamp<int>(g_pGlobalState->config.padding->value(), 0, 32);
+    const bool LEFT = buttonsLeftValue();
+    const double y  = std::floor((barH - SIZE) / 2.0);
+
+    // Free area between the menu target and the min/max/close cluster — the
+    // same bounds the centered title uses, so tabs never overlap the buttons
+    // or the narrow-window fallback in layoutButtons.
+    double occupiedLeft = 0, occupiedRight = 0;
+    for (const auto& s : layoutButtons(barW, barH)) {
+        if (s.id == BTN_MENU && !LEFT)
+            occupiedLeft = std::max(occupiedLeft, s.box.x + s.box.w);
+        else if (s.id == BTN_MENU)
+            occupiedRight = std::max(occupiedRight, barW - s.box.x);
+        else if (LEFT)
+            occupiedLeft = std::max(occupiedLeft, s.box.x + s.box.w);
+        else
+            occupiedRight = std::max(occupiedRight, barW - s.box.x);
+    }
+
+    const double leftEdge  = occupiedLeft + PAD;
+    const double rightEdge = barW - occupiedRight - PAD;
+    const double avail     = rightEdge - leftEdge;
+    const double minW      = (double)tabMinWidthValue();
+    if (avail < minW)
+        return m_tabBoxes; // too narrow for tabs: fall back to the plain title
+
+    // Every tab gets at least minW, expanding evenly while space allows.
+    const size_t n    = G->tabs.size();
+    double       segW = std::max(minW, avail / (double)n);
+    double       total = segW * (double)n;
+    double       x     = leftEdge + std::max(0.0, (avail - total) / 2.0);
+
+    for (size_t i = 0; i < n; ++i) {
+        STabBox tb;
+        tb.index  = (int)i;
+        tb.active = (i == (size_t)G->active);
+        tb.token  = G->tabs[i];
+        tb.box    = CBox{x, y, segW, (double)SIZE};
+        const double CS = std::max(12.0, SIZE * 0.5);
+        tb.closeBox     = CBox{x + segW - CS - 6, y + (SIZE - CS) / 2.0, CS, CS};
+        m_tabBoxes.push_back(tb);
+        x += segW;
+    }
+    return m_tabBoxes;
+}
+
+int CGrabbarDeco::tabAt(const Vector2D& rel) {
+    const auto BOX = assignedBoxGlobal();
+    layoutTabs(BOX.w, BOX.h);
+    for (const auto& tb : m_tabBoxes)
+        if (tb.box.containsPoint(rel))
+            return tb.index;
+    return -1;
+}
+
+bool CGrabbarDeco::tryJoinDrop() {
+    const auto PWINDOW = m_window.lock();
+    if (!validMapped(PWINDOW))
+        return false;
+
+    const auto MOUSE = g_pInputManager->getMouseCoordsInternal();
+    Desktop::CViewHitTester hitTester{*Desktop::viewState()};
+
+    // The dragged window follows the pointer, so skip it to find the window
+    // underneath: that is the drop target this window joins as a tab of.
+    auto target = hitTester.windowAt(MOUSE, Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS | Desktop::View::ALLOW_FLOATING, PWINDOW);
+    if (!target || target == PWINDOW)
+        return false;
+
+    const auto TARGETTOKEN = g_pBackend->tokenFor(target);
+    if (TARGETTOKEN.empty() || TARGETTOKEN == m_pressToken)
+        return false;
+
+    std::string err;
+    const auto  st = g_pBackend->joinTabs(m_pressToken, TARGETTOKEN, err);
+    if (st != ACTION_OK)
+        Log::logger->log(Log::DEBUG, "[grabbar] drop-join {} -> {} refused: {}", m_pressToken, TARGETTOKEN, err);
+    return st == ACTION_OK;
+}
+
+void CGrabbarDeco::startTabTearOff(const std::string& token) {
+    std::string err;
+    if (g_pBackend->detachTab(token, err) != ACTION_OK) {
+        Log::logger->log(Log::WARN, "[grabbar] tab tear-off failed: {}", err);
+        m_tabTearOff = false;
+        m_tearToken.clear();
+        return;
+    }
+
+    // The detached tab is now a floating, focused window; grab it for a move.
+    auto w = g_pBackend->resolve(token);
+    if (!w || !validMapped(w)) {
+        m_tabTearOff = false;
+        m_tearToken.clear();
+        return;
+    }
+    if (!w->m_isFloating)
+        (void)Config::Actions::floatWindow(Config::Actions::TOGGLE_ACTION_ENABLE, w);
+    if (Desktop::focusState()->window() != w)
+        Desktop::focusState()->fullWindowFocus(w, Desktop::FOCUS_REASON_CLICK);
+    Desktop::windowState()->raise(w);
+
+    g_pKeybindManager->changeMouseBindMode(MBIND_MOVE);
+    m_dragging = true;
+    Log::logger->log(Log::DEBUG, "[grabbar] tab tear-off drag on {}", token);
+}
+
 // ------------------------------------------------------------------ input
 
 bool CGrabbarDeco::inputIsValid() {
@@ -346,6 +477,23 @@ void CGrabbarDeco::handleDownEvent(Event::SCallbackInfo& info) {
         return;
     }
 
+    // Tab segment: a click activates the tab, its close affordance closes just
+    // that window, and dragging a non-active segment tears it out of the group.
+    if (const int TAB = tabAt(COORDS); TAB >= 0) {
+        const auto& TB      = m_tabBoxes[TAB];
+        m_pressedTab        = TAB;
+        m_pressedTabClose   = TB.closeBox.containsPoint(COORDS);
+        m_pressToken        = TB.token;
+        m_lastPressWasTitle = false;
+        m_tabTearOff        = !TB.active && !m_pressedTabClose;
+        m_tearToken         = m_tabTearOff ? TB.token : "";
+        m_dragPending       = !m_pressedTabClose;
+        m_pressPos          = g_pInputManager->getMouseCoordsInternal();
+        m_pressOffset       = COORDS;
+        damageEntire();
+        return;
+    }
+
     // Title region: double-click toggles Maximize / Restore size, otherwise a
     // drag may start once the pointer travels past the threshold.
     const auto NOW = Time::steadyNow();
@@ -392,9 +540,48 @@ void CGrabbarDeco::handleUpEvent(Event::SCallbackInfo& info) {
             Log::logger->log(Log::DEBUG, "[grabbar] release outside target: cancelled");
     }
 
+    // Tab release: activate, or close just that tab, only when released on the
+    // same segment (a tab press consumed by a drag clears m_pressedTab).
+    if (m_pressedTab >= 0) {
+        const bool        CLOSE = m_pressedTabClose;
+        const std::string TOKEN = m_pressToken;
+        m_pressedTab      = -1;
+        m_pressedTabClose = false;
+        m_tabTearOff      = false;
+        m_tearToken.clear();
+        damageEntire();
+        if (inputIsValid()) {
+            const int REL = tabAt(cursorRelativeToBar());
+            if (REL >= 0 && m_tabBoxes[REL].token == TOKEN) {
+                std::string err;
+                if (CLOSE)
+                    g_pBackend->closeWindow(TOKEN, err);
+                else
+                    g_pBackend->activateTabByToken(TOKEN, err);
+            }
+        }
+    }
+
     if (m_dragging) {
         endDrag();
-        snapToZone();
+        // Glow comes from config, same as the preview.
+        m_snapFx.glowEnabled = g_pGlobalState->config.snapGlow->value();
+
+        // A drop onto another window wins over the snap; a tear-off drag
+        // commits nothing here.
+        if (m_tabTearOff) {
+            m_tabTearOff = false;
+            m_tearToken.clear();
+            // Tear-off drag: the detached tab is dropped where the pointer is.
+        } else if (tabsValue() && tryJoinDrop()) {
+            // Dropped onto another window: it just became a tab group (no snap).
+        } else if (snapToZone()) {
+            m_snapFx.flash(std::clamp<int>(g_pGlobalState->config.snapGlowMs->value(), 0, 5000));
+        }
+
+        m_snapFx.setZone(SnapFx::ZoneResult{}); // clear the drag preview glow
+        m_snapFxLastTick = Time::steadyNow();
+        damageEntire();
     }
 
     m_dragPending = false;
@@ -414,7 +601,12 @@ void CGrabbarDeco::onMouseMove(Vector2D coords) {
         damageEntire();
     }
 
-    if (!m_dragPending || m_dragging)
+    if (m_dragging) {
+        updateSnapPreview();
+        return;
+    }
+
+    if (!m_dragPending)
         return;
 
     static auto PDRAGTHRESHOLD = CConfigValue<Config::INTEGER>("binds:drag_threshold");
@@ -425,7 +617,10 @@ void CGrabbarDeco::onMouseMove(Vector2D coords) {
         return;
 
     m_dragPending = false;
-    startDrag();
+    if (m_tabTearOff)
+        startTabTearOff(m_tearToken);
+    else
+        startDrag();
 }
 
 void CGrabbarDeco::startDrag() {
@@ -484,6 +679,8 @@ void CGrabbarDeco::startDrag() {
 
     g_pKeybindManager->changeMouseBindMode(MBIND_MOVE);
     m_dragging = true;
+    m_pressedTab      = -1; // a tab press consumed by the drag is no longer a click
+    m_pressedTabClose = false;
     Log::logger->log(Log::DEBUG, "[grabbar] drag started on {}", m_pressToken);
 }
 
@@ -508,17 +705,82 @@ void CGrabbarDeco::endDrag() {
 // snapped window is ordinary floating geometry, so the next drag is a plain
 // move again: releasing away from an edge leaves the window where it was
 // dropped, which is how a snap is undone.
-void CGrabbarDeco::snapToZone() {
+bool CGrabbarDeco::snapToZone() {
     if (!g_pGlobalState->config.snapLock->value())
-        return;
+        return false;
+
+    const auto PWINDOW = m_window.lock();
+    if (!validMapped(PWINDOW) || !PWINDOW->m_isFloating)
+        return false;
+
+    // A tiled window was detached when the drag started (startDrag), so by
+    // the time a drag ends it is floating; if it is not, the drag never
+    // really moved and there is nothing to snap.
+    auto MON = PWINDOW->m_monitor.lock();
+    if (!MON)
+        MON = Desktop::focusState()->monitor();
+    if (!MON)
+        return false;
+
+    const CBox FRAME = MON->logicalBox();
+    CBox       AREA  = MON->logicalBoxMinusReserved();
+    if (AREA.w <= 0 || AREA.h <= 0)
+        AREA = FRAME;
+
+    const auto P = g_pInputManager->getMouseCoordsInternal();
+
+    // The strip's reserved top band, in logical pixels — the same value
+    // getPositioningInfo reports to the compositor (0 when the strip is
+    // disabled or hidden, so those windows snap flush like before). Handed to
+    // decideZone so the drag preview and the release-time snap agree.
+    const double topReserve = effectiveEnabled() ? (double)barHeightValue() : 0.0;
+
+    // Zone decision shared with the drag preview (updateSnapPreview) so the
+    // preview and the release-time snap can never disagree about where the
+    // pointer would land.
+    const auto R = SnapFx::decideZone(P.x, P.y, {FRAME.x, FRAME.y, FRAME.w, FRAME.h}, {AREA.x, AREA.y, AREA.w, AREA.h}, topReserve);
+
+    switch (R.zone) {
+        case SnapFx::Zone::CornerTL:
+        case SnapFx::Zone::CornerTR:
+        case SnapFx::Zone::CornerBL:
+        case SnapFx::Zone::CornerBR: {
+            const CBox target = {R.target.x, R.target.y, R.target.w, R.target.h};
+            (void)Config::Actions::resize(target.size(), false, PWINDOW);
+            (void)Config::Actions::move(target.pos(), false, PWINDOW);
+            return true;
+        }
+        case SnapFx::Zone::Left:
+        case SnapFx::Zone::Right: {
+            const CBox target = {R.target.x, R.target.y, R.target.w, R.target.h};
+            (void)Config::Actions::resize(target.size(), false, PWINDOW);
+            (void)Config::Actions::move(target.pos(), false, PWINDOW);
+            return true;
+        }
+        case SnapFx::Zone::Top: {
+            // Top edge means maximize: same typed call as the Maximize button and
+            // the title double-click, so it shares their validation and reporting.
+            std::string err;
+            g_pBackend->setMaximized(m_pressToken, true, err);
+            return true;
+        }
+        default:
+            // A bottom edge alone does nothing: the window stays where it was dropped.
+            return false;
+    }
+}
+
+// While a drag is in progress, track the snap zone under the pointer and drive
+// the frame-edge glow. Uses the same decideZone() as snapToZone(), so the
+// preview and the release-time snap can never disagree.
+void CGrabbarDeco::updateSnapPreview() {
+    m_snapFx.glowEnabled    = g_pGlobalState->config.snapGlow->value();
+    m_snapFx.previewEnabled = g_pGlobalState->config.snapPreview->value();
 
     const auto PWINDOW = m_window.lock();
     if (!validMapped(PWINDOW) || !PWINDOW->m_isFloating)
         return;
 
-    // A tiled window was detached when the drag started (startDrag), so by
-    // the time a drag ends it is floating; if it is not, the drag never
-    // really moved and there is nothing to snap.
     auto MON = PWINDOW->m_monitor.lock();
     if (!MON)
         MON = Desktop::focusState()->monitor();
@@ -530,64 +792,29 @@ void CGrabbarDeco::snapToZone() {
     if (AREA.w <= 0 || AREA.h <= 0)
         AREA = FRAME;
 
+    // The strip's reserved top band, in logical pixels — the same value
+    // getPositioningInfo reports to the compositor (0 when the strip is
+    // disabled or hidden, so those windows snap flush like before). Handed to
+    // decideZone so the drag preview and the release-time snap agree.
+    const double topReserve = effectiveEnabled() ? (double)barHeightValue() : 0.0;
+
     const auto P = g_pInputManager->getMouseCoordsInternal();
+    const auto R = SnapFx::decideZone(P.x, P.y, {FRAME.x, FRAME.y, FRAME.w, FRAME.h}, {AREA.x, AREA.y, AREA.w, AREA.h}, topReserve);
 
-    // Trigger thresholds in logical pixels. An edge zone is narrow so a
-    // window released just short of the edge still lands where the pointer
-    // is; a corner is the intersection of two such zones. Corners are tested
-    // first, so a corner drag yields a quarter tile rather than the top
-    // edge's maximize or a half.
-    constexpr double EDGE = 24.0;
-
-    const bool nearLeft   = P.x - FRAME.x <= EDGE;
-    const bool nearRight  = (FRAME.x + FRAME.w) - P.x <= EDGE;
-    const bool nearTop    = P.y - FRAME.y <= EDGE;
-    const bool nearBottom = (FRAME.y + FRAME.h) - P.y <= EDGE;
-
-    const bool cornerTL = nearTop && nearLeft;
-    const bool cornerTR = nearTop && nearRight;
-    const bool cornerBL = nearBottom && nearLeft;
-    const bool cornerBR = nearBottom && nearRight;
-
-    if (cornerTL || cornerTR || cornerBL || cornerBR) {
-        CBox target = AREA;
-        target.w /= 2.0;
-        target.h /= 2.0;
-        if (cornerTR || cornerBR)
-            target.x += target.w;
-        if (cornerBL || cornerBR)
-            target.y += target.h;
-        (void)Config::Actions::resize(target.size(), false, PWINDOW);
-        (void)Config::Actions::move(target.pos(), false, PWINDOW);
-        return;
+    if (R.zone != m_snapFx.zone()) {
+        m_snapFx.setZone(R);
+        m_snapFxLastTick = Time::steadyNow();
+        damageEntire();
     }
+}
 
-    if (nearLeft) {
-        CBox target = AREA;
-        target.w /= 2.0;
-        (void)Config::Actions::resize(target.size(), false, PWINDOW);
-        (void)Config::Actions::move(target.pos(), false, PWINDOW);
-        return;
-    }
-
-    if (nearRight) {
-        CBox target = AREA;
-        target.x += target.w / 2.0;
-        target.w /= 2.0;
-        (void)Config::Actions::resize(target.size(), false, PWINDOW);
-        (void)Config::Actions::move(target.pos(), false, PWINDOW);
-        return;
-    }
-
-    if (nearTop) {
-        // Top edge means maximize: same typed call as the Maximize button and
-        // the title double-click, so it shares their validation and reporting.
-        std::string err;
-        g_pBackend->setMaximized(m_pressToken, true, err);
-        return;
-    }
-
-    // A bottom edge alone does nothing: the window stays where it was dropped.
+// Advance the glow/flash animation from wall-clock elapsed time. Driven from
+// renderPass; the render loop keeps running while the state is animating.
+void CGrabbarDeco::snapFxTick() {
+    const auto   NOW = Time::steadyNow();
+    const double DT  = std::clamp(std::chrono::duration<double, std::milli>(NOW - m_snapFxLastTick).count(), 0.0, 100.0);
+    m_snapFxLastTick = NOW;
+    m_snapFx.tick(DT);
 }
 
 // `token` was captured at press and re-validated at release: the action
@@ -627,6 +854,49 @@ void CGrabbarDeco::renderTitle(const Vector2D& bufferSize, const float scale, in
     }
 
     m_textTex = g_pHyprRenderer->renderText(m_lastTitle, COLOR, std::round(SIZE * scale), false, FONT, maxWidth);
+}
+
+void CGrabbarDeco::renderTabs(float a, const CBox& titleBarBox, float SCALE, int PAD, const CHyprColor& textColor, bool focused) {
+    const auto SIZE = std::clamp<int>(g_pGlobalState->config.textSize->value(), 6, 40);
+    const auto FONT = textFontValue();
+    const auto HC   = colorOf(g_pGlobalState->shell.hoverColor, g_pGlobalState->config.hoverColor);
+
+    for (const auto& tb : m_tabBoxes) {
+        CBox b = tb.box;
+        b.translate(Vector2D{titleBarBox.x / SCALE, titleBarBox.y / SCALE}).scale(SCALE).round();
+
+        // Segment background: the active tab reads as the "selected" strip.
+        if (tb.active) {
+            auto bg = HC;
+            bg.a *= a * 0.55;
+            g_pHyprOpenGL->renderRect(b, bg, {.round = (int)std::round(6 * SCALE), .roundingPower = 2.F});
+        }
+
+        auto xc = textColor;
+        if (!focused)
+            xc.a *= 0.75;
+
+        // Close affordance: a small x on the right edge of the segment.
+        CBox cb = tb.closeBox;
+        cb.translate(Vector2D{titleBarBox.x / SCALE, titleBarBox.y / SCALE}).scale(SCALE).round();
+        auto xtex = g_pHyprRenderer->renderText("×", xc, std::round(12 * SCALE), false, FONT, (int)std::round(tb.closeBox.w * SCALE));
+        if (xtex && xtex->m_texID != 0) {
+            CBox pos = {cb.x + (cb.w - xtex->m_size.x) / 2.0, cb.y + (cb.h - xtex->m_size.y) / 2.0, (double)xtex->m_size.x, (double)xtex->m_size.y};
+            pos.round();
+            g_pHyprOpenGL->renderTexture(xtex, pos, {.a = a});
+        }
+
+        // Tab title, truncated to the segment minus the close affordance.
+        auto              w     = g_pBackend->resolve(tb.token);
+        const std::string title = w ? w->m_title : tb.token;
+        const int         maxW  = std::max<int>(8, (int)std::round((tb.closeBox.x - tb.box.x - PAD) * SCALE));
+        auto              ttex  = g_pHyprRenderer->renderText(title, xc, std::round(SIZE * SCALE), false, FONT, maxW);
+        if (ttex && ttex->m_texID != 0) {
+            CBox pos = {b.x + PAD * SCALE, b.y + (b.h - ttex->m_size.y) / 2.0, (double)ttex->m_size.x, (double)ttex->m_size.y};
+            pos.round();
+            g_pHyprOpenGL->renderTexture(ttex, pos, {.a = a});
+        }
+    }
 }
 
 void CGrabbarDeco::draw(PHLMONITOR pMonitor, const float& a) {
@@ -673,6 +943,17 @@ void CGrabbarDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
 
     CHyprColor color = m_realBarColor->value();
     color.a *= a;
+
+    // Snap effect: light the frame edge up in the theme accent while a drag is
+    // in a snap zone, and flash+decay on a successful snap. Blended here so the
+    // glow shares the strip's rounding/clipping and can never leak the frame.
+    m_snapFx.glowEnabled = g_pGlobalState->config.snapGlow->value();
+    snapFxTick();
+    if (const double k = m_snapFx.intensity(); k > 0.0) {
+        color = SnapFx::blendFrameColor(color, SnapFx::glowColor(PWINDOW), k);
+        if (m_snapFx.animating())
+            damageEntire();
+    }
 
     if (HEIGHT < 1) {
         m_lastHeight = HEIGHT;
@@ -783,26 +1064,33 @@ void CGrabbarDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
         }
     }
 
-    // title
+    // Tabs (host of a tab group) replace the centered title when there is room
+    // for a strip; otherwise the plain title is drawn exactly as before.
     const int PAD      = g_pGlobalState->config.padding->value();
-    const int maxWidth = std::max<int>(0, std::round((DECOBOX.w - occupiedLeft - occupiedRight - PAD * 2) * SCALE));
 
-    if (m_lastTitle != PWINDOW->m_title || m_windowSizeChanged || !m_textTex || m_textTex->m_texID == 0 || m_lastTitleWidth != maxWidth) {
-        m_lastTitle      = PWINDOW->m_title;
-        m_lastTitleWidth = maxWidth;
-        renderTitle(BARBUF, SCALE, maxWidth);
-    }
+    layoutTabs(DECOBOX.w, DECOBOX.h);
+    if (!m_tabBoxes.empty()) {
+        renderTabs(a, titleBarBox, SCALE, PAD, TEXTCOL, FOCUSED);
+    } else {
+        const int maxWidth = std::max<int>(0, std::round((DECOBOX.w - occupiedLeft - occupiedRight - PAD * 2) * SCALE));
 
-    if (m_textTex && m_textTex->m_texID != 0 && maxWidth > 8) {
-        const double areaX = titleBarBox.x + occupiedLeft * SCALE + PAD * SCALE;
-        const double areaW = maxWidth;
-        const double x     = std::round(areaX + (areaW - m_textTex->m_size.x) / 2.0);
-        const double y     = std::round(titleBarBox.y + (BARBUF.y - m_textTex->m_size.y) / 2.0);
-        CBox         titleBox = {x, y, (double)m_textTex->m_size.x, (double)m_textTex->m_size.y};
-        auto         ta       = a;
-        if (!FOCUSED)
-            ta *= 0.75;
-        g_pHyprOpenGL->renderTexture(m_textTex, titleBox, {.a = ta});
+        if (m_lastTitle != PWINDOW->m_title || m_windowSizeChanged || !m_textTex || m_textTex->m_texID == 0 || m_lastTitleWidth != maxWidth) {
+            m_lastTitle      = PWINDOW->m_title;
+            m_lastTitleWidth = maxWidth;
+            renderTitle(BARBUF, SCALE, maxWidth);
+        }
+
+        if (m_textTex && m_textTex->m_texID != 0 && maxWidth > 8) {
+            const double areaX = titleBarBox.x + occupiedLeft * SCALE + PAD * SCALE;
+            const double areaW = maxWidth;
+            const double x     = std::round(areaX + (areaW - m_textTex->m_size.x) / 2.0);
+            const double y     = std::round(titleBarBox.y + (BARBUF.y - m_textTex->m_size.y) / 2.0);
+            CBox         titleBox = {x, y, (double)m_textTex->m_size.x, (double)m_textTex->m_size.y};
+            auto         ta       = a;
+            if (!FOCUSED)
+                ta *= 0.75;
+            g_pHyprOpenGL->renderTexture(m_textTex, titleBox, {.a = ta});
+        }
     }
 
     g_pHyprOpenGL->scissor(nullptr);

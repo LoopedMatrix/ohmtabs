@@ -21,6 +21,7 @@
 #include <hyprland/src/helpers/signal/Signal.hpp>
 
 #include "globals.hpp"
+#include "snapfx.hpp"
 
 #define private public
 #include <hyprland/src/managers/input/InputManager.hpp>
@@ -41,6 +42,15 @@ enum eGrabbarButton : int8_t {
 struct SButtonSlot {
     eGrabbarButton id = BTN_NONE;
     CBox           box; // logical pixels, relative to the strip's top-left
+};
+
+// One tab segment in the native tab strip (window tabs, browser-style).
+struct STabBox {
+    int         index      = -1; // index into the host group's tab list
+    CBox        box;             // segment bounds (logical px, strip-relative)
+    CBox        closeBox;        // close affordance within the segment
+    bool        active     = false;
+    std::string token;
 };
 
 class CGrabbarDeco : public IHyprWindowDecoration {
@@ -64,6 +74,10 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     void                               onBackendStateChanged();
     void                               renderPass(PHLMONITOR, float const& a);
     CBox                               assignedBoxGlobal();
+
+    bool                               isDragging() const { return m_dragging; }
+    SnapFx::State&                     snapFx() { return m_snapFx; }
+    const SnapFx::State&               snapFx() const { return m_snapFx; }
 
     WP<CGrabbarDeco>                   m_self;
 
@@ -92,6 +106,16 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     bool                       m_dragging     = false;
     bool                       m_cancelledDown = false;
 
+    // --- snap glow / flash (feat/snap-glow) ---
+    SnapFx::State              m_snapFx;            // glow/flash state machine
+    Time::steady_tp            m_snapFxLastTick = Time::steadyNow();
+    // --- window tabs (feat/tabs-native) ---
+    std::vector<STabBox>       m_tabBoxes;
+    int                        m_pressedTab      = -1;      // index into the host group
+    bool                       m_pressedTabClose = false;   // press was on a close affordance
+    bool                       m_tabTearOff      = false;   // drag tears a tab out of its group
+    std::string                m_tearToken;                 // tab being torn off
+
     PHLANIMVAR<CHyprColor>     m_realBarColor;
 
     CHyprSignalListener        m_mouseButtonCallback;
@@ -108,10 +132,26 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     void                       handleUpEvent(Event::SCallbackInfo& info);
     void                       startDrag();
     void                       endDrag();
-    void                       snapToZone();
+    bool                       snapToZone();
+    void                       updateSnapPreview();
+    void                       snapFxTick();
     void                       activate(eGrabbarButton b, const std::string& token);
     void                       renderTitle(const Vector2D& bufferSize, float scale, int maxWidth);
     SP<Render::ITexture>       glyph(eGrabbarButton b, bool maximized, int size, const CHyprColor& color);
 
+    // tab strip layout / hit-test / input
+    std::vector<STabBox>       layoutTabs(double barW, double barH);
+    int                        tabAt(const Vector2D& rel);      // segment index under the pointer, -1 if none
+    bool                       tryJoinDrop();
+    void                       startTabTearOff(const std::string& token);
+    void                       renderTabs(float a, const CBox& titleBarBox, float SCALE, int PAD, const CHyprColor& textColor, bool focused);
+
     friend class CGrabbarPassElement;
 };
+
+// Compositor glue for the snap effect (defined in snapfx.cpp).
+namespace SnapFx {
+    CHyprColor glowColor(PHLWINDOW w);
+    CHyprColor blendFrameColor(const CHyprColor& base, const CHyprColor& accent, double intensity);
+    std::string statusJson();
+}

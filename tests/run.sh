@@ -11,6 +11,14 @@ python3 tests/unit/test_autoload.py
 python3 tests/unit/test_loader.py
 python3 tests/unit/test_startup_selection.py
 python3 tests/unit/test_protocol.py
+# Native pure-logic unit tests: the snap zone decider (incl. the strip reserve
+# that keeps a snapped strip out from under the Omarchy bar) and the glow
+# state machine. Header-only, no Hyprland, no compositor, no session.
+g++ -std=c++20 -Wall -Wno-unused-parameter -I native/grabbar \
+  native/grabbar/tests/test_snapfx.cpp -o /tmp/grabbar-test_snapfx
+/tmp/grabbar-test_snapfx
+# Window-tab model (TabStore): pure logic, no Hyprland, compiled with -Werror.
+bash tests/unit/run_tabs_test.sh
 python3 -m py_compile helpers/grabbar-journal helpers/grabbar_backend.py
 bash -n bin/grabbar tests/integration/*.sh
 if command -v qmllint >/dev/null 2>&1; then
