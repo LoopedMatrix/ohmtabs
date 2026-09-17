@@ -831,17 +831,26 @@ eActionStatus CGrabbarBackend::activateTab(uint64_t group, int index, std::strin
         err = "bad tab index";
         return ACTION_REFUSED;
     }
-    if (index == G->active)
-        return ACTION_OK;
-    const auto NEWTOKEN = G->tabs[index];
-    const auto OLDTOKEN = G->tabs[G->active];
-    if (restore(NEWTOKEN, "current", "", true, err) != ACTION_OK)
-        return ACTION_FAILED;
-    if (auto ot = tracked(OLDTOKEN); ot && ot->owned) {
+
+    // Convergence: the active tab is the only visible member. Restore it if it is
+    // parked and hide every OTHER member no matter what state it is in - hiding only
+    // "the previous tab" left two tabs visible whenever the previous one was on screen
+    // (it is not 'owned'), and made the call non-idempotent. Copy the member list,
+    // m_tabs.activate() below mutates the group.
+    const auto MEMBERS = G->tabs;
+    for (size_t i = 0; i < MEMBERS.size(); ++i) {
+        auto t = tracked(MEMBERS[i]);
+        if (!t)
+            continue;
         std::string herr;
-        if (!hideOwned(*ot, herr))
-            Log::logger->log(Log::WARN, "[grabbar] could not hide previous tab {}: {}", OLDTOKEN, herr);
+        if (static_cast<int>(i) == index) {
+            if (t->owned && restore(MEMBERS[i], "current", "", true, herr) != ACTION_OK)
+                Log::logger->log(Log::WARN, "[grabbar] could not show tab {}: {}", MEMBERS[i], herr);
+        } else if (!t->owned && !hideOwned(*t, herr)) {
+            Log::logger->log(Log::WARN, "[grabbar] could not hide tab {}: {}", MEMBERS[i], herr);
+        }
     }
+
     if (!m_tabs.activate(group, index)) {
         err = "failed to activate tab";
         return ACTION_FAILED;

@@ -51,8 +51,11 @@ namespace SnapFx {
         std::string zone     = "none";
         bool        glow     = false;
 
+        // NOTE: decos are owned by a CUniquePointer (HyprlandAPI::addWindowDecoration),
+        // so lock() would abort here - hyprutils asserts weak-over-unique.
+        // get() is the non-owning, assert-free accessor (same as the other bars loops).
         for (const auto& wp : g_pGlobalState->bars) {
-            const auto b = wp.lock();
+            auto* b = wp.get();
             if (!b || !b->isDragging())
                 continue;
             dragging = true;
