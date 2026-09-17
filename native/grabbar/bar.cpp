@@ -508,6 +508,24 @@ void CGrabbarDeco::endDrag() {
 // snapped window is ordinary floating geometry, so the next drag is a plain
 // move again: releasing away from an edge leaves the window where it was
 // dropped, which is how a snap is undone.
+//
+// The title strip is drawn in a band reserved above the client (see
+// getPositioningInfo: desiredExtents = {{0, HEIGHT}, {0, 0}}, i.e. top =
+// barHeight and nothing on the sides or bottom). A snap whose target starts
+// at the work area's top edge must therefore push the client down by that
+// band, or the strip hides under the Omarchy bar. The window border is drawn
+// inside the client box (resize/move set the full box including the border),
+// so only the top band needs insetting. Height is clamped to a minimum of 1
+// so a work area smaller than the strip still yields a valid box.
+static CBox applyTopReserve(CBox box, double reserve) {
+    if (reserve <= 0.0 || box.h <= 1.0)
+        return box;
+    const double inset = std::min(reserve, box.h - 1.0);
+    box.y += inset;
+    box.h -= inset;
+    return box;
+}
+
 void CGrabbarDeco::snapToZone() {
     if (!g_pGlobalState->config.snapLock->value())
         return;
@@ -529,6 +547,11 @@ void CGrabbarDeco::snapToZone() {
     CBox       AREA  = MON->logicalBoxMinusReserved();
     if (AREA.w <= 0 || AREA.h <= 0)
         AREA = FRAME;
+
+    // The strip's reserved top band, in logical pixels — the same value
+    // getPositioningInfo reports to the compositor (0 when the strip is
+    // disabled or hidden, so those windows snap flush like before).
+    const double topReserve = effectiveEnabled() ? (double)barHeightValue() : 0.0;
 
     const auto P = g_pInputManager->getMouseCoordsInternal();
 
@@ -557,6 +580,10 @@ void CGrabbarDeco::snapToZone() {
             target.x += target.w;
         if (cornerBL || cornerBR)
             target.y += target.h;
+        // Top corners start at the work area's top edge: pull them down by
+        // the strip band so the strip (drawn above the client) clears the bar.
+        if (cornerTL || cornerTR)
+            target = applyTopReserve(target, topReserve);
         (void)Config::Actions::resize(target.size(), false, PWINDOW);
         (void)Config::Actions::move(target.pos(), false, PWINDOW);
         return;
@@ -565,6 +592,7 @@ void CGrabbarDeco::snapToZone() {
     if (nearLeft) {
         CBox target = AREA;
         target.w /= 2.0;
+        target = applyTopReserve(target, topReserve);
         (void)Config::Actions::resize(target.size(), false, PWINDOW);
         (void)Config::Actions::move(target.pos(), false, PWINDOW);
         return;
@@ -574,6 +602,7 @@ void CGrabbarDeco::snapToZone() {
         CBox target = AREA;
         target.x += target.w / 2.0;
         target.w /= 2.0;
+        target = applyTopReserve(target, topReserve);
         (void)Config::Actions::resize(target.size(), false, PWINDOW);
         (void)Config::Actions::move(target.pos(), false, PWINDOW);
         return;
