@@ -11,7 +11,7 @@
   <img alt="Hyprland 0.56.2" src="https://img.shields.io/badge/Hyprland-0.56.2-38c8e8?labelColor=0b0f14">
 </p>
 
-**omarchy-tab** gives ordinary application windows a Windows/macOS-style title strip — a window menu, Minimize, Maximize/Restore, Close, and drag-to-move — and **adds a Windows-style minimized-window taskbar** to [Omarchy](https://github.com/cyberus-technology/omarchy) (Arch + Hyprland). It is a [Quickshell](https://github.com/outfoxxed/quickshell) plugin.
+**omarchy-tab** gives ordinary application windows a Windows/macOS-style title strip — a window menu, Minimize, Maximize/Restore, Close, and drag-to-move — and **adds a Windows-style minimized-window taskbar** to [Omarchy](https://github.com/omacom/omarchy) (Arch + Hyprland). It is a [Quickshell](https://github.com/outfoxxed/quickshell) plugin.
 
 > **Name vs. label.** The repository and project are **omarchy-tab**, but the plugin's id (`tech.greyforge.grabbar`) and its visible label (**Grabbar**) are intentionally kept unchanged, so live installs and saved settings keep working. In the UI and in file paths you will still see "Grabbar"; that is the same plugin.
 
@@ -212,6 +212,12 @@ omarchy-rescue grabbar-off   # restore the stable copy
 ```
 
 Parked/replaced plugin copies are deliberately kept **outside** the plugins directory, so a same-id parked copy can never shadow the deployed one (see [Troubleshooting](#troubleshooting)). A shell restart is `omarchy restart shell`; the native service is `keepLoaded`, so hot reloads keep the old backend.
+
+`grabbar-on` is **gated and self-reverting**, because deploying an untested plugin is what wedged this desktop once:
+
+- **Before deploying** it refuses to swap anything unless `manifest.json` declares the expected plugin id, `qmllint --bare` reports no syntax errors on every QML file, and `tests/run.sh` is green. `FORCE=1` overrides.
+- **After restarting** it verifies the plugin actually came up — `backend.ready`, `minimizeEnabled`, `restoreHost`, and no read-only-`settings` TypeError in the shell log written since the deploy — and **automatically rolls back** to the stable copy if any check fails. `ROLLBACK=0` disables the check.
+- `omarchy-rescue status` reports live plugin health (backend/version/epoch, minimize, restore host, minimized count, failed restores) and the taskbar's layer geometry, flagging the duplicate-surface case.
 
 ### Keeping the desktop alive
 
