@@ -15,7 +15,7 @@ Feature-wise the bar currently provides:
 - A title strip for every tracked non-hidden window, with the standard controls and the window menu.
 - Minimize-to-drawer / panel behavior, with a two-phase minimize (the shell acknowledges before the backend actually hides the window) so a shell disconnect cannot lose a window.
 - Per-window opt-out (`grabbar:no_bar` window rule, or the `excludedClasses` setting).
-- A status readout and a config summary via `omarchy-shell tech.greyforge.grabbar stats`.
+- A status readout and a config summary via `omarchy-shell tech.greyforge.grabbar status`.
 - IPC verbs for window actions, grouping primitives, and tab-group operations (the tab verbs are only wired when the `tabGroups` setting is on).
 
 The tab strip itself — the visual tab segments on a host window's title strip — is drawn by the **native** backend, not the shell. The shell's job for tabs is the IPC wiring, the group state kept in `GrabbarModel.js`, and the "close all windows in this group?" confirm prompt. See the [Tab groups](#tab-groups) section.
@@ -37,7 +37,7 @@ Configuration for the bar lives in the bar's own entry in the shell layout (`~/.
 | `sidePanel` | bool | `true` | Windows-style taskbar (`true`) vs the in-bar drawer only (`false`). |
 | `panelPosition` | `"bottom"` \| `"left"` \| `"right"` | `"bottom"` | Screen edge the taskbar sits on. |
 | `panelAutoHide` | bool | `true` | Park the taskbar off the edge until the pointer reaches it. |
-| `tabGroups` | bool | `false` | If `true`, the bar accepts window-tab grouping: dropping one window onto another hosts a tab group, alt-tab cycles within the group's tabs while the pointer is over them (and otherwise falls through to normal alt-tab), and closing a group with more than one window asks "are you sure you want to close all N windows?" before closing them. The tab strip itself is drawn by the native backend on the host window's title strip; the shell side is the IPC wiring, the group state in `GrabbarModel.js`, and the close-all confirm prompt. When `tabGroups` is off (the default), the tab verbs are silently ignored and the panel behaves as before — turning it on does not, by itself, change the panel's appearance. |
+| `tabGroups` | bool | `false` | If `true`, the bar accepts window-tab grouping: dropping one window onto another hosts a tab group, alt-tab within a group is exposed as the opt-in `groupCycle` method (no keybind is installed by default), and closing a group with more than one window asks "are you sure you want to close all N windows?" before closing them. The tab strip itself is drawn by the native backend on the host window's title strip; the shell side is the IPC wiring, the group state in `GrabbarModel.js`, and the close-all confirm prompt. When `tabGroups` is off (the default), the tab verbs are silently ignored and the panel behaves as before — turning it on does not, by itself, change the panel's appearance. |
 
 Unknown keys are ignored; invalid values fall back to the default. Values are validated in [`GrabbarModel.js`](GrabbarModel.js) (`normalizeSettings`).
 
@@ -46,7 +46,7 @@ Unknown keys are ignored; invalid values fall back to the default. Values are va
 When `tabGroups: true` is set on the bar's layout entry:
 
 - **Dropping a window onto another** makes the target the *host* and turns the dragged window into a tab in the host's group. The host's native title strip gains the tab strip (drawn natively). The shell keeps the group state and the window list; the visual strip is the backend's.
-- **Alt-tab behavior** changes while the pointer is over the host's tab strip: alt-tab cycles within the group's tabs instead of the global cycle. Once the pointer leaves the tab area, alt-tab falls back to the normal global alt-tab. This is a shell-side decision communicated to the backend; the backend honors it when the pointer is over the tab strip.
+- **Alt-tab within a group** is a decision the shell exposes, not a binding this plugin installs. `omarchy-shell tech.greyforge.grabbar groupCycle <hostToken> <prev|next> <true|false>` returns the token of the tab it switched to, or `fallthrough` when the group holds fewer than two tabs or the pointer is not over the host's strip. Browser-like alt-tab is therefore opt-in: bind a key (e.g. SUPER+TAB) that calls `groupCycle` and, on `fallthrough`, hands alt-tab back to the compositor (e.g. `hyprctl cyclenext`). Hyprland's built-in alt-tab is a compositor binding the plugin cannot intercept, so nothing changes until you add that binding.
 - **Closing a group** with more than one window triggers a confirm prompt: "are you sure you want to close all N windows?" with the tab titles listed, like a browser. Yes closes all the group's windows; Cancel/Escape dismisses the prompt with no action. There is no focus steal from the rest of the shell for the prompt.
 - The `tabGroups` setting is off by default. Until it is turned on explicitly in the bar's layout entry, the tab verbs are not wired and nothing about the panel changes.
 
@@ -58,21 +58,19 @@ When the shell isn't connected yet, the native backend falls back to `plugin:gra
 
 ## Command line & scripting
 
-The shell exposes the plugin's IPC over the CLI as:
+The shell exposes the plugin's IPC over the CLI as `omarchy-shell tech.greyforge.grabbar <function> [args…]`, where the functions are exactly those declared in `Service.qml`'s `IpcHandler` (the shell rejects any other name):
 
-`omarchy-shell tech.greyforge.grabbar <verb> '<json>'`
+`status` · `minimize TOKEN` · `restore TOKEN [MODE]` · `restoreAll` · `openDrawer` · `openSettings` · `reconcile` · `disable` · `enable` · `ping` · `groupCreate TOKEN` · `groupRemove TOKEN` · `groupAddMember HOST MEMBER` · `groupRemoveMember TOKEN` · `groupActivate HOST MEMBER` · `groupCycle HOST DIR POINTER_INSIDE` · `groupClose TOKEN` · `groupCloseForce TOKEN`
 
-The helper `helpers/grabbar_backend.py` wraps this for Python callers. The verbs the shell accepts (from `Service.qml`'s `IpcHandler`) include window actions (`minimize`, `maximize`, `toggleMaximize`, `restore`, `kill`, `activate`, `focus`, `menu`), grouping primitives (`group.create`, `group.add`, `group.remove`, `group.removeMember`, `group.activate`, `group.cycle`, `group.close`, `group.closeForce`), and tab-group operations (`tabs.list`, `tabs.join`, `tabs.activate`, `tabs.detach`, `tabs.ungroup`, `tabs.closeAll`) — the tab verbs are only honored when `tabGroups` is on.
+There is no `stats` function (use `status`) and no `tabs.*` CLI function. The tab verbs are the **shell ↔ native-backend messages** (`tabs.list`, `tabs.join`, `tabs.activate`, `tabs.detach`, `tabs.ungroup`, `tabs.closeAll`): `Service.qml`'s tab wrappers send them over the backend socket (`$XDG_RUNTIME_DIR/grabbar/<signature>/backend.sock`, wire format `<type>\t<key>=<value>`), and the panel's tab strip is what invokes them. `helpers/grabbar_backend.py` is a client of that same socket (subcommands: `status`, `windows`, `ready`, `minimize`, `restore`, `restore-all`, `maximize`, `restore-size`, `toggle-maximize`, `close`, `float`, `listen`) — it has no tabs subcommand today either.
 
 ### Querying tab-group state
 
-`omarchy-shell tech.greyforge.grabbar stats` prints a JSON status blob that includes a `tabGroups` field (`{ count, groups }`) when the setting is on. The `tabs.list` verb returns the same shape the shell keeps internally:
+`tabs verb=list` on that socket answers with a `tabsList` message carrying one `json` field, in the shape the shell's tab wrappers and the prompt's title list are built from:
 
-`omarchy-shell tech.greyforge.grabbar tabs.list '{}'`
+`{"groups":[{"id":N,"host":"<token>","active":<index>,"tabs":[{"token":"<token>","title":"...","active":bool}]}]}`
 
-→ `{"groups":[{"id":N,"host":"<token>","active":<index>,"tabs":[{"token":"<token>","title":"...","active":bool}]}]}`
-
-This is the shape the shell's tab wrappers and the prompt's title list are built from; it is also what the native backend is expected to reply with once it implements the verb.
+The other tab verbs answer `result` (with `verb`, `status`, `error`), and `tabs.closeAll` is refused unless `confirm` is set — that is what the confirm prompt supplies. `tests/integration/tabs-ipc.py` is an instance-scoped client for these verbs (used by the nested integration test): it addresses one named Hyprland instance and never the running shell, so scripted checks cannot disturb a live session.
 
 ## The close-all confirm prompt
 
