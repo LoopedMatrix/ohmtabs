@@ -48,7 +48,10 @@ def status(state_dir, hypr_config):
     hooked = False
     try:
         with open(hypr_config) as f:
-            hooked = BEGIN in f.read()
+            text = f.read()
+        # Either the helper's own marked block, or a hand-written direct hook
+        # (pcall(dofile, .../native/autoload.lua)) - both are installed.
+        hooked = BEGIN in text or ("autoload.lua" in text and "ohmtabs" in text)
     except OSError:
         pass
     last_attempt = read_line(os.path.join(d, "last-attempt"))
