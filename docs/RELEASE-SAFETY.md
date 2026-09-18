@@ -39,7 +39,7 @@ if an assertion fails.
 ## Exact 0.1.1 preview build
 
 The operator subsequently authorized publication and deployment. The native
-plugin was rebuilt from the 0.1.1 source with `make -B -C native/grabbar
+plugin was rebuilt from the 0.1.1 source with `make -B -C native/ohmtabs
 CXX=g++`, and both `tests/run.sh` and `startup-nested.sh all` passed again
 (exit 0, all 19 nested assertions) against that rebuilt binary.
 

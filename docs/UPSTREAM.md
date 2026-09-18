@@ -1,7 +1,7 @@
 # Upstream source identity and maintained changes
 
-Grabbar's native backend starts from Hyprbars. This file records exactly
-which upstream revision it is based on and what Grabbar changes, so the
+OhmTabs's native backend starts from Hyprbars. This file records exactly
+which upstream revision it is based on and what OhmTabs changes, so the
 patch footprint stays visible (spec §6.1, §16).
 
 ## Base revision
@@ -17,25 +17,25 @@ patch footprint stays visible (spec §6.1, §16).
 
 ## Files derived from Hyprbars
 
-| Grabbar file | Upstream file | Relationship |
+| OhmTabs file | Upstream file | Relationship |
 | --- | --- | --- |
-| `native/grabbar/bar.hpp` / `bar.cpp` | `barDeco.hpp` / `barDeco.cpp` | Decoration positioning, reserved-area geometry, hit validation (`inputIsValid`), stencil-rounded bar rendering, `assignedBoxGlobal`, rule handling retained. Input and button model rewritten (below). |
-| `native/grabbar/pass.hpp` / `pass.cpp` | `BarPassElement.hpp` / `.cpp` | Same structure; blur support removed. |
-| `native/grabbar/main.cpp` | `main.cpp` | Same plugin skeleton (version-hash check, decoration attach, config values, exit). Lua/legacy `add_button` keyword removed; backend and hyprctl command added. |
-| `native/grabbar/globals.hpp` | `globals.hpp` | Config-value holder retained; button list replaced by a fixed control set. |
-| `native/grabbar/backend.hpp` / `backend.cpp` | — | New: identities, typed actions, owned workspace, socket, recovery. |
+| `native/ohmtabs/bar.hpp` / `bar.cpp` | `barDeco.hpp` / `barDeco.cpp` | Decoration positioning, reserved-area geometry, hit validation (`inputIsValid`), stencil-rounded bar rendering, `assignedBoxGlobal`, rule handling retained. Input and button model rewritten (below). |
+| `native/ohmtabs/pass.hpp` / `pass.cpp` | `BarPassElement.hpp` / `.cpp` | Same structure; blur support removed. |
+| `native/ohmtabs/main.cpp` | `main.cpp` | Same plugin skeleton (version-hash check, decoration attach, config values, exit). Lua/legacy `add_button` keyword removed; backend and hyprctl command added. |
+| `native/ohmtabs/globals.hpp` | `globals.hpp` | Config-value holder retained; button list replaced by a fixed control set. |
+| `native/ohmtabs/backend.hpp` / `backend.cpp` | — | New: identities, typed actions, owned workspace, socket, recovery. |
 
 ## Maintained changes (behavioural)
 
-1. **Buttons act on release inside the same target.** Upstream fires `exec` on press. Grabbar records the pressed button and the window token at press and acts only if release lands on the same button of the same live window (spec §3.3, test F03).
-2. **No shell commands.** Upstream buttons run user-configured command strings through the `exec` dispatcher and target `activewindow`. Grabbar calls typed actions (`Config::Actions::closeWindow`, `fullscreenWindow`, `floatWindow`, `pinWindow`, `moveToWorkspace`, `move`, `resize`, `focus`) with an explicit `PHLWINDOW` resolved from a token.
+1. **Buttons act on release inside the same target.** Upstream fires `exec` on press. OhmTabs records the pressed button and the window token at press and acts only if release lands on the same button of the same live window (spec §3.3, test F03).
+2. **No shell commands.** Upstream buttons run user-configured command strings through the `exec` dispatcher and target `activewindow`. OhmTabs calls typed actions (`Config::Actions::closeWindow`, `fullscreenWindow`, `floatWindow`, `pinWindow`, `moveToWorkspace`, `move`, `resize`, `focus`) with an explicit `PHLWINDOW` resolved from a token.
 3. **Fixed control set.** Window-menu target, Minimize, Maximize/Restore size, Close; left or right placement; narrow-window fallback keeps only the menu target.
-4. **Drag threshold and tiled detach.** Upstream starts a native move on the first motion event. Grabbar waits for `binds:drag_threshold` (6 px fallback), gives a layout-filling window a 60 % floating size, keeps the pointer over the same proportional strip point, then starts the compositor's native move (`changeMouseBindMode(MBIND_MOVE)`).
+4. **Drag threshold and tiled detach.** Upstream starts a native move on the first motion event. OhmTabs waits for `binds:drag_threshold` (6 px fallback), gives a layout-filling window a 60 % floating size, keeps the pointer over the same proportional strip point, then starts the compositor's native move (`changeMouseBindMode(MBIND_MOVE)`).
 5. **Double-click on the title region only** toggles Maximize/Restore size; buttons never double-click.
 6. **Suspended until a shell service completes the readiness handshake**; suspended again when the shell disappears for longer than the grace period. Reserved height becomes 0 so clients get their space back.
 7. **Touch input dropped** for the G0 prototype (upstream supports it); to be re-qualified.
 8. **Glyphs are cairo paths** (menu, minimize, maximize, restore, close) rendered into textures through `createTexture(cairo_surface_t*)`, cached per glyph/size/colour. Upstream renders text glyphs with the text renderer. No icon font.
-10. **Appearance pushed by the shell.** Colours, font, control side and size, and per-class exclusions arrive over the socket (`theme`/`settings` messages) and take precedence over `plugin:grabbar:*` while set, so the strip follows the Omarchy theme without config edits.
+10. **Appearance pushed by the shell.** Colours, font, control side and size, and per-class exclusions arrive over the socket (`theme`/`settings` messages) and take precedence over `plugin:ohmtabs:*` while set, so the strip follows the Omarchy theme without config edits.
 11. **Right-click opens the window menu** (a `menuRequest` to the shell); upstream has no menu.
 12. **`decorate()` window rule** disables the reservation too (upstream reserves the band even for `nodecoration` windows).
 

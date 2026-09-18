@@ -24,19 +24,19 @@
 #include "globals.hpp"
 
 // Boot guard (native/autoload.lua, docs/AUTOLOAD.md): once the compositor has
-// kept running with Grabbar loaded for GRABBAR_BOOT_OK_MS, record this
+// kept running with OhmTabs loaded for OHMTABS_BOOT_OK_MS, record this
 // instance's signature so the next start is allowed to declare the plugin.
 static SP<CEventLoopTimer> g_bootOkTimer;
 
 static std::string autoloadStateDir() {
-    const char* S = getenv("GRABBAR_STATE_DIR");
+    const char* S = getenv("OHMTABS_STATE_DIR");
     if (S && *S)
         return std::string(S) + "/autoload";
     const char* X = getenv("XDG_STATE_HOME");
     if (X && *X)
-        return std::string(X) + "/grabbar/autoload";
+        return std::string(X) + "/ohmtabs/autoload";
     const char* H = getenv("HOME");
-    return std::string(H ? H : "") + "/.local/state/grabbar/autoload";
+    return std::string(H ? H : "") + "/.local/state/ohmtabs/autoload";
 }
 
 static void writeBootOk() {
@@ -61,10 +61,10 @@ static void onNewWindow(PHLWINDOW window) {
 
     g_pBackend->onWindowOpen(window);
 
-    if (std::ranges::any_of(window->m_windowDecorations, [](const auto& d) { return d->getDisplayName() == "Grabbar"; }))
+    if (std::ranges::any_of(window->m_windowDecorations, [](const auto& d) { return d->getDisplayName() == "OhmTabs"; }))
         return;
 
-    auto bar = makeUnique<CGrabbarDeco>(window);
+    auto bar = makeUnique<COhmTabsDeco>(window);
     g_pGlobalState->bars.emplace_back(bar);
     bar->m_self = bar;
     HyprlandAPI::addWindowDecoration(PHANDLE, window, std::move(bar));
@@ -96,37 +96,37 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     const std::string CLIENT_HASH = __hyprland_api_get_client_hash();
 
     if (HASH != CLIENT_HASH) {
-        HyprlandAPI::addNotification(PHANDLE, "[grabbar] Grabbar needs an update for this desktop version (native build does not match the running Hyprland)",
+        HyprlandAPI::addNotification(PHANDLE, "[ohmtabs] OhmTabs needs an update for this desktop version (native build does not match the running Hyprland)",
                                      CHyprColor{1.0, 0.2, 0.2, 1.0}, 8000);
-        throw std::runtime_error("[grabbar] Version mismatch");
+        throw std::runtime_error("[ohmtabs] Version mismatch");
     }
 
     g_pGlobalState               = makeUnique<SGlobalState>();
-    g_pGlobalState->nobarRuleIdx = Desktop::Rule::windowEffects()->registerEffect("grabbar:no_bar");
+    g_pGlobalState->nobarRuleIdx = Desktop::Rule::windowEffects()->registerEffect("ohmtabs:no_bar");
 
     auto& cfg              = g_pGlobalState->config;
-    cfg.enabled            = makeShared<Config::Values::CBoolValue>("plugin:grabbar:enabled", "Whether Grabbar strips are enabled", true);
-    cfg.buttonsLeft        = makeShared<Config::Values::CBoolValue>("plugin:grabbar:buttons_left", "Place the control group on the leading edge", false);
-    cfg.barHeight          = makeShared<Config::Values::CIntValue>("plugin:grabbar:bar_height", "Strip height in logical pixels", 34);
-    cfg.buttonSize         = makeShared<Config::Values::CIntValue>("plugin:grabbar:button_size", "Button target size in logical pixels", 32);
-    cfg.padding            = makeShared<Config::Values::CIntValue>("plugin:grabbar:padding", "Horizontal padding in logical pixels", 4);
-    cfg.textSize           = makeShared<Config::Values::CIntValue>("plugin:grabbar:text_size", "Title text size", 11);
-    cfg.shellGraceMs       = makeShared<Config::Values::CIntValue>("plugin:grabbar:shell_grace_ms", "How long hidden windows wait for the shell service to come back before they are returned", GRABBAR_GRACE_MS);
-    cfg.snapLock           = makeShared<Config::Values::CBoolValue>("plugin:grabbar:snap_lock", "Snap the window into a screen-edge zone when a drag is released near an edge", true);
+    cfg.enabled            = makeShared<Config::Values::CBoolValue>("plugin:ohmtabs:enabled", "Whether OhmTabs strips are enabled", true);
+    cfg.buttonsLeft        = makeShared<Config::Values::CBoolValue>("plugin:ohmtabs:buttons_left", "Place the control group on the leading edge", false);
+    cfg.barHeight          = makeShared<Config::Values::CIntValue>("plugin:ohmtabs:bar_height", "Strip height in logical pixels", 34);
+    cfg.buttonSize         = makeShared<Config::Values::CIntValue>("plugin:ohmtabs:button_size", "Button target size in logical pixels", 32);
+    cfg.padding            = makeShared<Config::Values::CIntValue>("plugin:ohmtabs:padding", "Horizontal padding in logical pixels", 4);
+    cfg.textSize           = makeShared<Config::Values::CIntValue>("plugin:ohmtabs:text_size", "Title text size", 11);
+    cfg.shellGraceMs       = makeShared<Config::Values::CIntValue>("plugin:ohmtabs:shell_grace_ms", "How long hidden windows wait for the shell service to come back before they are returned", OHMTABS_GRACE_MS);
+    cfg.snapLock           = makeShared<Config::Values::CBoolValue>("plugin:ohmtabs:snap_lock", "Snap the window into a screen-edge zone when a drag is released near an edge", true);
     // Snap glow / flash (feat/snap-glow): drag preview + release flash.
-    cfg.snapGlow           = makeShared<Config::Values::CBoolValue>("plugin:grabbar:snap_glow", "Light up the window frame while a drag is in a snap zone and flash on snap", true);
-    cfg.snapGlowColor      = makeShared<Config::Values::CColorValue>("plugin:grabbar:snap_glow_color", "Accent colour for the snap glow and flash (0 = active border colour)", 0x00000000);
-    cfg.snapGlowMs         = makeShared<Config::Values::CIntValue>("plugin:grabbar:snap_glow_ms", "How long the snap flash decays, in milliseconds", 260);
-    cfg.snapPreview        = makeShared<Config::Values::CBoolValue>("plugin:grabbar:snap_preview", "Reserved: translucent snap-zone preview while dragging (not yet rendered)", true);
-    cfg.tabs               = makeShared<Config::Values::CBoolValue>("plugin:grabbar:tabs", "Enable browser-like window tabs (drop one window onto another)", true);
-    cfg.tabMinWidth        = makeShared<Config::Values::CIntValue>("plugin:grabbar:tabMinWidth", "Minimum width of a tab segment in logical pixels", 120);
+    cfg.snapGlow           = makeShared<Config::Values::CBoolValue>("plugin:ohmtabs:snap_glow", "Light up the window frame while a drag is in a snap zone and flash on snap", true);
+    cfg.snapGlowColor      = makeShared<Config::Values::CColorValue>("plugin:ohmtabs:snap_glow_color", "Accent colour for the snap glow and flash (0 = active border colour)", 0x00000000);
+    cfg.snapGlowMs         = makeShared<Config::Values::CIntValue>("plugin:ohmtabs:snap_glow_ms", "How long the snap flash decays, in milliseconds", 260);
+    cfg.snapPreview        = makeShared<Config::Values::CBoolValue>("plugin:ohmtabs:snap_preview", "Reserved: translucent snap-zone preview while dragging (not yet rendered)", true);
+    cfg.tabs               = makeShared<Config::Values::CBoolValue>("plugin:ohmtabs:tabs", "Enable browser-like window tabs (drop one window onto another)", true);
+    cfg.tabMinWidth        = makeShared<Config::Values::CIntValue>("plugin:ohmtabs:tabMinWidth", "Minimum width of a tab segment in logical pixels", 120);
 
-    cfg.textFont           = makeShared<Config::Values::CStringValue>("plugin:grabbar:text_font", "Title font family", "Sans");
-    cfg.barColor           = makeShared<Config::Values::CColorValue>("plugin:grabbar:bar_color", "Strip color for the focused window", 0xff2a2f36);
-    cfg.inactiveBarColor   = makeShared<Config::Values::CColorValue>("plugin:grabbar:inactive_bar_color", "Strip color for unfocused windows", 0xff20242a);
-    cfg.textColor          = makeShared<Config::Values::CColorValue>("plugin:grabbar:text_color", "Title and glyph color", 0xffe6e9ee);
-    cfg.hoverColor         = makeShared<Config::Values::CColorValue>("plugin:grabbar:hover_color", "Hovered button background", 0x40ffffff);
-    cfg.closeHoverColor    = makeShared<Config::Values::CColorValue>("plugin:grabbar:close_hover_color", "Hovered Close background", 0xd0c0392b);
+    cfg.textFont           = makeShared<Config::Values::CStringValue>("plugin:ohmtabs:text_font", "Title font family", "Sans");
+    cfg.barColor           = makeShared<Config::Values::CColorValue>("plugin:ohmtabs:bar_color", "Strip color for the focused window", 0xff2a2f36);
+    cfg.inactiveBarColor   = makeShared<Config::Values::CColorValue>("plugin:ohmtabs:inactive_bar_color", "Strip color for unfocused windows", 0xff20242a);
+    cfg.textColor          = makeShared<Config::Values::CColorValue>("plugin:ohmtabs:text_color", "Title and glyph color", 0xffe6e9ee);
+    cfg.hoverColor         = makeShared<Config::Values::CColorValue>("plugin:ohmtabs:hover_color", "Hovered button background", 0x40ffffff);
+    cfg.closeHoverColor    = makeShared<Config::Values::CColorValue>("plugin:ohmtabs:close_hover_color", "Hovered Close background", 0xd0c0392b);
 
     const std::vector<SP<Config::Values::IValue>> VALUES = {cfg.enabled,  cfg.buttonsLeft, cfg.barHeight,        cfg.buttonSize, cfg.padding,    cfg.textSize,
                                                             cfg.textFont, cfg.barColor,    cfg.inactiveBarColor, cfg.textColor,  cfg.hoverColor, cfg.closeHoverColor,
@@ -134,11 +134,11 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     for (const auto& v : VALUES)
         HyprlandAPI::addConfigValueV2(PHANDLE, v);
 
-    g_pBackend = makeUnique<CGrabbarBackend>();
+    g_pBackend = makeUnique<COhmTabsBackend>();
     if (!g_pBackend->start()) {
-        HyprlandAPI::addNotification(PHANDLE, "[grabbar] could not create the private backend socket; Grabbar stays inactive", CHyprColor{1.0, 0.5, 0.2, 1.0}, 8000);
+        HyprlandAPI::addNotification(PHANDLE, "[ohmtabs] could not create the private backend socket; OhmTabs stays inactive", CHyprColor{1.0, 0.5, 0.2, 1.0}, 8000);
         g_pBackend.reset();
-        throw std::runtime_error("[grabbar] socket setup failed");
+        throw std::runtime_error("[ohmtabs] socket setup failed");
     }
 
     static auto P1 = Event::bus()->m_events.window.open.listen([&](PHLWINDOW w) { onNewWindow(w); });
@@ -150,14 +150,14 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     static auto P7 = Event::bus()->m_events.window.pin.listen([&](PHLWINDOW w) { g_pBackend->onWindowChanged(w, "pin"); });
     static auto P8 = Event::bus()->m_events.window.moveToWorkspace.listen([&](PHLWINDOW w, PHLWORKSPACE) { g_pBackend->onWindowChanged(w, "workspace"); });
     static auto P9 = Event::bus()->m_events.config.reloaded.listen([&] { onConfigReloaded(); });
-    // Other tools focusing a hidden window or opening Grabbar's workspace (spec §8).
+    // Other tools focusing a hidden window or opening OhmTabs's workspace (spec §8).
     static auto P10 = Event::bus()->m_events.window.active.listen([&](PHLWINDOW w, Desktop::eFocusReason) { g_pBackend->onOwnedWindowActivated(w); });
     static auto P11 = Event::bus()->m_events.workspace.specialActive.listen([&](PHLWORKSPACE ws, PHLMONITOR mon) {
-        if (ws && ws->m_name == GRABBAR_WORKSPACE)
+        if (ws && ws->m_name == OHMTABS_WORKSPACE)
             g_pBackend->onOwnedWorkspaceRevealed(mon);
     });
 
-    static auto CMD = HyprlandAPI::registerHyprCtlCommand(PHANDLE, SHyprCtlCommand{.name = "grabbar", .exact = true, .fn = [](eHyprCtlOutputFormat fmt, std::string) {
+    static auto CMD = HyprlandAPI::registerHyprCtlCommand(PHANDLE, SHyprCtlCommand{.name = "ohmtabs", .exact = true, .fn = [](eHyprCtlOutputFormat fmt, std::string) {
                                                                                         return g_pBackend ? g_pBackend->statusText(fmt == FORMAT_JSON) : std::string("inactive");
                                                                                     }});
 
@@ -167,7 +167,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         onNewWindow(w);
     }
 
-    g_bootOkTimer = makeShared<CEventLoopTimer>(std::chrono::milliseconds(GRABBAR_BOOT_OK_MS), [](SP<CEventLoopTimer> self, void*) {
+    g_bootOkTimer = makeShared<CEventLoopTimer>(std::chrono::milliseconds(OHMTABS_BOOT_OK_MS), [](SP<CEventLoopTimer> self, void*) {
         writeBootOk();
         g_pEventLoopManager->removeTimer(self);
         g_bootOkTimer.reset();
@@ -179,7 +179,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     // and a second one only adds reload churn. Every extra reload matters when
     // the plugin is declared from the config itself (see docs/AUTOLOAD.md).
 
-    return {"grabbar", "Familiar window controls for Omarchy.", "Greyforge Labs", GRABBAR_VERSION};
+    return {"OhmTabs", "Familiar window controls for Omarchy.", "LoopedMatrix", OHMTABS_VERSION};
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {
@@ -187,14 +187,14 @@ APICALL EXPORT void PLUGIN_EXIT() {
         g_pEventLoopManager->removeTimer(g_bootOkTimer);
         g_bootOkTimer.reset();
     }
-    // Return every Grabbar-hidden window before native references go away (spec §7.5).
+    // Return every OhmTabs-hidden window before native references go away (spec §7.5).
     if (g_pBackend)
         g_pBackend->stop(true, "unload");
 
     for (auto& m : State::monitorState()->monitors())
         m->m_scheduledRecalc = true;
 
-    g_pHyprRenderer->m_renderPass.removeAllOfType("CGrabbarPassElement");
+    g_pHyprRenderer->m_renderPass.removeAllOfType("COhmTabsPassElement");
 
     if (g_pGlobalState)
         Desktop::Rule::windowEffects()->unregisterEffect(g_pGlobalState->nobarRuleIdx);

@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "tech.greyforge.grabbar",
-  "name": "Grabbar",
+  "id": "tech.loopedmatrix.ohmtabs",
+  "name": "OhmTabs",
   "version": "0.1.1",
-  "author": "Greyforge Labs",
+  "author": "LoopedMatrix",
   "license": "MIT",
-  "homepage": "https://github.com/GreyforgeLabs/omarchy-grabbar",
+  "homepage": "https://github.com/LoopedMatrix/ohmtabs",
   "description": "Familiar window controls for Omarchy: minimize, maximize, close, move and resize with the mouse, and a drawer that always brings a minimized window back.",
   "kinds": [
     "service",
@@ -19,7 +19,7 @@
     "barWidget": "BarWidget.qml"
   },
   "barWidget": {
-    "displayName": "Grabbar",
+    "displayName": "OhmTabs",
     "description": "Minimized windows: a stable place to find them again. Click for the drawer.",
     "category": "System",
     "allowMultiple": false,

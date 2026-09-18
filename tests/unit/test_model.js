@@ -6,7 +6,7 @@
 
 const assert = require("assert")
 const path = require("path")
-const M = require(path.join(__dirname, "..", "..", "GrabbarModel.js"))
+const M = require(path.join(__dirname, "..", "..", "OhmTabsModel.js"))
 
 let passed = 0
 function test(name, fn) {
@@ -53,7 +53,7 @@ test("token validation", () => {
 })
 
 test("workspace and label sanitizing", () => {
-  assert.strictEqual(M.normalizeWorkspace("special:grabbar-minimized"), "special:grabbar-minimized")
+  assert.strictEqual(M.normalizeWorkspace("special:ohmtabs-minimized"), "special:ohmtabs-minimized")
   assert.strictEqual(M.normalizeWorkspace('2" }) os.exit()'), "")
   assert.strictEqual(M.sanitizeLabel("a\u0000b​\tc  d"), "abc d")
   assert.strictEqual(M.sanitizeLabel("x".repeat(200), 10).length, 10)
@@ -220,7 +220,7 @@ test("duplicate titles get display-only ordinals; labels are sanitized", () => {
 
 test("originLabel and statusSummary", () => {
   assert.strictEqual(M.originLabel({ origin: { workspaceName: "2", monitor: "DP-2" } }, { "DP-2": "Left display" }), "Workspace 2 · Left display")
-  assert.strictEqual(M.originLabel({ origin: { workspaceName: "special:grabbar-minimized" } }), "")
+  assert.strictEqual(M.originLabel({ origin: { workspaceName: "special:ohmtabs-minimized" } }), "")
   const s = { entries: [{ status: "minimized" }, { status: "prepared" }, { status: "failed", recovered: true }] }
   assert.deepStrictEqual(M.statusSummary(s), { minimized: 1, prepared: 1, failed: 1, recovered: 1, total: 3 })
 })
@@ -231,8 +231,8 @@ test("normalizeSettings validates and bounds; readOwnEntry finds the plugin entr
   const s = M.normalizeSettings({ enabled: false, buttonsLeft: true, controlSize: "huge", excludedClasses: ["chromium", "bad class; rm", "chromium", 42] })
   assert.deepStrictEqual(s, { enabled: false, buttonsLeft: true, showOnHover: false, controlSize: "standard", excludedClasses: ["chromium", "badclassrm", "42"], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: true })
   assert.deepStrictEqual(M.normalizeSettings(null), { enabled: true, buttonsLeft: false, showOnHover: false, controlSize: "standard", excludedClasses: [], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: true })
-  const doc = JSON.stringify({ bar: { layout: { left: [{ id: "x" }], right: [{ id: "tech.greyforge.grabbar", controlSize: "large", excludedClasses: ["foot"] }] } } })
-  assert.deepStrictEqual(M.readOwnEntry(doc, "tech.greyforge.grabbar"), { controlSize: "large", excludedClasses: ["foot"] })
+  const doc = JSON.stringify({ bar: { layout: { left: [{ id: "x" }], right: [{ id: "tech.loopedmatrix.ohmtabs", controlSize: "large", excludedClasses: ["foot"] }] } } })
+  assert.deepStrictEqual(M.readOwnEntry(doc, "tech.loopedmatrix.ohmtabs"), { controlSize: "large", excludedClasses: ["foot"] })
   assert.strictEqual(M.readOwnEntry(doc, "nope"), null)
   assert.strictEqual(M.readOwnEntry("{bad", "x"), null)
 })

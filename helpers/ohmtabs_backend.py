@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Client for the Grabbar native backend socket (protocol 1).
+"""Client for the OhmTabs native backend socket (protocol 1).
 
 Used by the CLI, the integration tests, and as a stand-in shell service during
 the nested-compositor test rig. Standard library only; short-lived.
@@ -74,7 +74,7 @@ def socket_path(session=None):
     session = session or os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
     if not runtime or not session:
         return None
-    return os.path.join(runtime, "grabbar", session, "backend.sock")
+    return os.path.join(runtime, "ohmtabs", session, "backend.sock")
 
 
 class BackendClient:
@@ -191,7 +191,7 @@ def _print(msg):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Grabbar backend socket client")
+    ap = argparse.ArgumentParser(description="OhmTabs backend socket client")
     ap.add_argument("--session", help="Hyprland instance signature (default: $HYPRLAND_INSTANCE_SIGNATURE)")
     ap.add_argument("--role", default="observer", choices=("observer", "shell"))
     ap.add_argument("--timeout", type=float, default=2.0)

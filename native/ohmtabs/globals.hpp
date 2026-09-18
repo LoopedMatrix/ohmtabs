@@ -1,6 +1,6 @@
 #pragma once
 
-// Grabbar native backend.
+// OhmTabs native backend.
 //
 // Derived from Hyprbars (hyprland-plugins @ 7644cecdb947060682891a0db2a0cdc5c0b9e704,
 // BSD-3-Clause, Copyright (c) 2023 Hypr Development). See docs/UPSTREAM.md and
@@ -18,23 +18,23 @@
 #include <string>
 #include <vector>
 
-#define GRABBAR_VERSION       "0.1.1"
-#define GRABBAR_PROTOCOL      1
-#define GRABBAR_WORKSPACE     "special:grabbar-minimized"
-#define GRABBAR_GRACE_MS      2000
-#define GRABBAR_BOOT_OK_MS    15000 // boot guard: how long the compositor must survive with Grabbar loaded
-#define GRABBAR_MAX_LINE      8192
-#define GRABBAR_MAX_OUTBUF    (256 * 1024)
-#define GRABBAR_MAX_INBUF     (32 * 1024)
-#define GRABBAR_MAX_OWNED     256
+#define OHMTABS_VERSION       "0.1.1"
+#define OHMTABS_PROTOCOL      1
+#define OHMTABS_WORKSPACE     "special:ohmtabs-minimized"
+#define OHMTABS_GRACE_MS      2000
+#define OHMTABS_BOOT_OK_MS    15000 // boot guard: how long the compositor must survive with OhmTabs loaded
+#define OHMTABS_MAX_LINE      8192
+#define OHMTABS_MAX_OUTBUF    (256 * 1024)
+#define OHMTABS_MAX_INBUF     (32 * 1024)
+#define OHMTABS_MAX_OWNED     256
 
 inline HANDLE PHANDLE = nullptr;
 
-class CGrabbarDeco;
-class CGrabbarBackend;
+class COhmTabsDeco;
+class COhmTabsBackend;
 
 struct SGlobalState {
-    std::vector<WP<CGrabbarDeco>> bars;
+    std::vector<WP<COhmTabsDeco>> bars;
     uint32_t                      nobarRuleIdx = 0;
 
     struct {
@@ -44,7 +44,7 @@ struct SGlobalState {
         SP<Config::Values::CStringValue> textFont;
     } config;
 
-    // Values pushed by the shell service (Omarchy theme and Grabbar settings).
+    // Values pushed by the shell service (Omarchy theme and OhmTabs settings).
     // They take precedence over the config values above while set, so the
     // strip follows the desktop theme without edits to hyprland.lua.
     struct {
@@ -63,4 +63,4 @@ struct SGlobalState {
 };
 
 inline UP<SGlobalState>     g_pGlobalState;
-inline UP<CGrabbarBackend>  g_pBackend;
+inline UP<COhmTabsBackend>  g_pBackend;

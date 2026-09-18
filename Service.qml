@@ -2,9 +2,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
-import "GrabbarModel.js" as Model
+import "OhmTabsModel.js" as Model
 
-// Grabbar shell service: the only writer of the recovery journal, the
+// OhmTabs shell service: the only writer of the recovery journal, the
 // backend's shell client, and the restore model behind the bar widget and
 // the drawer. It never resolves an action against the focused window; every
 // action carries a backend token.
@@ -24,12 +24,12 @@ Item {
     if (url.indexOf("file://") === 0) url = url.slice(7)
     return url.replace(/\/+$/, "")
   }
-  readonly property string journalBin: pluginDir + "/helpers/grabbar-journal"
+  readonly property string journalBin: pluginDir + "/helpers/ohmtabs-journal"
   readonly property string home: Quickshell.env("HOME") || ""
-  readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || (home + "/.local/state")) + "/grabbar"
+  readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || (home + "/.local/state")) + "/ohmtabs"
   readonly property string session: Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE") || ""
   readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || ""
-  readonly property string socketPath: (runtimeDir && session) ? runtimeDir + "/grabbar/" + session + "/backend.sock" : ""
+  readonly property string socketPath: (runtimeDir && session) ? runtimeDir + "/ohmtabs/" + session + "/backend.sock" : ""
 
   // ------------------------------------------------------------- model
   property var model: Model.createState()
@@ -51,7 +51,7 @@ Item {
   property string backendVersion: ""
   property bool minimizeEnabled: false
   property bool suspended: true
-  property bool paused: false         // Disable Grabbar was chosen
+  property bool paused: false         // Disable OhmTabs was chosen
   property bool snapshotDone: false
   property var restoreHosts: ({})
   readonly property bool restoreHost: Object.keys(restoreHosts).length > 0
@@ -66,10 +66,10 @@ Item {
   property int requestSeq: 0
 
   readonly property string attentionReason: {
-    if (busy) return "Another Grabbar shell service is connected"
-    if (!backendConnected) return "Grabbar's native backend is not loaded"
-    if (paused) return "Grabbar is turned off — open Settings to turn it on"
-    if (!restoreHost) return "Grabbar needs its bar widget before windows can be minimized"
+    if (busy) return "Another OhmTabs shell service is connected"
+    if (!backendConnected) return "OhmTabs's native backend is not loaded"
+    if (paused) return "OhmTabs is turned off — open Settings to turn it on"
+    if (!restoreHost) return "OhmTabs needs its bar widget before windows can be minimized"
     if (failedCount > 0) return failedCount + " window" + (failedCount === 1 ? "" : "s") + " could not be restored — open the drawer"
     if (recoveredCount > 0) return "Recovered windows are waiting in the drawer"
     return ""
@@ -139,9 +139,9 @@ Item {
     try { ok = JSON.parse(String(text || "{}")).status === "ok" } catch (e) {}
     var cbs = root.afterWrite
     root.afterWrite = []
-    for (var i = 0; i < cbs.length; i++) { try { cbs[i](ok) } catch (e) { console.warn("grabbar: afterWrite", e) } }
+    for (var i = 0; i < cbs.length; i++) { try { cbs[i](ok) } catch (e) { console.warn("ohmtabs: afterWrite", e) } }
     if (ok) root.journalStatus = "ok"
-    else root.say("Grabbar could not save its recovery information")
+    else root.say("OhmTabs could not save its recovery information")
     if (root.journalDirty) persistDebounce.restart()
   }
 
@@ -172,7 +172,7 @@ Item {
   }
 
   function quarantineJournal(reason) {
-    console.warn("grabbar: quarantining recovery journal:", reason)
+    console.warn("ohmtabs: quarantining recovery journal:", reason)
     quarantineProcess.command = ["python3", root.journalBin, "quarantine", "--state-dir", root.stateDir,
                                  "--reason", String(reason || "damaged").replace(/[^A-Za-z0-9_-]/g, "")]
     quarantineProcess.running = true
@@ -191,7 +191,7 @@ Item {
     if (r.recovered.length) root.say("Recovered " + r.recovered.length + " hidden window" + (r.recovered.length === 1 ? "" : "s"))
     else if (r.reconstructed.length || r.completed.length)
       root.say("Restored " + (r.reconstructed.length + r.completed.length) + " minimized window" + ((r.reconstructed.length + r.completed.length) === 1 ? "" : "s") + " to the drawer")
-    console.log("grabbar: reconcile", JSON.stringify(r))
+    console.log("ohmtabs: reconcile", JSON.stringify(r))
     root.sendReady()
   }
 
@@ -252,13 +252,13 @@ Item {
     switch (msg.type) {
       case "welcome":
         root.backendEpoch = String(msg.backendEpoch || "")
-        root.backendVersion = String(msg.grabbarVersion || "")
+        root.backendVersion = String(msg.ohmtabsVersion || "")
         if (msg.role === "shell") root.backendReady = true
-        else { root.busy = true; root.say("Another Grabbar shell service is connected") }
+        else { root.busy = true; root.say("Another OhmTabs shell service is connected") }
         break
       case "error":
         if (msg.reason === "busy") root.busy = true
-        else console.warn("grabbar: backend error", JSON.stringify(msg))
+        else console.warn("ohmtabs: backend error", JSON.stringify(msg))
         break
       case "window":
         root.onWindow(msg)
@@ -285,7 +285,7 @@ Item {
         root.onMenuRequest(msg)
         break
       case "event":
-        if (msg.kind === "backendStopping") root.say("Grabbar's native backend is stopping" + (Number(msg.restored) > 0 ? "; your windows were restored" : ""))
+        if (msg.kind === "backendStopping") root.say("OhmTabs's native backend is stopping" + (Number(msg.restored) > 0 ? "; your windows were restored" : ""))
         else if (msg.event === "tabs.closeAllRequested") root.onCloseAllRequested(msg)
         break
       case "pong":
@@ -338,9 +338,9 @@ Item {
     var win = Model.windowFromMessage(msg)
     var requestId = String(msg.requestId || "")
     if (!win || !Model.isRequestId(requestId)) return
-    if (!root.restoreHost) { root.say("Minimize is unavailable until Grabbar's bar widget is in place"); return }
+    if (!root.restoreHost) { root.say("Minimize is unavailable until OhmTabs's bar widget is in place"); return }
     var r = Model.prepareEntry(root.model, win, requestId, Date.now())
-    if (!r.ok) { console.warn("grabbar: prepare refused", r.reason); return }
+    if (!r.ok) { console.warn("ohmtabs: prepare refused", r.reason); return }
     root.model = r.state
     root.publish()
     var token = win.token
@@ -384,7 +384,7 @@ Item {
         root.commit(Model.removeDead(root.model, token))
       } else {
         root.commit(Model.finishRestore(root.model, token, false).state)
-        root.say(msg.error || "Grabbar could not restore the window")
+        root.say(msg.error || "OhmTabs could not restore the window")
       }
       return
     }
@@ -550,7 +550,7 @@ Item {
     var next = Model.normalizeSettings(Object.assign({}, root.settings, patch || {}))
     var ok = false
     if (typeof root.settingsWriter === "function") {
-      try { ok = root.settingsWriter(next) === true } catch (e) { console.warn("grabbar: settings writer", e) }
+      try { ok = root.settingsWriter(next) === true } catch (e) { console.warn("ohmtabs: settings writer", e) }
     }
     if (ok) root.fileSettings = next
     else root.mirrorSettings = next
@@ -571,7 +571,7 @@ Item {
     return root.saveSettings({ excludedClasses: root.settings.excludedClasses.filter(function(x) { return x !== c }) })
   }
 
-  // Disable Grabbar: windows come back first, then the strip goes away and
+  // Disable OhmTabs: windows come back first, then the strip goes away and
   // Minimize stays refused until it is turned on again (spec §10.4).
   function disable() {
     root.saveSettings({ enabled: false })
@@ -796,13 +796,13 @@ Item {
     if (!popup || popup.status !== "alive") {
       var c = Qt.createComponent("/usr/share/omarchy/shell/Ui/PopupCard.qml", root)
       if (!c || c.status !== "ready") {
-        console.warn("grabbar: cannot load PopupCard for close-all prompt")
+        console.warn("ohmtabs: cannot load PopupCard for close-all prompt")
         return
       }
       popup = c.createObject(root, { "anchorItem": root, "bar": root })
-      if (!popup) { console.warn("grabbar: PopupCard createObject failed"); return }
+      if (!popup) { console.warn("ohmtabs: PopupCard createObject failed"); return }
       var content = closeAllPopupContent.createObject(popup)
-      if (!content) { console.warn("grabbar: close-all content createObject failed"); return }
+      if (!content) { console.warn("ohmtabs: close-all content createObject failed"); return }
       popup.triggerMode = "click"
       popup.open = true
       root.closeAllPopup = popup
@@ -1030,7 +1030,7 @@ Item {
   }
 
   IpcHandler {
-    target: "tech.greyforge.grabbar"
+    target: "tech.loopedmatrix.ohmtabs"
 
     function status(): string { return root.statusJson() }
     function restore(token: string, mode: string): string { return root.restore(token, mode, "") }

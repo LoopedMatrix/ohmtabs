@@ -3,7 +3,7 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 
-// SidePanel — the Windows-11-style minimized-window taskbar for Grabbar.
+// SidePanel — the Windows-11-style minimized-window taskbar for OhmTabs.
 //
 // A run of window buttons along one screen edge: click a button to restore
 // that window. Like the bar widget it registers itself as a restore host, so
@@ -30,7 +30,7 @@ Item {
 
   property var shell: null
   property var service: null
-  property string serviceName: "tech.greyforge.grabbar"
+  property string serviceName: "tech.loopedmatrix.ohmtabs"
 
   // ---- settings (from this plugin's shell.json entry) ----
   property bool panelEnabled: true
@@ -274,7 +274,7 @@ Item {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top
-    WlrLayershell.namespace: "grabbar-taskbar"
+    WlrLayershell.namespace: "ohmtabs-taskbar"
     WlrLayershell.keyboardFocus: root.selectedIndex >= 0 ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     // Anchoring follows the position; parking is a negative margin along the

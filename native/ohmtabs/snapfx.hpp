@@ -8,8 +8,8 @@
 // (colour resolution, frame blending, IPC) lives in snapfx.cpp.
 //
 // The zone decision lives here in exactly one place: both the release-time
-// snap (CGrabbarDeco::snapToZone) and the drag preview
-// (CGrabbarDeco::updateSnapPreview) call decideZone(), so they can never
+// snap (COhmTabsDeco::snapToZone) and the drag preview
+// (COhmTabsDeco::updateSnapPreview) call decideZone(), so they can never
 // disagree about where a pointer position would land.
 
 #include <algorithm>
@@ -145,8 +145,8 @@ namespace SnapFx {
     // can step it deterministically.
     class State {
       public:
-        bool glowEnabled    = true; // plugin:grabbar:snap_glow
-        bool previewEnabled = true; // plugin:grabbar:snap_preview (reserved)
+        bool glowEnabled    = true; // plugin:ohmtabs:snap_glow
+        bool previewEnabled = true; // plugin:ohmtabs:snap_preview (reserved)
 
         // While dragging: called every time the pointer's zone changes.
         void setZone(const ZoneResult& r) {

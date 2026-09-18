@@ -6,10 +6,10 @@ set -u
 SIG="${SIG:?}"; NESTED_DISPLAY="${NESTED_DISPLAY:?}"; CYCLES="${CYCLES:-500}"
 SHELL_CONFIG="${SHELL_CONFIG:-/usr/share/omarchy/shell}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-HELPER="$ROOT/helpers/grabbar_backend.py"
+HELPER="$ROOT/helpers/ohmtabs_backend.py"
 hc() { hyprctl -i "$SIG" "$@"; }
 be() { HYPRLAND_INSTANCE_SIGNATURE="$SIG" python3 "$HELPER" --timeout 4 "$@"; }
-sipc() { WAYLAND_DISPLAY="$NESTED_DISPLAY" qs ipc -p "$SHELL_CONFIG" call tech.greyforge.grabbar "$@"; }
+sipc() { WAYLAND_DISPLAY="$NESTED_DISPLAY" qs ipc -p "$SHELL_CONFIG" call tech.loopedmatrix.ohmtabs "$@"; }
 HPID=$(head -1 "$XDG_RUNTIME_DIR/hypr/$SIG/hyprland.lock")
 QPID=$(for p in $(pgrep -f "qs -p $SHELL_CONFIG"); do tr '\0' '\n' < /proc/$p/environ 2>/dev/null | grep -qx "WAYLAND_DISPLAY=$NESTED_DISPLAY" && echo $p; done | head -1)
 mem() { awk '/^Pss:/{print $2}' /proc/$1/smaps_rollup; }
@@ -23,7 +23,7 @@ wait_ws() { for _ in $(seq 1 40); do [[ "$(ws)" == "$1" ]] && return 0; sleep 0.
 sample "before"
 T0=$(date +%s); FAILS=0; LAT=()
 for i in $(seq 1 "$CYCLES"); do
-  s=$(date +%s%N); sipc minimize "$T" >/dev/null; wait_ws special:grabbar-minimized || { FAILS=$((FAILS+1)); continue; }
+  s=$(date +%s%N); sipc minimize "$T" >/dev/null; wait_ws special:ohmtabs-minimized || { FAILS=$((FAILS+1)); continue; }
   sipc restore "$T" current >/dev/null; wait_ws 1 || { FAILS=$((FAILS+1)); continue; }
   LAT+=( $(( ($(date +%s%N) - s) / 1000000 )) )
   (( i % 100 == 0 )) && sample "cycle $i"

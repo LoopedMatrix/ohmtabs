@@ -1,9 +1,9 @@
 #pragma once
 
-// The Grabbar title strip: a reserved top decoration with a window-menu
+// The OhmTabs title strip: a reserved top decoration with a window-menu
 // target, an ellipsized title, and Minimize / Maximize-Restore / Close.
 //
-// Derived from Hyprbars' CHyprBar (BSD-3-Clause, Hypr Development). Grabbar
+// Derived from Hyprbars' CHyprBar (BSD-3-Clause, Hypr Development). OhmTabs
 // changes: buttons act on release inside the same target with the window
 // identity captured at press; actions go through typed backend calls instead
 // of `exec`; dragging respects the drag threshold and detaches tiled windows;
@@ -31,7 +31,7 @@ namespace Event {
     struct SCallbackInfo;
 }
 
-enum eGrabbarButton : int8_t {
+enum eOhmTabsButton : int8_t {
     BTN_NONE = -1,
     BTN_MENU = 0,
     BTN_MINIMIZE,
@@ -40,7 +40,7 @@ enum eGrabbarButton : int8_t {
 };
 
 struct SButtonSlot {
-    eGrabbarButton id = BTN_NONE;
+    eOhmTabsButton id = BTN_NONE;
     CBox           box; // logical pixels, relative to the strip's top-left
 };
 
@@ -53,10 +53,10 @@ struct STabBox {
     std::string token;
 };
 
-class CGrabbarDeco : public IHyprWindowDecoration {
+class COhmTabsDeco : public IHyprWindowDecoration {
   public:
-    CGrabbarDeco(PHLWINDOW);
-    virtual ~CGrabbarDeco();
+    COhmTabsDeco(PHLWINDOW);
+    virtual ~COhmTabsDeco();
 
     virtual SDecorationPositioningInfo getPositioningInfo();
     virtual void                       onPositioningReply(const SDecorationPositioningReply& reply);
@@ -79,7 +79,7 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     SnapFx::State&                     snapFx() { return m_snapFx; }
     const SnapFx::State&               snapFx() const { return m_snapFx; }
 
-    WP<CGrabbarDeco>                   m_self;
+    WP<COhmTabsDeco>                   m_self;
 
   private:
     PHLWINDOWREF               m_window;
@@ -88,15 +88,15 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     std::string                m_lastTitle;
     int                        m_lastTitleWidth = -1;
     bool                       m_windowSizeChanged = false;
-    bool                       m_hidden            = false; // rule grabbar:no_bar
+    bool                       m_hidden            = false; // rule ohmtabs:no_bar
     bool                       m_lastEffectiveEnabled = false;
     bool                       m_windowHasFocus       = false;
     int                        m_lastHeight           = 0;
     bool                       m_showOnHover          = false; // reveal only when pointer is in the top zone
 
     // input state
-    eGrabbarButton             m_pressedButton = BTN_NONE;
-    eGrabbarButton             m_hoverButton   = BTN_NONE;
+    eOhmTabsButton             m_pressedButton = BTN_NONE;
+    eOhmTabsButton             m_hoverButton   = BTN_NONE;
     std::string                m_pressToken;
     Vector2D                   m_pressPos;      // global coords at press
     Vector2D                   m_pressOffset;   // press position relative to the strip
@@ -125,7 +125,7 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     bool                       inputIsValid();
     Vector2D                   cursorRelativeToBar();
     std::vector<SButtonSlot>   layoutButtons(double barW, double barH);
-    eGrabbarButton             buttonAt(const Vector2D& rel);
+    eOhmTabsButton             buttonAt(const Vector2D& rel);
     void                       onMouseButton(Event::SCallbackInfo& info, IPointer::SButtonEvent e);
     void                       onMouseMove(Vector2D coords);
     void                       handleDownEvent(Event::SCallbackInfo& info);
@@ -135,9 +135,9 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     bool                       snapToZone();
     void                       updateSnapPreview();
     void                       snapFxTick();
-    void                       activate(eGrabbarButton b, const std::string& token);
+    void                       activate(eOhmTabsButton b, const std::string& token);
     void                       renderTitle(const Vector2D& bufferSize, float scale, int maxWidth);
-    SP<Render::ITexture>       glyph(eGrabbarButton b, bool maximized, int size, const CHyprColor& color);
+    SP<Render::ITexture>       glyph(eOhmTabsButton b, bool maximized, int size, const CHyprColor& color);
 
     // tab strip layout / hit-test / input
     std::vector<STabBox>       layoutTabs(double barW, double barH);
@@ -146,7 +146,7 @@ class CGrabbarDeco : public IHyprWindowDecoration {
     void                       startTabTearOff(const std::string& token);
     void                       renderTabs(float a, const CBox& titleBarBox, float SCALE, int PAD, const CHyprColor& textColor, bool focused);
 
-    friend class CGrabbarPassElement;
+    friend class COhmTabsPassElement;
 };
 
 // Compositor glue for the snap effect (defined in snapfx.cpp).

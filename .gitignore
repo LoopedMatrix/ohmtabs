@@ -1,10 +1,10 @@
 native/upstream/hyprbars/*.so
-native/grabbar/*.so
+native/ohmtabs/*.so
 native/build/
 __pycache__/
 *.o
 native/upstream/
 tests/integration/vpointer/vpointer
 # compiled native unit-test binaries
-native/grabbar/tests/test_snapfx
+native/ohmtabs/tests/test_snapfx
 tests/unit/tabs_store_test

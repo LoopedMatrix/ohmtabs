@@ -1,21 +1,21 @@
 #pragma once
 
-// Render pass element for the Grabbar strip. Structure follows Hyprbars'
+// Render pass element for the OhmTabs strip. Structure follows Hyprbars'
 // CBarPassElement (BSD-3-Clause, Hypr Development); see docs/UPSTREAM.md.
 
 #include <hyprland/src/render/pass/PassElement.hpp>
 
-class CGrabbarDeco;
+class COhmTabsDeco;
 
-class CGrabbarPassElement : public IPassElement {
+class COhmTabsPassElement : public IPassElement {
   public:
     struct SBarData {
-        CGrabbarDeco* deco = nullptr;
+        COhmTabsDeco* deco = nullptr;
         float         a    = 1.F;
     };
 
-    CGrabbarPassElement(const SBarData& data);
-    virtual ~CGrabbarPassElement() = default;
+    COhmTabsPassElement(const SBarData& data);
+    virtual ~COhmTabsPassElement() = default;
 
     virtual std::vector<UP<IPassElement>> draw() override;
     virtual bool                          needsLiveBlur() override;
@@ -23,7 +23,7 @@ class CGrabbarPassElement : public IPassElement {
     virtual std::optional<CBox>           boundingBox() override;
 
     virtual const char*                   passName() override {
-        return "CGrabbarPassElement";
+        return "COhmTabsPassElement";
     }
 
     virtual ePassElementType type() override {

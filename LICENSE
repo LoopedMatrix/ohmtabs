@@ -20,6 +20,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-The files under native/upstream/ and parts of native/grabbar/ are derived from
+The files under native/upstream/ and parts of native/ohmtabs/ are derived from
 the Hyprland plugins repository and are licensed under the BSD 3-Clause
 License; see THIRD_PARTY_NOTICES.

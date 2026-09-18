@@ -3,9 +3,9 @@ import Quickshell
 import Quickshell.Widgets
 import qs.Commons
 import qs.Ui
-import "GrabbarModel.js" as Model
+import "OhmTabsModel.js" as Model
 
-// Grabbar bar widget: the stable place a minimized window can be found again.
+// OhmTabs bar widget: the stable place a minimized window can be found again.
 //
 //   glyph [count]   — always visible (spec §5.1), highlighted when attention is needed
 //
@@ -16,7 +16,7 @@ import "GrabbarModel.js" as Model
 // the host's settings writer (for this plugin's shell.json entry).
 BarWidget {
   id: root
-  moduleName: "tech.greyforge.grabbar"
+  moduleName: "tech.loopedmatrix.ohmtabs"
 
   readonly property var service: bar && bar.shell && typeof bar.shell.serviceFor === "function"
     ? bar.shell.serviceFor(moduleName) : null
@@ -38,8 +38,8 @@ BarWidget {
 
   function tooltip() {
     if (attention) return attentionReason
-    if (!service) return "Grabbar — click for minimized windows"
-    if (count === 0) return "No minimized windows\nright-click: Grabbar settings"
+    if (!service) return "OhmTabs — click for minimized windows"
+    if (count === 0) return "No minimized windows\nright-click: OhmTabs settings"
     return count + " minimized window" + (count === 1 ? "" : "s") + "\nclick: open · middle: restore all · right: settings"
   }
 

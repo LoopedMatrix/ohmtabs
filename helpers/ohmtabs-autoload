@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Grabbar native autoload management (docs/AUTOLOAD.md).
+"""OhmTabs native autoload management (docs/AUTOLOAD.md).
 
-    grabbar-autoload status  [--state-dir DIR] [--hypr-config FILE] [--json]
-    grabbar-autoload enable  [--state-dir DIR] [--hypr-config FILE]
-    grabbar-autoload disable [--state-dir DIR] [--hypr-config FILE]
-    grabbar-autoload retry   [--state-dir DIR]
-    grabbar-autoload arm     [--state-dir DIR]        # create the 'enabled' marker only
-    grabbar-autoload disarm  [--state-dir DIR]        # remove it (config hook stays, declares nothing)
+    ohmtabs-autoload status  [--state-dir DIR] [--hypr-config FILE] [--json]
+    ohmtabs-autoload enable  [--state-dir DIR] [--hypr-config FILE]
+    ohmtabs-autoload disable [--state-dir DIR] [--hypr-config FILE]
+    ohmtabs-autoload retry   [--state-dir DIR]
+    ohmtabs-autoload arm     [--state-dir DIR]        # create the 'enabled' marker only
+    ohmtabs-autoload disarm  [--state-dir DIR]        # remove it (config hook stays, declares nothing)
 
 `enable` writes one guarded line into the Hyprland Lua config (with a timestamped
 backup) and creates the 'enabled' marker. It never reloads the compositor: the
@@ -16,19 +16,19 @@ failed start so the next evaluation declares the plugin again.
 """
 import argparse, json, os, re, sys, time
 
-BEGIN = "-- BEGIN tech.greyforge.grabbar autoload"
-END = "-- END tech.greyforge.grabbar autoload"
+BEGIN = "-- BEGIN tech.loopedmatrix.ohmtabs autoload"
+END = "-- END tech.loopedmatrix.ohmtabs autoload"
 HOOK = (
     BEGIN + "\n"
-    "-- Managed by `grabbar autoload enable|disable`. Loads Grabbar's native window\n"
+    "-- Managed by `ohmtabs autoload enable|disable`. Loads OhmTabs's native window\n"
     "-- controls through the plugin's own guarded loader (docs/AUTOLOAD.md).\n"
-    'pcall(dofile, (os.getenv("HOME") or "") .. "/.config/omarchy/plugins/tech.greyforge.grabbar/native/autoload.lua")\n'
+    'pcall(dofile, (os.getenv("HOME") or "") .. "/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs/native/autoload.lua")\n'
     + END + "\n"
 )
 
 
 def default_state_dir():
-    return os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "grabbar")
+    return os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"), "ohmtabs")
 
 
 def default_hypr_config():
@@ -113,7 +113,7 @@ def enable(state_dir, hypr_config):
         with open(hypr_config) as f:
             text = f.read()
     except FileNotFoundError:
-        sys.exit("grabbar-autoload: %s does not exist; Grabbar autoload needs Hyprland's Lua config" % hypr_config)
+        sys.exit("ohmtabs-autoload: %s does not exist; OhmTabs autoload needs Hyprland's Lua config" % hypr_config)
     if BEGIN in text:
         arm(state_dir)
         return "already-installed"
@@ -123,7 +123,7 @@ def enable(state_dir, hypr_config):
     if not text.endswith("\n"):
         text += "\n"
     text += "\n" + HOOK
-    tmp = hypr_config + ".grabbar.tmp"
+    tmp = hypr_config + ".ohmtabs.tmp"
     with open(tmp, "w") as f:
         f.write(text)
     os.chmod(tmp, 0o644)
@@ -145,7 +145,7 @@ def disable(state_dir, hypr_config):
     backup = "%s.bak.%s" % (hypr_config, time.strftime("%Y%m%d-%H%M%S"))
     with open(backup, "w") as f:
         f.write(text)
-    tmp = hypr_config + ".grabbar.tmp"
+    tmp = hypr_config + ".ohmtabs.tmp"
     with open(tmp, "w") as f:
         f.write(new)
     os.chmod(tmp, 0o644)
@@ -154,7 +154,7 @@ def disable(state_dir, hypr_config):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Grabbar native autoload")
+    ap = argparse.ArgumentParser(description="OhmTabs native autoload")
     ap.add_argument("command", choices=("status", "enable", "disable", "retry", "arm", "disarm"))
     ap.add_argument("--state-dir", default=default_state_dir())
     ap.add_argument("--hypr-config", default=default_hypr_config())
@@ -167,7 +167,7 @@ def main():
         else:
             print("autoload        %s" % s["state"])
             if s["skipped"]:
-                print("skipped start   %s (clear with: grabbar autoload retry)" % s["skipped"])
+                print("skipped start   %s (clear with: ohmtabs autoload retry)" % s["skipped"])
         return
     if a.command == "enable":
         print("autoload hook: %s" % enable(a.state_dir, a.hypr_config))

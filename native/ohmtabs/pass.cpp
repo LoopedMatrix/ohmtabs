@@ -5,24 +5,24 @@
 
 #include "bar.hpp"
 
-CGrabbarPassElement::CGrabbarPassElement(const CGrabbarPassElement::SBarData& data) : m_data(data) {
+COhmTabsPassElement::COhmTabsPassElement(const COhmTabsPassElement::SBarData& data) : m_data(data) {
     ;
 }
 
-std::vector<UP<IPassElement>> CGrabbarPassElement::draw() {
+std::vector<UP<IPassElement>> COhmTabsPassElement::draw() {
     m_data.deco->renderPass(g_pHyprRenderer->m_renderData.pMonitor.lock(), m_data.a);
     return {};
 }
 
-bool CGrabbarPassElement::needsLiveBlur() {
+bool COhmTabsPassElement::needsLiveBlur() {
     return false;
 }
 
-std::optional<CBox> CGrabbarPassElement::boundingBox() {
+std::optional<CBox> COhmTabsPassElement::boundingBox() {
     // Expand a little so occlusion culling does not clip the strip's rounded corners.
     return m_data.deco->assignedBoxGlobal().translate(-g_pHyprRenderer->m_renderData.pMonitor->m_position).expand(10);
 }
 
-bool CGrabbarPassElement::needsPrecomputeBlur() {
+bool COhmTabsPassElement::needsPrecomputeBlur() {
     return false;
 }

@@ -8,7 +8,7 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-HELPER = os.path.join(ROOT, "helpers", "grabbar-journal")
+HELPER = os.path.join(ROOT, "helpers", "ohmtabs-journal")
 
 
 def run(cmd, state_dir, stdin=""):
@@ -23,7 +23,7 @@ def doc(entries=None, session="s1"):
 
 def main():
     with tempfile.TemporaryDirectory() as tmp:
-        sd = os.path.join(tmp, "grabbar")
+        sd = os.path.join(tmp, "ohmtabs")
 
         assert run("read", sd)["status"] == "empty"
 

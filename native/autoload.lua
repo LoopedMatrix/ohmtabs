@@ -1,7 +1,7 @@
--- Grabbar native autoload for Hyprland's Lua config.
+-- OhmTabs native autoload for Hyprland's Lua config.
 --
 -- Called from ~/.config/hypr/hyprland.lua as
---   pcall(dofile, os.getenv("HOME") .. "/.config/omarchy/plugins/tech.greyforge.grabbar/native/autoload.lua")
+--   pcall(dofile, os.getenv("HOME") .. "/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs/native/autoload.lua")
 --
 -- Two rules keep this safe (see docs/AUTOLOAD.md for the 2026-09-15 incident):
 --
@@ -16,11 +16,11 @@
 --    same signature to <state>/autoload/last-ok once it has run for a while.
 --    If, at startup, the previous attempt never reached ok, this file declares
 --    nothing and records the skip, so a bad boot cannot repeat itself. Clear it
---    with `grabbar autoload retry`.
+--    with `ohmtabs autoload retry`.
 do
   local home  = os.getenv("HOME") or ""
-  local so    = os.getenv("GRABBAR_SO") or (home .. "/.config/omarchy/plugins/tech.greyforge.grabbar/native/grabbar/grabbar.so")
-  local state = os.getenv("GRABBAR_STATE_DIR") or ((os.getenv("XDG_STATE_HOME") or (home .. "/.local/state")) .. "/grabbar")
+  local so    = os.getenv("OHMTABS_SO") or (home .. "/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs/native/ohmtabs/ohmtabs.so")
+  local state = os.getenv("OHMTABS_STATE_DIR") or ((os.getenv("XDG_STATE_HOME") or (home .. "/.local/state")) .. "/ohmtabs")
   local dir   = state .. "/autoload"
   local his   = os.getenv("HYPRLAND_INSTANCE_SIGNATURE") or ""
 
@@ -54,14 +54,14 @@ do
       -- the declared plugin set is empty on every evaluation until `retry`.
       write(dir .. "/skipped", last_attempt)
       pcall(function()
-        hl.notification.create({ text = "Grabbar: native controls stayed off because the last start with them did not finish. Run: grabbar autoload retry", timeout = 12000 })
+        hl.notification.create({ text = "OhmTabs: native controls stayed off because the last start with them did not finish. Run: ohmtabs autoload retry", timeout = 12000 })
       end)
     else
       -- Record this instance before declaring, so a start that never gets far
       -- enough for the plugin to confirm health leaves the attempt on record.
       if last_attempt ~= his and not write(dir .. "/last-attempt", his) then
         pcall(function()
-          hl.notification.create({ text = "Grabbar: native controls stayed off because startup recovery state could not be saved.", timeout = 12000 })
+          hl.notification.create({ text = "OhmTabs: native controls stayed off because startup recovery state could not be saved.", timeout = 12000 })
         end)
         return
       end

@@ -21,7 +21,7 @@ namespace SnapFx {
         if (g_pGlobalState->shell.snapGlowColor)
             return CHyprColor{*g_pGlobalState->shell.snapGlowColor};
 
-        // 2. plugin:grabbar:snap_glow_color when the user set it explicitly
+        // 2. plugin:ohmtabs:snap_glow_color when the user set it explicitly
         //    (0 is the "use the active border colour" default).
         if (const auto C = g_pGlobalState->config.snapGlowColor; C && C->value() != 0)
             return CHyprColor{static_cast<uint64_t>(C->value())};

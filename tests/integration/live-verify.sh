@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
-# live-verify.sh — SAFE, read-mostly verification of the DEPLOYED Grabbar plugin
+# live-verify.sh — SAFE, read-mostly verification of the DEPLOYED OhmTabs plugin
 # running on this live desktop. It never reloads the shell, never kills
 # quickshell/Hyprland, never writes under ~/.config/omarchy/, and only ever
 # minimizes/restores ONE window that it spawns itself (and cleans up, even on
 # failure, via a trap). Everything is read from textual/JSON output — no screen.
 #
 # Assertions:
-#   [1] plugin health  — `omarchy-shell tech.greyforge.grabbar status` (timeout)
+#   [1] plugin health  — `omarchy-shell tech.loopedmatrix.ohmtabs status` (timeout)
 #                        reports backend.ready / enabled / minimizeEnabled /
 #                        restoreHost all true, and failed == 0.
 #   [2] freeze-bug      — the newest /run/user/1000/quickshell/by-id/*/log.qslog,
 #                        stripped of non-printables, contains neither
 #                        "Cannot assign to read-only property" nor a TypeError
-#                        mentioning grabbar.
+#                        mentioning ohmtabs.
 #   [3] taskbar surface — when a window is minimized, `hyprctl -j layers` has
 #                        exactly one surface per monitor with namespace
-#                        "grabbar-taskbar"; its geometry is reported and
+#                        "ohmtabs-taskbar"; its geometry is reported and
 #                        classified parked (mostly off one edge, ~4 px sliver)
 #                        vs revealed (flush with the edge). At rest (nothing
 #                        minimized) the surface is, by design, absent.
 #   [4] end-to-end      — spawn a terminal (alacritty/kitty/foot/ghostty),
 #                        wait for it in `hyprctl -j clients`, resolve its
-#                        Grabbar token from the backend's own snapshot registry
+#                        OhmTabs token from the backend's own snapshot registry
 #                        (matched by window address — never guessed; a
 #                        downward-generation probe is the fallback), minimize
 #                        through the plugin IPC, assert minimized grew and the
@@ -40,8 +40,8 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-HELPER="$ROOT/helpers/grabbar_backend.py"
-PLUGIN="tech.greyforge.grabbar"
+HELPER="$ROOT/helpers/ohmtabs_backend.py"
+PLUGIN="tech.loopedmatrix.ohmtabs"
 READONLY=0
 [ "${1:-}" = "--readonly" ] && READONLY=1
 
@@ -75,7 +75,7 @@ poll_status() {
   return 1
 }
 
-# taskbar_surfaces — every grabbar-taskbar layer surface as a JSON array
+# taskbar_surfaces — every ohmtabs-taskbar layer surface as a JSON array
 # [{monitor,x,y,w,h,address}] by walking the nested {monitor:{levels:{...}}} shape.
 taskbar_surfaces() {
   layers_json | python3 -c '
@@ -85,7 +85,7 @@ out = []
 for mon, v in d.items():
     for arr in (v.get("levels") or {}).values():
         for s in arr:
-            if s.get("namespace") == "grabbar-taskbar":
+            if s.get("namespace") == "ohmtabs-taskbar":
                 out.append({"monitor": mon, "x": s.get("x"), "y": s.get("y"),
                             "w": s.get("w"), "h": s.get("h"), "address": s.get("address")})
 print(json.dumps(out))
@@ -151,12 +151,12 @@ if [ -z "$NEWEST" ]; then
 else
   CLEAN="$(tr -cd '\11\12\15\40-\176' < "$NEWEST")"
   RO="$(printf '%s' "$CLEAN" | grep -cF "Cannot assign to read-only property" || true)"
-  TE="$(printf '%s' "$CLEAN" | grep -ciE "TypeError.*grabbar|grabbar.*TypeError" || true)"
-  echo "log: $NEWEST ($(stat -c%s "$NEWEST") bytes); 'Cannot assign to read-only property'=$RO, TypeError(grabbar)=$TE"
+  TE="$(printf '%s' "$CLEAN" | grep -ciE "TypeError.*ohmtabs|ohmtabs.*TypeError" || true)"
+  echo "log: $NEWEST ($(stat -c%s "$NEWEST") bytes); 'Cannot assign to read-only property'=$RO, TypeError(ohmtabs)=$TE"
   if [ "$RO" = "0" ] && [ "$TE" = "0" ]; then
-    pass 2 "no read-only-assignment or grabbar TypeError in the newest shell log"
+    pass 2 "no read-only-assignment or ohmtabs TypeError in the newest shell log"
   else
-    fail 2 "read-only-assignment=$RO grabbar-typeerror=$TE (regression of the desktop-freezing bug)"
+    fail 2 "read-only-assignment=$RO ohmtabs-typeerror=$TE (regression of the desktop-freezing bug)"
   fi
 fi
 
@@ -185,7 +185,7 @@ else
   echo "terminal: $TERM_NAME ($TERM_BIN)"
 
   # --- cleanup bookkeeping (trap runs even on failure)
-  TITLE="grabbar-live-verify-$$"
+  TITLE="ohmtabs-live-verify-$$"
   FOOT_PID=""; FOOT_ADDR=""; TOKEN=""
   BASELINE_TERM="$(pgrep -x "$TERM_NAME" 2>/dev/null | tr '\n' ' ')"
   cleanup() {
@@ -300,7 +300,7 @@ print(mx)
     fi
 
     if [ -z "$TOKEN" ]; then
-      fail 4 "could not resolve a Grabbar token for the spawned window"
+      fail 4 "could not resolve a OhmTabs token for the spawned window"
     else
       # --- minimize (the response is 'requested'; judge from state, not text)
       R="$(timeout 10 omarchy-shell "$PLUGIN" minimize "$TOKEN" 2>/dev/null)"
@@ -329,10 +329,10 @@ print(mx)
         if [ "$DUP" = "0" ]; then
           pass 3 "surface present, exactly one per monitor; geometry/parking above"
         else
-          fail 3 "duplicate grabbar-taskbar surfaces detected ($DUP monitor(s) have >1)"
+          fail 3 "duplicate ohmtabs-taskbar surfaces detected ($DUP monitor(s) have >1)"
         fi
       else
-        fail 3 "no grabbar-taskbar surface after minimize (minimized=$NEWMIN)"
+        fail 3 "no ohmtabs-taskbar surface after minimize (minimized=$NEWMIN)"
         E2E_OK=0
       fi
 

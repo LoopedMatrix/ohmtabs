@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Renamed: Grabbar / omarchy-tab -> OhmTabs
+
+- Project, repository and plugin identity renamed: plugin id is now
+  `tech.loopedmatrix.ohmtabs`, the native artifact is `ohmtabs.so`, the holding
+  workspace is `special:ohmtabs-minimized`, and state moves to
+  `~/.local/state/ohmtabs` (with a migration, so settings survive).
+- Upstream attribution is unchanged: the `GreyforgeLabs/omarchy-grabbar` slug,
+  the "Greyforge Labs" copyright notice and the `greyforge.hotbar` /
+  `tech.greyforge.reprieve` compatibility notes keep their original names.
+- Entries below this one describe the project under its previous name.
+
 ## 0.1.1 — 2026-09-15 (public preview)
 
 - Keep native controls off when the compositor identity is missing or the

@@ -14,13 +14,13 @@ python3 tests/unit/test_protocol.py
 # Native pure-logic unit tests: the snap zone decider (incl. the strip reserve
 # that keeps a snapped strip out from under the Omarchy bar) and the glow
 # state machine. Header-only, no Hyprland, no compositor, no session.
-g++ -std=c++20 -Wall -Wno-unused-parameter -I native/grabbar \
-  native/grabbar/tests/test_snapfx.cpp -o /tmp/grabbar-test_snapfx
-/tmp/grabbar-test_snapfx
+g++ -std=c++20 -Wall -Wno-unused-parameter -I native/ohmtabs \
+  native/ohmtabs/tests/test_snapfx.cpp -o /tmp/ohmtabs-test_snapfx
+/tmp/ohmtabs-test_snapfx
 # Window-tab model (TabStore): pure logic, no Hyprland, compiled with -Werror.
 bash tests/unit/run_tabs_test.sh
-python3 -m py_compile helpers/grabbar-journal helpers/grabbar_backend.py
-bash -n bin/grabbar tests/integration/*.sh
+python3 -m py_compile helpers/ohmtabs-journal helpers/ohmtabs_backend.py
+bash -n bin/ohmtabs tests/integration/*.sh
 # The virtual-pointer tool drives real drags in the nested scenarios; without it
 # those tests silently no-op'ed, so build it as part of the suite.
 bash tests/integration/vpointer/build.sh

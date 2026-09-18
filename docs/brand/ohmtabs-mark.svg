@@ -65,7 +65,7 @@
       <path d="M-74 -28 H74" stroke="#38c8e8" stroke-opacity="0.3" stroke-width="1.5" stroke-dasharray="5 5"/>
     </g>
 
-    <!-- the window, mid-drag, with its Grabbar strip -->
+    <!-- the window, mid-drag, with its OhmTabs strip -->
     <g transform="translate(14 -14)">
       <rect x="-74" y="-52" width="148" height="104" rx="8" fill="#1a2028" stroke="url(#steel)" stroke-width="3"/>
       <path d="M-74 -44 a8 8 0 0 1 8 -8 h132 a8 8 0 0 1 8 8 v16 h-148 z" fill="url(#strip)"/>

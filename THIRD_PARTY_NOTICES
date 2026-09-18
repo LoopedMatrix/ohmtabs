@@ -1,9 +1,9 @@
-Third-party notices for Grabbar
+Third-party notices for OhmTabs
 ================================
 
 1. Hyprbars (hyprland-plugins)
 ------------------------------
-The native backend in native/grabbar/ is derived from Hyprbars in the
+The native backend in native/ohmtabs/ is derived from Hyprbars in the
 hyprland-plugins repository, revision 7644cecdb947060682891a0db2a0cdc5c0b9e704
 (the hyprpm pin for Hyprland v0.56.2). A pinned checkout is kept under
 native/upstream/ for reference and comparison. Files with retained upstream

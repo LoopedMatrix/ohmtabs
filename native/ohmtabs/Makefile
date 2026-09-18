@@ -1,4 +1,4 @@
-# Grabbar native backend — builds against the installed Hyprland headers.
+# OhmTabs native backend — builds against the installed Hyprland headers.
 # The result is only valid for the exact Hyprland build whose headers were
 # used; PLUGIN_INIT refuses to load into any other build.
 
@@ -14,7 +14,7 @@ INCLUDES = `pkg-config --cflags pixman-1 libdrm hyprland libinput libudev waylan
 LIBS =
 
 SRC = main.cpp backend.cpp bar.cpp pass.cpp snapfx.cpp tabs.cpp
-TARGET = grabbar.so
+TARGET = ohmtabs.so
 
 all: $(TARGET)
 

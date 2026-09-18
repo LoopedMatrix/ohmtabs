@@ -8,10 +8,10 @@ native plugin in the live compositor:
 
 ```lua
 do
-  local so = os.getenv("HOME") .. "/.config/omarchy/plugins/tech.greyforge.grabbar/native/grabbar/grabbar.so"
+  local so = os.getenv("HOME") .. "/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs/native/ohmtabs/ohmtabs.so"
   local loaded = false
   for _, p in ipairs(hl.get_loaded_plugins() or {}) do
-    if p.name == "grabbar" then loaded = true end
+    if p.name == "ohmtabs" then loaded = true end
   end
   if not loaded then hl.plugin.load(so) end     -- THE DEFECT
 end
@@ -21,7 +21,7 @@ The reload hung (`Hyprland IPC didn't respond in time`). On the next login
 Hyprland crashed during startup on every attempt; UWSM never received a
 display, systemd killed and restarted it, and the screen stayed black. The
 operator recovered by booting another OS and removing the block
-(`~/.local/state/greyarch-recovery/20260915-grabbar/RECOVERY.md`).
+(`~/.local/state/greyarch-recovery/20260915-ohmtabs/RECOVERY.md`).
 
 ## Root cause (Hyprland 0.56.2 source, `src/config/lua/*`, `src/plugins/PluginSystem.cpp`)
 
@@ -38,7 +38,7 @@ diffs the declared list against the loaded plugins:
 - if anything changed, `handlePluginLoads` calls `reload()` **synchronously**.
 
 The block above declared the plugin only while it was *not* loaded. So the
-declared set alternated between `{grabbar.so}` and `{}` on every evaluation,
+declared set alternated between `{ohmtabs.so}` and `{}` on every evaluation,
 and each evaluation changed the set:
 
 ```
@@ -69,15 +69,15 @@ marker exists) are fine.
 - `native/autoload.lua`: the shipped loader. One unconditional
   `hl.plugin.load(so)` when the `.so` and the `enabled` marker exist, plus a
   **boot guard**: it records the compositor instance signature in
-  `<state>/grabbar/autoload/last-attempt` before declaring; the native plugin
+  `<state>/ohmtabs/autoload/last-attempt` before declaring; the native plugin
   writes the same signature to `last-ok` after it has run for 15 s
-  (`GRABBAR_BOOT_OK_MS`). If at startup the previous attempt never reached
+  (`OHMTABS_BOOT_OK_MS`). If at startup the previous attempt never reached
   `last-ok`, nothing is declared, `skipped` is written and a notification asks
-  the user to run `grabbar autoload retry`. A bad start therefore cannot
+  the user to run `ohmtabs autoload retry`. A bad start therefore cannot
   repeat itself.
 - `hyprland.lua` gets one guarded line, installed and removed by
-  `grabbar autoload enable|disable` (timestamped backups, byte-exact removal):
-  `pcall(dofile, HOME .. "/.config/omarchy/plugins/tech.greyforge.grabbar/native/autoload.lua")`
+  `ohmtabs autoload enable|disable` (timestamped backups, byte-exact removal):
+  `pcall(dofile, HOME .. "/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs/native/autoload.lua")`
 - `enable` never loads the plugin. The first load happens at the operator's
   own `hyprctl reload` or next login.
 

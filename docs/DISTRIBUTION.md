@@ -1,6 +1,6 @@
 # Directory distribution after a release
 
-Directory submission is part of Grabbar's release workflow. The operator
+Directory submission is part of OhmTabs's release workflow. The operator
 requested this standing step on 2026-09-15. Carry an authorized release through
 the applicable directory updates; announcements on social media are separate.
 
@@ -27,4 +27,4 @@ the applicable directory updates; announcements on social media are separate.
 
 Greyforge's shared `omarchy-plugin-distribution` skill maintains the practical
 routing reference. Local submission receipts live under
-`~/.local/state/greyforge/plugin-distribution/grabbar/`.
+`~/.local/state/greyforge/plugin-distribution/ohmtabs/`.

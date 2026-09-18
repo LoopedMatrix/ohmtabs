@@ -1,6 +1,6 @@
 #pragma once
 
-// The Grabbar backend: live window identities, typed window actions, the
+// The OhmTabs backend: live window identities, typed window actions, the
 // owned hidden workspace, the private shell socket, and disconnect recovery.
 //
 // Nothing in here builds a shell command or resolves an action against the
@@ -45,16 +45,16 @@ struct STrackedWindow {
     PHLWINDOWREF  window;
     uint64_t      stableId = 0;
     pid_t         pid      = 0;
-    bool          owned    = false; // currently hidden on Grabbar's workspace by Grabbar
+    bool          owned    = false; // currently hidden on OhmTabs's workspace by OhmTabs
     std::string   ownerRequest;     // requestId of the minimize that hid it
     std::string   pendingRequest;   // minimize request awaiting the shell's commit
-    bool          transitioning = false; // Grabbar itself is moving it right now
+    bool          transitioning = false; // OhmTabs itself is moving it right now
     SWindowOrigin origin;
 };
 
 using Fields = std::vector<std::pair<std::string, std::string>>;
 
-struct SGrabbarClient {
+struct SOhmTabsClient {
     int              fd     = -1;
     wl_event_source* source = nullptr;
     std::string      inbuf;
@@ -63,10 +63,10 @@ struct SGrabbarClient {
     bool             dead    = false;
 };
 
-class CGrabbarBackend {
+class COhmTabsBackend {
   public:
-    CGrabbarBackend();
-    ~CGrabbarBackend();
+    COhmTabsBackend();
+    ~COhmTabsBackend();
 
     bool                start();
     void                stop(bool restoreOwned, const char* reason);
@@ -115,13 +115,13 @@ class CGrabbarBackend {
     void                onWindowClose(PHLWINDOW w);
     void                onWindowChanged(PHLWINDOW w, const char* what);
     // Another tool (a taskbar, a window switcher, `focuswindow`) focused a
-    // hidden window or opened Grabbar's workspace: treat it as a restore.
+    // hidden window or opened OhmTabs's workspace: treat it as a restore.
     void                onOwnedWindowActivated(PHLWINDOW w);
     void                onOwnedWorkspaceRevealed(PHLMONITOR mon);
 
     // called from the wayland event loop
     void                acceptClient();
-    void                clientEvent(SGrabbarClient* c, uint32_t mask);
+    void                clientEvent(SOhmTabsClient* c, uint32_t mask);
     void                onGraceExpired();
 
   private:
@@ -132,8 +132,8 @@ class CGrabbarBackend {
     uint64_t                               m_requestSeq = 0;
     int                                    m_listenFd   = -1;
     wl_event_source*                       m_listenSource = nullptr;
-    std::vector<UP<SGrabbarClient>>        m_clients;
-    SGrabbarClient*                        m_shell = nullptr;
+    std::vector<UP<SOhmTabsClient>>        m_clients;
+    SOhmTabsClient*                        m_shell = nullptr;
     bool                                   m_ready = false;     // shell confirmed restore access
     bool                                   m_suspended = true;  // no handshake yet, or grace expired
     bool                                   m_stopping  = false;
@@ -156,14 +156,14 @@ class CGrabbarBackend {
     void                                   broadcastTabs();
 
     // protocol
-    void                                   send(SGrabbarClient* c, const std::string& type, const Fields& fields);
+    void                                   send(SOhmTabsClient* c, const std::string& type, const Fields& fields);
     void                                   broadcastShell(const std::string& type, const Fields& fields);
-    void                                   flush(SGrabbarClient* c);
-    void                                   dropClient(SGrabbarClient* c, const char* why);
-    void                                   handleLine(SGrabbarClient* c, const std::string& line);
+    void                                   flush(SOhmTabsClient* c);
+    void                                   dropClient(SOhmTabsClient* c, const char* why);
+    void                                   handleLine(SOhmTabsClient* c, const std::string& line);
     Fields                                 windowFields(const STrackedWindow& t) const;
-    void                                   sendWindow(SGrabbarClient* c, const STrackedWindow& t, const char* kind);
-    void                                   sendState(SGrabbarClient* c);
+    void                                   sendWindow(SOhmTabsClient* c, const STrackedWindow& t, const char* kind);
+    void                                   sendState(SOhmTabsClient* c);
     void                                   onShellLost(const char* why);
     void                                   setSuspended(bool suspended);
     void                                   applyTheme(const Fields& f);
@@ -172,5 +172,5 @@ class CGrabbarBackend {
 };
 
 // protocol helpers (also used by tests)
-std::string grabbarEncode(const std::string& v);
-std::string grabbarDecode(const std::string& v);
+std::string ohmtabsEncode(const std::string& v);
+std::string ohmtabsDecode(const std::string& v);

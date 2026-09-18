@@ -58,7 +58,7 @@ def check(label, expected, *, signature='session-new', attempt=None, ok=None,
             (guard / 'last-ok').write_text(ok + '\n')
         harness = state / 'test.lua'
         harness.write_text(HARNESS)
-        env = {**os.environ, 'GRABBAR_SO': str(so), 'GRABBAR_STATE_DIR': td,
+        env = {**os.environ, 'OHMTABS_SO': str(so), 'OHMTABS_STATE_DIR': td,
                'HYPRLAND_INSTANCE_SIGNATURE': signature,
                'TEST_WRITE_FAILURE': str(int(write_failure)),
                'TEST_CLOSE_FAILURE': str(int(close_failure)),

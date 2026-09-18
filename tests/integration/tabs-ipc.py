@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Instance-scoped IPC client for the plugin's tabs/snap verbs.
 
-Why this exists: the documented CLI (`omarchy-shell tech.greyforge.grabbar <verb>`)
+Why this exists: the documented CLI (`omarchy-shell tech.loopedmatrix.ohmtabs <verb>`)
 forwards to the RUNNING Omarchy shell, so it can only ever address the plugin in
 the user's live session. A nested-rig test must not do that -- it would drive the
 live desktop instead of the instance under test. This talks to the plugin's own
@@ -35,7 +35,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "helpers"))
 
-import grabbar_backend as gb  # noqa: E402
+import ohmtabs_backend as gb  # noqa: E402
 
 TABS_VERBS = {"list", "join", "activate", "detach", "ungroup", "closeAll"}
 

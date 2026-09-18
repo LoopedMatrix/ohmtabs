@@ -1,25 +1,25 @@
-<h1 align="center">omarchy-tab</h1>
+<h1 align="center">ohmtabs</h1>
 
 <p align="center">
-  <img src="docs/brand/grabbar-banner.png" alt="Grabbar — familiar window controls for Omarchy" width="100%">
+  <img src="docs/brand/ohmtabs-banner.png" alt="OhmTabs — familiar window controls for Omarchy" width="100%">
 </p>
 
 <p align="center">
-  <a href="https://github.com/LoopedMatrix/omarchy-tab/actions/workflows/test.yml"><img alt="tests" src="https://github.com/LoopedMatrix/omarchy-tab/actions/workflows/test.yml/badge.svg"></a>
+  <a href="https://github.com/LoopedMatrix/ohmtabs/actions/workflows/test.yml"><img alt="tests" src="https://github.com/LoopedMatrix/ohmtabs/actions/workflows/test.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="MIT + BSD-3" src="https://img.shields.io/badge/license-MIT%20%2B%20BSD--3-aab3bc?labelColor=0b0f14"></a>
   <img alt="Omarchy 4" src="https://img.shields.io/badge/Omarchy-4-fda52b?labelColor=0b0f14">
   <img alt="Hyprland 0.56.2" src="https://img.shields.io/badge/Hyprland-0.56.2-38c8e8?labelColor=0b0f14">
 </p>
 
-**omarchy-tab** gives ordinary application windows a Windows/macOS-style title strip — a window menu, Minimize, Maximize/Restore, Close, and drag-to-move — and **adds a Windows-style minimized-window taskbar** to [Omarchy](https://github.com/omacom/omarchy) (Arch + Hyprland). It is a [Quickshell](https://github.com/outfoxxed/quickshell) plugin.
+**ohmtabs** gives ordinary application windows a Windows/macOS-style title strip — a window menu, Minimize, Maximize/Restore, Close, and drag-to-move — and **adds a Windows-style minimized-window taskbar** to [Omarchy](https://github.com/omacom/omarchy) (Arch + Hyprland). It is a [Quickshell](https://github.com/outfoxxed/quickshell) plugin.
 
-> **Name vs. label.** The repository and project are **omarchy-tab**, but the plugin's id (`tech.greyforge.grabbar`) and its visible label (**Grabbar**) are intentionally kept unchanged, so live installs and saved settings keep working. In the UI and in file paths you will still see "Grabbar"; that is the same plugin.
+> **Name vs. label.** The repository and project are **ohmtabs**, but the plugin's id (`tech.loopedmatrix.ohmtabs`) and its visible label (**OhmTabs**) are intentionally kept unchanged, so live installs and saved settings keep working. In the UI and in file paths you will still see "OhmTabs"; that is the same plugin.
 
 <img src="docs/screenshots/desktop.png" alt="Title strips on focused and unfocused windows" width="100%">
 
 ## Why a fork?
 
-omarchy-tab is a personal fork of [GreyforgeLabs/omarchy-grabbar](https://github.com/GreyforgeLabs/omarchy-grabbar) ("Grabbar"), which is itself based on [hyprbars](https://github.com/hyprwm/hyprland-plugins). We forked it because **our version deviates substantially from upstream** — it replaces the drawer-first minimized-window UX with a real taskbar and adds a scripting/IPC surface, hot-applied settings, and a critical freeze fix — changes we wanted to live under our own repo name rather than as an upstream patch. The core strip work, the journal/recovery machinery, and the test suite are inherited from upstream and credited in [License & credits](#license--credits).
+OhmTabs is a personal fork of [GreyforgeLabs/omarchy-grabbar](https://github.com/GreyforgeLabs/omarchy-grabbar) ("OhmTabs"), which is itself based on [hyprbars](https://github.com/hyprwm/hyprland-plugins). We forked it because **our version deviates substantially from upstream** — it replaces the drawer-first minimized-window UX with a real taskbar and adds a scripting/IPC surface, hot-applied settings, and a critical freeze fix — changes we wanted to live under our own repo name rather than as an upstream patch. The core strip work, the journal/recovery machinery, and the test suite are inherited from upstream and credited in [License & credits](#license--credits).
 
 ### What our version adds
 
@@ -28,7 +28,7 @@ omarchy-tab is a personal fork of [GreyforgeLabs/omarchy-grabbar](https://github
 | **Minimized-window taskbar** | A Windows-style taskbar ([`SidePanel.qml`](SidePanel.qml)) replaces the drawer-first UX. Bottom/left/right placement, auto-hide-until-hover with a 4 px reveal sliver, app badge + title + origin rows, and **Restore all**. It draws *no surface at all* when nothing is minimized (`live = panelEnabled && count > 0`). |
 | **Hot-applied settings** | Every setting in the plugin's `shell.json` entry is watched and applied live — changing `panelPosition` or `panelAutoHide` takes effect with **no shell restart**. |
 | **The freeze fix** | Upstream's bar assigns `settings`/`moduleName`/`bar` onto every widget. We made those writable, fixing a `TypeError: Cannot assign to read-only property "settings"` that wedged the whole shell (commit `0d79811`). See [Troubleshooting](#troubleshooting). |
-| **Scripting / IPC surface** | A complete command surface — `status`, `minimize`, `restore`, `restoreAll`, `openDrawer`, `openSettings`, `reconcile`, `disable`, `enable`, `ping` — plus the `bin/grabbar` CLI and a stable token format. |
+| **Scripting / IPC surface** | A complete command surface — `status`, `minimize`, `restore`, `restoreAll`, `openDrawer`, `openSettings`, `reconcile`, `disable`, `enable`, `ping` — plus the `bin/ohmtabs` CLI and a stable token format. |
 | **Kept from upstream** | The native title-strip backend, the drawer view, the menu, the autoload journal, and the offline test suite. |
 
 ## Install
@@ -38,17 +38,17 @@ Two parts: the **shell plugin** (widget, taskbar, settings, IPC) and the **nativ
 ### 1. Shell plugin
 
 ```sh
-omarchy plugin add https://github.com/LoopedMatrix/omarchy-tab.git --enable
+omarchy plugin add https://github.com/LoopedMatrix/ohmtabs.git --enable
 ```
 
-This installs the plugin to `~/.config/omarchy/plugins/tech.greyforge.grabbar` (the id is kept from upstream for compatibility) and enables it.
+This installs the plugin to `~/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs` (the id is kept from upstream for compatibility) and enables it.
 
 ### 2. Native strip backend
 
 ```sh
-cd ~/.config/omarchy/plugins/tech.greyforge.grabbar
-make -C native/grabbar CXX=g++
-hyprctl plugin load ./native/grabbar/grabbar.so
+cd ~/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs
+make -C native/ohmtabs CXX=g++
+hyprctl plugin load ./native/ohmtabs/ohmtabs.so
 ```
 
 > **Without the native part** there are no strips and Minimize stays off; the shell side (bar widget, taskbar/drawer, settings, IPC) still mounts and the drawer still lists nothing to restore.
@@ -56,9 +56,9 @@ hyprctl plugin load ./native/grabbar/grabbar.so
 ### 3. Autoload (optional)
 
 ```sh
-cd ~/.config/omarchy/plugins/tech.greyforge.grabbar
-ln -s "$(pwd)/bin/grabbar" ~/.local/bin/grabbar   # optional, for the CLI
-grabbar autoload enable                           # survive shell restarts
+cd ~/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs
+ln -s "$(pwd)/bin/ohmtabs" ~/.local/bin/ohmtabs   # optional, for the CLI
+ohmtabs autoload enable                           # survive shell restarts
 ```
 
 See [docs/AUTOLOAD.md](docs/AUTOLOAD.md) for what autoload does under the hood.
@@ -81,7 +81,7 @@ Window controls sit on the right by default; set `buttonsLeft` to put them on th
 
 ### Minimizing and the taskbar
 
-Minimizing moves a window to the special workspace `special:grabbar-minimized`; the taskbar shows one row per minimized window (app badge, title, and the workspace it came from):
+Minimizing moves a window to the special workspace `special:ohmtabs-minimized`; the taskbar shows one row per minimized window (app badge, title, and the workspace it came from):
 
 - **Left-click** a row → restore to the **current** workspace.
 - **Right-click** a row → restore to its **original** workspace.
@@ -122,7 +122,7 @@ Settings live in the plugin's `shell.json` entry (edit through **Settings**, or 
 | `buttonsLeft` | bool | `false` | Window controls on the left (`true`) or right (`false`). |
 | `showOnHover` | bool | `false` | *Legacy* — draw the strip only while the pointer is near the window's top edge. |
 | `controlSize` | `"standard"` \| `"large"` | `"standard"` | Strip thickness: 34 px (standard) vs 46 px (large). |
-| `excludedClasses` | string[] | `[]` | App classes whose windows get no strip (same as "Hide Grabbar for this app"). |
+| `excludedClasses` | string[] | `[]` | App classes whose windows get no strip (same as "Hide OhmTabs for this app"). |
 | `sidePanel` | bool | `true` | Windows-style taskbar (`true`) vs the in-bar drawer only (`false`). |
 | `panelPosition` | `"bottom"` \| `"left"` \| `"right"` | `"bottom"` | Screen edge the taskbar sits on. |
 | `panelAutoHide` | bool | `true` | Park the taskbar off the edge until the pointer reaches it. |
@@ -133,41 +133,41 @@ Settings live in the plugin's `shell.json` entry (edit through **Settings**, or 
 When `tabGroups: true` is set on the bar's layout entry:
 
 - **Dropping a window onto another** makes the target the *host* and turns the dragged window into a tab in the host's group. The host's native title strip gains the tab strip (drawn natively). The shell keeps the group state and the list of tab titles; the visual strip is the backend's.
-- **Alt-tab within a group** is a decision the shell exposes, not a binding this plugin installs. `omarchy-shell tech.greyforge.grabbar groupCycle <hostToken> <prev|next> <true|false>` returns the token of the tab it switched to, or `fallthrough` when the group holds fewer than two tabs or the pointer is not over the host's strip. Browser-like alt-tab is therefore opt-in: bind a key (e.g. SUPER+TAB) that calls `groupCycle` and, on `fallthrough`, hands alt-tab back to the compositor (e.g. `hyprctl cyclenext`). Hyprland's built-in alt-tab is a compositor binding the plugin cannot intercept, so nothing changes until you add that binding.
+- **Alt-tab within a group** is a decision the shell exposes, not a binding this plugin installs. `omarchy-shell tech.loopedmatrix.ohmtabs groupCycle <hostToken> <prev|next> <true|false>` returns the token of the tab it switched to, or `fallthrough` when the group holds fewer than two tabs or the pointer is not over the host's strip. Browser-like alt-tab is therefore opt-in: bind a key (e.g. SUPER+TAB) that calls `groupCycle` and, on `fallthrough`, hands alt-tab back to the compositor (e.g. `hyprctl cyclenext`). Hyprland's built-in alt-tab is a compositor binding the plugin cannot intercept, so nothing changes until you add that binding.
 - **Closing a group** with more than one window triggers a confirm prompt: "are you sure you want to close all N windows?" with the tab titles listed, like a browser. Yes closes all the group's windows; Cancel/Escape dismisses the prompt with no action. There is no focus steal from the rest of the shell for the prompt.
 - The `tabGroups` setting is off by default. Until it is turned on explicitly in the bar's layout entry, the tab verbs are not wired and nothing about the panel changes.
 - The close-all prompt is a theme-matched popup built on the shell's `PopupCard` UI component, so it inherits the user's theme rather than being a separate-styled card. It lists the tab titles and offers **Cancel** and **Close all**; Escape dismisses it with no action.
 
-Unknown keys are ignored; invalid values fall back to the default. Values are validated in [`GrabbarModel.js`](GrabbarModel.js) (`normalizeSettings`).
+Unknown keys are ignored; invalid values fall back to the default. Values are validated in [`OhmTabsModel.js`](OhmTabsModel.js) (`normalizeSettings`).
 
 ### Native config fallback
 
-When the shell isn't connected yet, the native backend falls back to `plugin:grabbar:*` keys in `hyprland.lua` (these are overridden by the shell theme/settings once connected):
+When the shell isn't connected yet, the native backend falls back to `plugin:ohmtabs:*` keys in `hyprland.lua` (these are overridden by the shell theme/settings once connected):
 
-`enabled`, `buttons_left`, `bar_height` (34), `button_size` (32), `padding` (4), `text_size` (11), `text_font` (`"Sans"`), `bar_color`, `inactive_bar_color`, `text_color`, `hover_color`, `close_hover_color`, `shell_grace_ms` (2000). Per-window opt-out via the `grabbar:no_bar` window rule.
+`enabled`, `buttons_left`, `bar_height` (34), `button_size` (32), `padding` (4), `text_size` (11), `text_font` (`"Sans"`), `bar_color`, `inactive_bar_color`, `text_color`, `hover_color`, `close_hover_color`, `shell_grace_ms` (2000). Per-window opt-out via the `ohmtabs:no_bar` window rule.
 
 ## Command line & scripting
 
-`bin/grabbar` (optionally linked into `~/.local/bin`) wraps the plugin's IPC:
+`bin/ohmtabs` (optionally linked into `~/.local/bin`) wraps the plugin's IPC:
 
 ```
-grabbar                 open the drawer
-grabbar settings        open settings
-grabbar status [--json] show backend + minimized-window state
-grabbar windows         list known windows
-grabbar restore TOKEN [--original]   restore one minimized window
-grabbar restore-all     restore all minimized windows
-grabbar doctor          diagnose the install
-grabbar autoload status|enable|disable|retry
-grabbar enable|disable  toggle the plugin
-grabbar uninstall       remove autoload + backend
+ohmtabs                 open the drawer
+ohmtabs settings        open settings
+ohmtabs status [--json] show backend + minimized-window state
+ohmtabs windows         list known windows
+ohmtabs restore TOKEN [--original]   restore one minimized window
+ohmtabs restore-all     restore all minimized windows
+ohmtabs doctor          diagnose the install
+ohmtabs autoload status|enable|disable|retry
+ohmtabs enable|disable  toggle the plugin
+ohmtabs uninstall       remove autoload + backend
 ```
 
 Exit codes: `0` ok · `2` usage · `3` backend unavailable · `4` stale target · `5` restore UI unavailable (shell service not running) · `6` state write failed · `7` incomplete recovery.
 
 ### IPC surface
 
-The plugin's `IpcHandler` (in [`Service.qml`](Service.qml)) exposes these methods over Quickshell's IPC — call them via `omarchy-shell tech.greyforge.grabbar <method> [args]`:
+The plugin's `IpcHandler` (in [`Service.qml`](Service.qml)) exposes these methods over Quickshell's IPC — call them via `omarchy-shell tech.loopedmatrix.ohmtabs <method> [args]`:
 
 | Method | Args | Returns |
 | --- | --- | --- |
@@ -181,7 +181,7 @@ The plugin's `IpcHandler` (in [`Service.qml`](Service.qml)) exposes these method
 | `disable` / `enable` | — | Toggle the plugin |
 | `ping` | — | Liveness check |
 
-**Token format.** Each minimized window is identified by a token `g<epoch>-<generation>` (e.g. `g1789644541-6`), minted by `tokenFor()` in [`native/grabbar/backend.cpp`](native/grabbar/backend.cpp). Read the token from `grabbar status --json` (`entries[].token`), then `grabbar restore g1789644541-6 --original`. Tokens are stable until the backend restarts.
+**Token format.** Each minimized window is identified by a token `g<epoch>-<generation>` (e.g. `g1789644541-6`), minted by `tokenFor()` in [`native/ohmtabs/backend.cpp`](native/ohmtabs/backend.cpp). Read the token from `ohmtabs status --json` (`entries[].token`), then `ohmtabs restore g1789644541-6 --original`. Tokens are stable until the backend restarts.
 
 A full, machine-oriented write-up is in [docs/PROTOCOL.md](docs/PROTOCOL.md).
 
@@ -191,7 +191,7 @@ A full, machine-oriented write-up is in [docs/PROTOCOL.md](docs/PROTOCOL.md).
 
 ```sh
 # native backend
-make -C native/grabbar CXX=g++
+make -C native/ohmtabs CXX=g++
 
 # QML syntax (import-path warnings are expected and fine)
 /usr/lib/qt6/bin/qmllint --bare BarWidget.qml
@@ -217,13 +217,13 @@ The live deployed plugin is a separate checkout; **never edit the deployed check
 The author's daily-driver desktop deploys this fork through the `omarchy-rescue` helper rather than `omarchy plugin add`:
 
 ```sh
-omarchy-rescue grabbar-on    # symlink this fork into the plugins dir + restart shell
-omarchy-rescue grabbar-off   # restore the stable copy
+omarchy-rescue ohmtabs-on    # symlink this fork into the plugins dir + restart shell
+omarchy-rescue ohmtabs-off   # restore the stable copy
 ```
 
 Parked/replaced plugin copies are deliberately kept **outside** the plugins directory, so a same-id parked copy can never shadow the deployed one (see [Troubleshooting](#troubleshooting)). A shell restart is `omarchy restart shell`; the native service is `keepLoaded`, so hot reloads keep the old backend.
 
-`grabbar-on` is **gated and self-reverting**, because deploying an untested plugin is what wedged this desktop once:
+`ohmtabs-on` is **gated and self-reverting**, because deploying an untested plugin is what wedged this desktop once:
 
 - **Before deploying** it refuses to swap anything unless `manifest.json` declares the expected plugin id, `qmllint --bare` reports no syntax errors on every QML file, and `tests/run.sh` is green. `FORCE=1` overrides.
 - **After restarting** it verifies the plugin actually came up — `backend.ready`, `minimizeEnabled`, `restoreHost`, and no read-only-`settings` TypeError in the shell log written since the deploy — and **automatically rolls back** to the stable copy if any check fails. `ROLLBACK=0` disables the check.
@@ -233,7 +233,7 @@ Parked/replaced plugin copies are deliberately kept **outside** the plugins dire
 
 The operator's desktop runs a small recovery toolkit alongside the plugin (not part of this repository):
 
-- **`omarchy-rescue`** — subcommands `status`, `shell`, `grabbar-off`, `grabbar-on`, `logs`, `sysrq`, `reboot`.
+- **`omarchy-rescue`** — subcommands `status`, `shell`, `ohmtabs-off`, `ohmtabs-on`, `logs`, `sysrq`, `reboot`.
 - **systemd --user watchdog** — `omarchy-shell-watchdog.timer` probes the shell every 15 s and restarts it after 3 consecutive failures.
 - **Keybind** — `SUPER+CTRL+SHIFT+R` = "Rescue desktop".
 - **Root-level half** — hardware watchdog / sysrq / panic handling, installed once with `sudo install.sh`.
@@ -244,7 +244,7 @@ The operator's desktop runs a small recovery toolkit alongside the plugin (not p
 Upstream's bar assigns `settings` (and `moduleName`, `bar`) onto every widget. If those are `readonly`, the assignment throws and wedges the shell. Fixed in commit `0d79811`. **Rule for contributors: never make `settings`, `moduleName`, or `bar` `readonly` in a widget.** Full write-up: [SYSTEM-BREAKING-BUG.md](SYSTEM-BREAKING-BUG.md).
 
 **A parked plugin copy shadows the deployed one.**
-Omarchy loads plugins by id, so two copies of `tech.greyforge.grabbar` anywhere under the plugins directory is ambiguous. Keep replaced copies *outside* the plugins directory (that is exactly why `grabbar-off` parks them outside).
+Omarchy loads plugins by id, so two copies of `tech.loopedmatrix.ohmtabs` anywhere under the plugins directory is ambiguous. Keep replaced copies *outside* the plugins directory (that is exactly why `ohmtabs-off` parks them outside).
 
 **Two stacked taskbar surfaces on one monitor.**
 Omarchy creates one bar per monitor, and the taskbar panel doesn't bind a screen — so with two monitors you can get both panels stacked on the same monitor. A fix is in development; see [Known issues](#known-issues).
@@ -275,4 +275,4 @@ Omarchy creates one bar per monitor, and the taskbar panel doesn't bind a screen
 
 ## License & credits
 
-MIT — the original Grabbar plugin is Copyright (c) 2024 GreyforgeLabs (see [LICENSE](LICENSE)). The native title-bar backend derives from **hyprbars** and is BSD-3-Clause (see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)). Both notices are retained intact, as required for a fork.
+MIT — the original OhmTabs plugin is Copyright (c) 2024 GreyforgeLabs (see [LICENSE](LICENSE)). The native title-bar backend derives from **hyprbars** and is BSD-3-Clause (see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)). Both notices are retained intact, as required for a fork.

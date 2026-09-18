@@ -15,8 +15,8 @@ case "$MODE" in
     exit 2 ;;
   *) echo "Usage: $0 [fixed|guard|all]" >&2; exit 2 ;;
 esac
-export GRABBAR_SO="${GRABBAR_SO:-$ROOT/native/grabbar/grabbar.so}"
-export GRABBAR_NESTED_BASE="$ROOT/tests/integration/nested/base.lua"
+export OHMTABS_SO="${OHMTABS_SO:-$ROOT/native/ohmtabs/ohmtabs.so}"
+export OHMTABS_NESTED_BASE="$ROOT/tests/integration/nested/base.lua"
 HEADLESS_WS="${HEADLESS_WS:?workspace id that lives on the headless output}"
 OUT="${OUT:-$ROOT/docs/evidence/startup}"
 mkdir -p "$OUT"
@@ -40,7 +40,7 @@ for m in json.load(sys.stdin):
 NESTED_SIG=""; NESTED_PID=""
 launch() { # $1 = lua config
   local before; before="$(ls "$HYPRDIR")"
-  hyprctl dispatch "hl.dsp.exec_cmd([[ [workspace $HEADLESS_WS silent] env HYPRLAND_INSTANCE_SIGNATURE= GRABBAR_SO=$GRABBAR_SO GRABBAR_NESTED_BASE=$GRABBAR_NESTED_BASE GRABBAR_AUTOLOAD_LUA=$ROOT/native/autoload.lua GRABBAR_STATE_DIR=$GUARD_STATE Hyprland -c $1 ]])" >/dev/null || return 1
+  hyprctl dispatch "hl.dsp.exec_cmd([[ [workspace $HEADLESS_WS silent] env HYPRLAND_INSTANCE_SIGNATURE= OHMTABS_SO=$OHMTABS_SO OHMTABS_NESTED_BASE=$OHMTABS_NESTED_BASE OHMTABS_AUTOLOAD_LUA=$ROOT/native/autoload.lua OHMTABS_STATE_DIR=$GUARD_STATE Hyprland -c $1 ]])" >/dev/null || return 1
   for _ in $(seq 1 60); do
     sleep 0.25
     for d in $(ls "$HYPRDIR"); do
@@ -71,8 +71,8 @@ trap stop_nested EXIT
 ready_within() { # $1 seconds; ready = hyprctl answers version
   local n=$(( $1 * 4 )); for _ in $(seq 1 $n); do nc version 2>/dev/null | grep -q '^Hyprland' && return 0; alive || return 1; sleep 0.25; done; return 1
 }
-plugin_count() { nc plugins list | grep -c 'Plugin grabbar'; }
-logcounts() { local L="$HYPRDIR/$NESTED_SIG/hyprland.log"; printf 'loaded=%s unloaded=%s twice=%s reloads=%s\n' "$(grep -c 'Plugin grabbar loaded' "$L")" "$(grep -c 'Plugin grabbar unloaded' "$L")" "$(grep -c 'Cannot load a plugin twice' "$L")" "$(grep -c 'Reloading the config' "$L")"; }
+plugin_count() { nc plugins list | grep -c 'Plugin ohmtabs'; }
+logcounts() { local L="$HYPRDIR/$NESTED_SIG/hyprland.log"; printf 'loaded=%s unloaded=%s twice=%s reloads=%s\n' "$(grep -c 'Plugin ohmtabs loaded' "$L")" "$(grep -c 'Plugin ohmtabs unloaded' "$L")" "$(grep -c 'Cannot load a plugin twice' "$L")" "$(grep -c 'Reloading the config' "$L")"; }
 
 if [[ "$MODE" == fixed || "$MODE" == all ]]; then
   say "FIXED: cold start with the unconditional declaration"
@@ -87,25 +87,25 @@ if [[ "$MODE" == fixed || "$MODE" == all ]]; then
   for i in 1 2 3; do nc reload >/dev/null; sleep 1.5; done
   [[ "$(plugin_count)" == 1 ]] && alive && pass "fixed: still one plugin after 3 reloads; $(logcounts)" || fail "fixed: reloads broke it; $(logcounts)"
   say "FIXED: hyprctl plugin unload / load / reload"
-  nc plugin unload "$GRABBAR_SO" >/dev/null; sleep 2
+  nc plugin unload "$OHMTABS_SO" >/dev/null; sleep 2
   [[ "$(plugin_count)" == 0 ]] && alive && pass "fixed: unload leaves it unloaded (config still declares it, set unchanged -> no reload storm)" || fail "fixed: after unload count=$(plugin_count) alive=$(alive && echo y || echo n)"
-  nc plugin load "$GRABBAR_SO" >/dev/null; sleep 2
+  nc plugin load "$OHMTABS_SO" >/dev/null; sleep 2
   [[ "$(plugin_count)" == 1 ]] && alive && pass "fixed: manual load after unload works" || fail "fixed: manual load count=$(plugin_count)"
   nc reload >/dev/null; sleep 2
   [[ "$(plugin_count)" == 1 ]] && alive && pass "fixed: reload after manual load is stable; $(logcounts)" || fail "fixed: reload after manual load; $(logcounts)"
   say "FIXED: backend socket and shell reconnect across a reload"
-  SOCK="$XDG_RUNTIME_DIR/grabbar/$NESTED_SIG/backend.sock"
+  SOCK="$XDG_RUNTIME_DIR/ohmtabs/$NESTED_SIG/backend.sock"
   [[ -S "$SOCK" ]] && pass "fixed: backend socket present" || fail "fixed: no backend socket at $SOCK"
-  HYPRLAND_INSTANCE_SIGNATURE="$NESTED_SIG" python3 "$ROOT/helpers/grabbar_backend.py" --timeout 3 status | grep -q '"epoch"' && pass "fixed: backend answers status" || fail "fixed: backend status"
-  nc grabbar | tee "$OUT/fixed-grabbar-status.txt" | head -3
+  HYPRLAND_INSTANCE_SIGNATURE="$NESTED_SIG" python3 "$ROOT/helpers/ohmtabs_backend.py" --timeout 3 status | grep -q '"epoch"' && pass "fixed: backend answers status" || fail "fixed: backend status"
+  nc ohmtabs | tee "$OUT/fixed-ohmtabs-status.txt" | head -3
   cp "$HYPRDIR/$NESTED_SIG/hyprland.log" "$OUT/fixed-hyprland.log"
   logcounts | tee "$OUT/fixed-counts.txt"
   stop_nested
 fi
 if [[ "$MODE" == guard || "$MODE" == all ]]; then
-  AL="python3 $ROOT/helpers/grabbar-autoload"
+  AL="python3 $ROOT/helpers/ohmtabs-autoload"
   G="$GUARD_STATE/autoload"
-  say "GUARD 1: armed, first start loads, health marker appears after ${GRABBAR_BOOT_OK_S:-15}s"
+  say "GUARD 1: armed, first start loads, health marker appears after ${OHMTABS_BOOT_OK_S:-15}s"
   rm -rf "$G"; $AL arm --state-dir "$GUARD_STATE" >/dev/null
   launch "$ROOT/tests/integration/nested/autoload-guarded.lua" || exit 1
   [[ -n "$NESTED_PID" ]] && ready_within 20 || { fail "guard1: not ready"; exit 1; }
@@ -129,7 +129,7 @@ if [[ "$MODE" == guard || "$MODE" == all ]]; then
   nc reload >/dev/null; sleep 2
   [[ "$(plugin_count)" == 1 ]] && pass "guard3: loaded after retry + reload" || fail "guard3: count $(plugin_count) after retry"
   [[ "$(head -1 "$G/last-attempt" 2>/dev/null)" == "$NESTED_SIG" ]] && pass "guard3: attempt re-recorded" || fail "guard3: last-attempt not updated"
-  echo "waiting $(( ${GRABBAR_BOOT_OK_S:-15} + 3 ))s for the health marker"; sleep $(( ${GRABBAR_BOOT_OK_S:-15} + 3 ))
+  echo "waiting $(( ${OHMTABS_BOOT_OK_S:-15} + 3 ))s for the health marker"; sleep $(( ${OHMTABS_BOOT_OK_S:-15} + 3 ))
   [[ "$(head -1 "$G/last-ok" 2>/dev/null)" == "$NESTED_SIG" ]] && pass "guard3: health marker written by the native plugin" || fail "guard3: last-ok='$(head -1 "$G/last-ok" 2>/dev/null)'"
   stop_nested; sleep 1
   launch "$ROOT/tests/integration/nested/autoload-guarded.lua" || exit 1

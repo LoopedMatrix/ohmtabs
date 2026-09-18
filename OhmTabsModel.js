@@ -1,16 +1,16 @@
-// Grabbar — pure state, protocol codec, journal and reconciliation logic.
+// OhmTabs — pure state, protocol codec, journal and reconciliation logic.
 // QML imports this; Node tests require() it. No I/O, no Hyprland.
 //
 // Everything that arrives from the backend socket, the journal file or the
 // CLI is treated as untrusted input: tokens, workspace names, labels and
 // geometry are validated before they influence an action.
 
-var PLUGIN_ID = "tech.greyforge.grabbar"
+var PLUGIN_ID = "tech.loopedmatrix.ohmtabs"
 var PROTOCOL = 1
 var JOURNAL_SCHEMA = 1
 var JOURNAL_MAX_BYTES = 262144
 var JOURNAL_MAX_ENTRIES = 256
-var OWNED_WORKSPACE = "special:grabbar-minimized"
+var OWNED_WORKSPACE = "special:ohmtabs-minimized"
 var LABEL_MAX = 96
 var CLASS_MAX = 128
 var TOKEN_RE = /^g[0-9]{1,20}-[0-9]{1,12}$/
@@ -390,7 +390,7 @@ function reconcile(state, journalEntries, live, backendEpoch, journalEpoch) {
     }
   }
 
-  // Unrecorded live windows on Grabbar's workspace: expose as Recovered.
+  // Unrecorded live windows on OhmTabs's workspace: expose as Recovered.
   for (var token in live) {
     var lw = live[token]
     if (!lw.alive || !lw.hidden || claimed[token]) continue

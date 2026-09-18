@@ -3,9 +3,9 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 import qs.Ui
-import "GrabbarModel.js" as Model
+import "OhmTabsModel.js" as Model
 
-// Grabbar overlay. One overlay entry point hosts three views:
+// OhmTabs overlay. One overlay entry point hosts three views:
 //
 //   drawer   — the minimized windows drawer (spec §5.2): newest first, Restore
 //              as the main action, Original workspace as the secondary one,
@@ -13,7 +13,7 @@ import "GrabbarModel.js" as Model
 //   menu     — the window menu (spec §3.4) for one window, opened from the
 //              strip's menu button or a right-click on the strip.
 //   settings — the short settings panel (spec §9) with Restore all, Check
-//              setup and the Grabbar on/off switch.
+//              setup and the OhmTabs on/off switch.
 //
 // The host calls open(payloadJson) / close(); `opened` reports the state.
 Item {
@@ -52,7 +52,7 @@ Item {
   readonly property var rows: service && service.rows ? service.rows : []
   readonly property string notice: service ? String(service.notice || "") : ""
   readonly property var settings: service && service.settings ? service.settings : Model.normalizeSettings({})
-  readonly property bool grabbarOn: service ? !service.paused && settings.enabled !== false : false
+  readonly property bool ohmtabsOn: service ? !service.paused && settings.enabled !== false : false
 
   // The live snapshot for the menu's window refreshes while the menu is open
   // (maximized / floating state may change under it); the token never does.
@@ -163,8 +163,8 @@ Item {
       { id: "close", label: "Close", enabled: true },
       { id: "sep" },
       { id: "drawer", label: "Minimized windows", enabled: true },
-      { id: "hide", label: "Hide Grabbar for " + (w.class || "this app"), enabled: !!w.class, why: w.class ? "" : "This window has no application class" },
-      { id: "settings", label: "Grabbar settings", enabled: true }
+      { id: "hide", label: "Hide OhmTabs for " + (w.class || "this app"), enabled: !!w.class, why: w.class ? "" : "This window has no application class" },
+      { id: "settings", label: "OhmTabs settings", enabled: true }
     ]
   }
 
@@ -189,20 +189,20 @@ Item {
     root.dismiss()
   }
 
-  function setGrabbarOn(on) {
+  function setOhmTabsOn(on) {
     if (!service) return
     if (on) service.enable(); else service.disable()
   }
 
   // Setup facts for "Check setup": plain, actionable lines.
   readonly property var setupLines: {
-    if (!service) return [{ ok: false, text: "The Grabbar service is not running" }]
+    if (!service) return [{ ok: false, text: "The OhmTabs service is not running" }]
     var out = []
     out.push({ ok: service.backendConnected, text: service.backendConnected ? "Native backend loaded (" + service.backendVersion + ")" : "Native backend is not loaded — see README: Enabling the native controls" })
     out.push({ ok: service.restoreHost, text: service.restoreHost ? "Bar widget in place; minimized windows can be found" : "Bar widget missing — Minimize stays off" })
-    out.push({ ok: service.minimizeEnabled || service.paused, text: service.paused ? "Grabbar is turned off" : (service.minimizeEnabled ? "Minimize enabled" : "Minimize disabled") })
+    out.push({ ok: service.minimizeEnabled || service.paused, text: service.paused ? "OhmTabs is turned off" : (service.minimizeEnabled ? "Minimize enabled" : "Minimize disabled") })
     out.push({ ok: service.journalStatus === "ok" || service.journalStatus === "empty", text: "Recovery journal: " + service.journalStatus })
-    if (service.busy) out.push({ ok: false, text: "Another Grabbar shell service holds the backend" })
+    if (service.busy) out.push({ ok: false, text: "Another OhmTabs shell service holds the backend" })
     return out
   }
 
@@ -214,7 +214,7 @@ Item {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "grabbar-overlay"
+    WlrLayershell.namespace: "ohmtabs-overlay"
     WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     anchors { top: true; bottom: true; left: true; right: true }
 
@@ -469,7 +469,7 @@ Item {
           padding: Style.space(6)
           Text {
             width: parent.width - Style.space(12)
-            text: "Hide Grabbar for " + (root.menuLive ? root.menuLive.class : "") + "? Its windows lose the title strip. You can undo this in Grabbar settings."
+            text: "Hide OhmTabs for " + (root.menuLive ? root.menuLive.class : "") + "? Its windows lose the title strip. You can undo this in OhmTabs settings."
             wrapMode: Text.WordWrap
             color: root.foreground
             font.family: root.fontFamily
@@ -512,7 +512,7 @@ Item {
           Text {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            text: "Grabbar settings"
+            text: "OhmTabs settings"
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
@@ -528,11 +528,11 @@ Item {
         }
 
         SettingRow {
-          label: "Grabbar"
-          hint: root.grabbarOn ? "Turning it off returns minimized windows first" : "Off: no title strips, Minimize refused"
+          label: "OhmTabs"
+          hint: root.ohmtabsOn ? "Turning it off returns minimized windows first" : "Off: no title strips, Minimize refused"
           options: ["On", "Off"]
-          current: root.grabbarOn ? 0 : 1
-          onChosen: function(i) { root.setGrabbarOn(i === 0) }
+          current: root.ohmtabsOn ? 0 : 1
+          onChosen: function(i) { root.setOhmTabsOn(i === 0) }
         }
         SettingRow {
           label: "Controls on"
@@ -588,7 +588,7 @@ Item {
           }
           Text {
             visible: root.settings.excludedClasses.length === 0
-            text: "None. Use “Hide Grabbar for …” in a window's menu to add one."
+            text: "None. Use “Hide OhmTabs for …” in a window's menu to add one."
             color: root.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -606,7 +606,7 @@ Item {
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
               }
-              PillButton { label: "Show Grabbar again"; onActivated: if (service) service.includeClass(modelData) }
+              PillButton { label: "Show OhmTabs again"; onActivated: if (service) service.includeClass(modelData) }
             }
           }
         }
@@ -636,7 +636,7 @@ Item {
           Text {
             visible: root.showTechnical && !!service
             width: settingsColumn.width
-            text: service ? ("plugin " + service.pluginDir + "\nbackend epoch " + service.backendEpoch + " · socket " + service.socketPath + "\njournal " + service.stateDir + "/state.json (" + service.journalStatus + ")\nCLI: grabbar status · grabbar doctor · grabbar autoload status") : ""
+            text: service ? ("plugin " + service.pluginDir + "\nbackend epoch " + service.backendEpoch + " · socket " + service.socketPath + "\njournal " + service.stateDir + "/state.json (" + service.journalStatus + ")\nCLI: ohmtabs status · ohmtabs doctor · ohmtabs autoload status") : ""
             wrapMode: Text.WrapAnywhere
             color: root.muted
             font.family: root.fontFamily

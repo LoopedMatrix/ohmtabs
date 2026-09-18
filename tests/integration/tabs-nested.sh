@@ -11,7 +11,7 @@
 #   - the native backend is loaded there (hyprctl -i "$SIG" plugin load ...)
 #   - tests/integration/vpointer/vpointer is built
 #
-# Verbs under test (frozen IPC contract -- omarchy-shell tech.greyforge.grabbar):
+# Verbs under test (frozen IPC contract -- omarchy-shell tech.loopedmatrix.ohmtabs):
 #   tabs.list   -> {"groups":[{"id":N,"host":"<token>","active":<index>,"tabs":[...]}]}
 #   tabs.join   {"source":"<token>","host":"<token>"}
 #   tabs.activate {"group":N,"index":i}
@@ -23,7 +23,7 @@
 #   After a left-half snap and after a TL/TR corner snap, assert:
 #     (a) strip band fully inside work area: (client_y - stripHeight) >= workArea_top
 #     (b) client box fully inside work area:  client_y + height <= workArea_bottom
-#   stripHeight  from hyprctl getoption plugin:grabbar:barHeight (not hardcoded)
+#   stripHeight  from hyprctl getoption plugin:ohmtabs:barHeight (not hardcoded)
 #   workArea_top from the bar surface geometry in hyprctl -j layers (not hardcoded)
 #
 # Each step records what the compositor actually reports; screenshots are
@@ -45,9 +45,9 @@ export HYPRLAND_INSTANCE_SIGNATURE="$SIG"
 
 OUT="${OUT:-$(mktemp -d)}"; mkdir -p "$OUT"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-HELPER="$ROOT/helpers/grabbar_backend.py"
+HELPER="$ROOT/helpers/ohmtabs_backend.py"
 VP="$ROOT/tests/integration/vpointer/vpointer"
-PLUGIN="${PLUGIN:-$ROOT/native/grabbar/grabbar.so}"
+PLUGIN="${PLUGIN:-$ROOT/native/ohmtabs/ohmtabs.so}"
 
 hc() { hyprctl -i "$SIG" "$@"; }
 spawn() { hc dispatch "hl.dsp.exec_cmd([[ $* ]])"; }
@@ -168,7 +168,7 @@ if monitors:
 
     if not monitor_name:
         for m in monitors:
-            if m.get("name") == "GRABBAR-LAB" or m.get("name") == "headless":
+            if m.get("name") == "OHMTABS-LAB" or m.get("name") == "headless":
                 monitor_name = m.get("name")
                 mon_x = m.get("x", 0)
                 mon_y = m.get("y", 0)
@@ -181,7 +181,7 @@ bar_height_str = ""
 try:
     import subprocess
     bar_height_str = subprocess.check_output(
-        ["hyprctl", "-i", os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", ""), "getoption", "plugin:grabbar:barHeight"],
+        ["hyprctl", "-i", os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", ""), "getoption", "plugin:ohmtabs:barHeight"],
         stderr=subprocess.DEVNULL, timeout=5
     ).decode()
     bar_height = float(json.loads(bar_height_str).get("value", 34))
@@ -201,7 +201,7 @@ if layers and monitor_name:
                 ns = s.get("namespace", "")
                 if y <= mon_y + 2 and h > 0 and h < 200 and (
                     "bar" in ns.lower() or "panel" in ns.lower() or
-                    "omarchy" in ns.lower() or "grabbar" in ns.lower()
+                    "omarchy" in ns.lower() or "ohmtabs" in ns.lower()
                 ):
                     top = y + h
                     if top > work_area_top:
@@ -252,7 +252,7 @@ echo "tabs.list available: $TABS_LIST_RAW"
 
 # --- snap feature gate ---
 SNAP_AVAILABLE=0
-SNAP_LOCK="$(timeout 10 hc getoption plugin:grabbar:snap_lock 2>/dev/null || true)"
+SNAP_LOCK="$(timeout 10 hc getoption plugin:ohmtabs:snap_lock 2>/dev/null || true)"
 if [ -n "$SNAP_LOCK" ] && printf '%s' "$SNAP_LOCK" | jq -e '.value == true' >/dev/null 2>&1; then
   SNAP_AVAILABLE=1
   echo "snap_lock enabled: $SNAP_LOCK"
@@ -278,7 +278,7 @@ cleanup_standin() {
 }
 trap cleanup_standin EXIT
 
-hc grabbar | tee "$OUT/status-active.txt" | grep -q 'decorations: active' || fail "strip not active with a ready shell"
+hc ohmtabs | tee "$OUT/status-active.txt" | grep -q 'decorations: active' || fail "strip not active with a ready shell"
 pass "backend active after readiness handshake"
 
 # ================================================================== TABS TESTS

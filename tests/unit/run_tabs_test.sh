@@ -5,7 +5,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
-SRC="$ROOT/native/grabbar"
+SRC="$ROOT/native/ohmtabs"
 
 CXX="${CXX:-g++}"
 OUT="$HERE/tabs_store_test"

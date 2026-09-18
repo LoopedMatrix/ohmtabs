@@ -13,7 +13,7 @@ NESTED_DISPLAY="${NESTED_DISPLAY:?nested Wayland display name}"
 OUT="${OUT:-$(mktemp -d)}"; mkdir -p "$OUT"
 W="${NESTED_W:-1600}"; H="${NESTED_H:-1000}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-HELPER="$ROOT/helpers/grabbar_backend.py"
+HELPER="$ROOT/helpers/ohmtabs_backend.py"
 VP="$ROOT/tests/integration/vpointer/vpointer"
 BAR_TOP="${BAR_TOP:-0}"   # height of a bar reserved at the top of the nested output
 
@@ -76,11 +76,11 @@ for spec in "$@"; do
   settle
   # 3. minimize (button -> shell two-phase) and restore (backend action, as the drawer does)
   geom; vp click "$MIN_X" "$STRIP_Y" sleep 1200
-  if [[ "$(wf "$CLASS" '["workspace"]["name"]')" == "special:grabbar-minimized" ]]; then
+  if [[ "$(wf "$CLASS" '["workspace"]["name"]')" == "special:ohmtabs-minimized" ]]; then
     shot "$LABEL-03-minimized"
     be restore "$TOK" | grep -q '"status": "ok"' || fail "restore action failed"
     settle
-    [[ "$(wf "$CLASS" '["workspace"]["name"]')" != "special:grabbar-minimized" && "$(wf "$CLASS" '["address"]')" == "$ADDR" ]] && pass "minimize by button, restore returns the same window" || fail "window did not return"
+    [[ "$(wf "$CLASS" '["workspace"]["name"]')" != "special:ohmtabs-minimized" && "$(wf "$CLASS" '["address"]')" == "$ADDR" ]] && pass "minimize by button, restore returns the same window" || fail "window did not return"
   else fail "minimize button did not hide the window (ws=$(wf "$CLASS" '["workspace"]["name"]'))"; fi
   settle
   # 4. drag the title: tiled detaches to floating; floating just moves

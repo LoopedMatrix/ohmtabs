@@ -1,6 +1,6 @@
 // Standalone unit test for TabStore (pure logic, no Hyprland, no session).
 //
-// Build:  g++ -std=c++20 -I../native/grabbar tabs_store_test.cpp ../native/grabbar/tabs.cpp -o tabs_store_test
+// Build:  g++ -std=c++20 -I../native/ohmtabs tabs_store_test.cpp ../native/ohmtabs/tabs.cpp -o tabs_store_test
 //   (or run ./run_tabs_test.sh)
 //
 // Prints PASS/FAIL per case and exits non-zero on the first failure.

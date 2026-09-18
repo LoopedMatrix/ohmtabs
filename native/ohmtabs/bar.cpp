@@ -42,7 +42,7 @@ static CHyprColor configColor(Config::INTEGER color) {
 }
 
 // Appearance values: what the shell pushed (Omarchy theme / Settings) wins
-// over the plugin:grabbar:* config values.
+// over the plugin:ohmtabs:* config values.
 namespace {
     CHyprColor colorOf(const std::optional<uint64_t>& pushed, const SP<Config::Values::CColorValue>& cfg) {
         return pushed ? CHyprColor{*pushed} : configColor(cfg->value());
@@ -74,7 +74,7 @@ namespace {
 // Control glyphs are drawn as paths (spec §3.3): no icon font is needed and
 // they stay crisp at every output scale. `px` is the glyph box in buffer
 // pixels; strokes are ~1/8 of it with round caps.
-static SP<Render::ITexture> drawGlyph(eGrabbarButton b, bool maximized, int px, const CHyprColor& color) {
+static SP<Render::ITexture> drawGlyph(eOhmTabsButton b, bool maximized, int px, const CHyprColor& color) {
     px = std::max(px, 4);
     auto* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, px, px);
     auto* cr      = cairo_create(surface);
@@ -136,7 +136,7 @@ static SP<Render::ITexture> drawGlyph(eGrabbarButton b, bool maximized, int px, 
     return tex;
 }
 
-CGrabbarDeco::CGrabbarDeco(PHLWINDOW pWindow) : IHyprWindowDecoration(pWindow) {
+COhmTabsDeco::COhmTabsDeco(PHLWINDOW pWindow) : IHyprWindowDecoration(pWindow) {
     m_window = pWindow;
 
     if (const auto PMONITOR = pWindow->m_monitor.lock(); PMONITOR)
@@ -150,11 +150,11 @@ CGrabbarDeco::CGrabbarDeco(PHLWINDOW pWindow) : IHyprWindowDecoration(pWindow) {
     m_realBarColor->setUpdateCallback([this](auto) { damageEntire(); });
 }
 
-CGrabbarDeco::~CGrabbarDeco() {
+COhmTabsDeco::~COhmTabsDeco() {
     std::erase(g_pGlobalState->bars, m_self);
 }
 
-bool CGrabbarDeco::effectiveEnabled() {
+bool COhmTabsDeco::effectiveEnabled() {
     if (!g_pGlobalState->config.enabled->value() || m_hidden || !g_pBackend || g_pBackend->suspended() || g_pBackend->paused())
         return false;
     // In "show on hover" mode the strip stays logically enabled (so it can
@@ -168,7 +168,7 @@ bool CGrabbarDeco::effectiveEnabled() {
     return true;
 }
 
-SDecorationPositioningInfo CGrabbarDeco::getPositioningInfo() {
+SDecorationPositioningInfo COhmTabsDeco::getPositioningInfo() {
     const auto                 HEIGHT  = barHeightValue();
     const bool                 ENABLED = effectiveEnabled();
 
@@ -181,20 +181,20 @@ SDecorationPositioningInfo CGrabbarDeco::getPositioningInfo() {
     return info;
 }
 
-void CGrabbarDeco::onPositioningReply(const SDecorationPositioningReply& reply) {
+void COhmTabsDeco::onPositioningReply(const SDecorationPositioningReply& reply) {
     if (reply.assignedGeometry.size() != m_assignedBox.size())
         m_windowSizeChanged = true;
 
     m_assignedBox = reply.assignedGeometry;
 }
 
-std::string CGrabbarDeco::getDisplayName() {
-    return "Grabbar";
+std::string COhmTabsDeco::getDisplayName() {
+    return "OhmTabs";
 }
 
 // ----------------------------------------------------------------- layout
 
-std::vector<SButtonSlot> CGrabbarDeco::layoutButtons(double barW, double barH) {
+std::vector<SButtonSlot> COhmTabsDeco::layoutButtons(double barW, double barH) {
     const int  SIZE = buttonSizeValue();
     const int  PAD  = std::clamp<int>(g_pGlobalState->config.padding->value(), 0, 32);
     const bool LEFT = buttonsLeftValue();
@@ -231,7 +231,7 @@ std::vector<SButtonSlot> CGrabbarDeco::layoutButtons(double barW, double barH) {
     return slots;
 }
 
-eGrabbarButton CGrabbarDeco::buttonAt(const Vector2D& rel) {
+eOhmTabsButton COhmTabsDeco::buttonAt(const Vector2D& rel) {
     const auto BOX = assignedBoxGlobal();
     for (const auto& s : layoutButtons(BOX.w, BOX.h)) {
         if (s.box.containsPoint(rel))
@@ -242,7 +242,7 @@ eGrabbarButton CGrabbarDeco::buttonAt(const Vector2D& rel) {
 
 // -------------------------------------------------------------- window tabs
 
-std::vector<STabBox> CGrabbarDeco::layoutTabs(double barW, double barH) {
+std::vector<STabBox> COhmTabsDeco::layoutTabs(double barW, double barH) {
     m_tabBoxes.clear();
     if (!tabsValue())
         return m_tabBoxes;
@@ -303,7 +303,7 @@ std::vector<STabBox> CGrabbarDeco::layoutTabs(double barW, double barH) {
     return m_tabBoxes;
 }
 
-int CGrabbarDeco::tabAt(const Vector2D& rel) {
+int COhmTabsDeco::tabAt(const Vector2D& rel) {
     const auto BOX = assignedBoxGlobal();
     layoutTabs(BOX.w, BOX.h);
     for (const auto& tb : m_tabBoxes)
@@ -312,7 +312,7 @@ int CGrabbarDeco::tabAt(const Vector2D& rel) {
     return -1;
 }
 
-bool CGrabbarDeco::tryJoinDrop() {
+bool COhmTabsDeco::tryJoinDrop() {
     const auto PWINDOW = m_window.lock();
     if (!validMapped(PWINDOW))
         return false;
@@ -333,14 +333,14 @@ bool CGrabbarDeco::tryJoinDrop() {
     std::string err;
     const auto  st = g_pBackend->joinTabs(m_pressToken, TARGETTOKEN, err);
     if (st != ACTION_OK)
-        Log::logger->log(Log::DEBUG, "[grabbar] drop-join {} -> {} refused: {}", m_pressToken, TARGETTOKEN, err);
+        Log::logger->log(Log::DEBUG, "[ohmtabs] drop-join {} -> {} refused: {}", m_pressToken, TARGETTOKEN, err);
     return st == ACTION_OK;
 }
 
-void CGrabbarDeco::startTabTearOff(const std::string& token) {
+void COhmTabsDeco::startTabTearOff(const std::string& token) {
     std::string err;
     if (g_pBackend->detachTab(token, err) != ACTION_OK) {
-        Log::logger->log(Log::WARN, "[grabbar] tab tear-off failed: {}", err);
+        Log::logger->log(Log::WARN, "[ohmtabs] tab tear-off failed: {}", err);
         m_tabTearOff = false;
         m_tearToken.clear();
         return;
@@ -361,12 +361,12 @@ void CGrabbarDeco::startTabTearOff(const std::string& token) {
 
     g_pKeybindManager->changeMouseBindMode(MBIND_MOVE);
     m_dragging = true;
-    Log::logger->log(Log::DEBUG, "[grabbar] tab tear-off drag on {}", token);
+    Log::logger->log(Log::DEBUG, "[ohmtabs] tab tear-off drag on {}", token);
 }
 
 // ------------------------------------------------------------------ input
 
-bool CGrabbarDeco::inputIsValid() {
+bool COhmTabsDeco::inputIsValid() {
     if (!effectiveEnabled())
         return false;
 
@@ -404,7 +404,7 @@ bool CGrabbarDeco::inputIsValid() {
     return true;
 }
 
-void CGrabbarDeco::onMouseButton(Event::SCallbackInfo& info, IPointer::SButtonEvent e) {
+void COhmTabsDeco::onMouseButton(Event::SCallbackInfo& info, IPointer::SButtonEvent e) {
     if (e.button != BTN_LEFT) {
         // A drag in progress ends on any release so a stray button cannot
         // leave the window glued to the pointer.
@@ -440,7 +440,7 @@ void CGrabbarDeco::onMouseButton(Event::SCallbackInfo& info, IPointer::SButtonEv
     handleDownEvent(info);
 }
 
-void CGrabbarDeco::handleDownEvent(Event::SCallbackInfo& info) {
+void COhmTabsDeco::handleDownEvent(Event::SCallbackInfo& info) {
     const auto PWINDOW = m_window.lock();
     if (!validMapped(PWINDOW))
         return;
@@ -518,7 +518,7 @@ void CGrabbarDeco::handleDownEvent(Event::SCallbackInfo& info) {
     m_dragPending = true;
 }
 
-void CGrabbarDeco::handleUpEvent(Event::SCallbackInfo& info) {
+void COhmTabsDeco::handleUpEvent(Event::SCallbackInfo& info) {
     if (m_cancelledDown)
         info.cancelled = true;
     m_cancelledDown = false;
@@ -535,9 +535,9 @@ void CGrabbarDeco::handleUpEvent(Event::SCallbackInfo& info) {
             if (g_pBackend->resolve(TOKEN))
                 activate(BTN, TOKEN);
             else
-                Log::logger->log(Log::DEBUG, "[grabbar] release ignored: stale target {}", TOKEN);
+                Log::logger->log(Log::DEBUG, "[ohmtabs] release ignored: stale target {}", TOKEN);
         } else
-            Log::logger->log(Log::DEBUG, "[grabbar] release outside target: cancelled");
+            Log::logger->log(Log::DEBUG, "[ohmtabs] release outside target: cancelled");
     }
 
     // Tab release: activate, or close just that tab, only when released on the
@@ -587,7 +587,7 @@ void CGrabbarDeco::handleUpEvent(Event::SCallbackInfo& info) {
     m_dragPending = false;
 }
 
-void CGrabbarDeco::onMouseMove(Vector2D coords) {
+void COhmTabsDeco::onMouseMove(Vector2D coords) {
     if (!validMapped(m_window))
         return;
 
@@ -623,7 +623,7 @@ void CGrabbarDeco::onMouseMove(Vector2D coords) {
         startDrag();
 }
 
-void CGrabbarDeco::startDrag() {
+void COhmTabsDeco::startDrag() {
     const auto PWINDOW = m_window.lock();
     if (!validMapped(PWINDOW))
         return;
@@ -681,13 +681,13 @@ void CGrabbarDeco::startDrag() {
     m_dragging = true;
     m_pressedTab      = -1; // a tab press consumed by the drag is no longer a click
     m_pressedTabClose = false;
-    Log::logger->log(Log::DEBUG, "[grabbar] drag started on {}", m_pressToken);
+    Log::logger->log(Log::DEBUG, "[ohmtabs] drag started on {}", m_pressToken);
 }
 
-void CGrabbarDeco::endDrag() {
+void COhmTabsDeco::endDrag() {
     g_pKeybindManager->changeMouseBindMode(MBIND_INVALID);
     m_dragging = false;
-    Log::logger->log(Log::DEBUG, "[grabbar] drag ended");
+    Log::logger->log(Log::DEBUG, "[ohmtabs] drag ended");
 }
 
 // ------------------------------------------------------------- snap lock
@@ -705,7 +705,7 @@ void CGrabbarDeco::endDrag() {
 // snapped window is ordinary floating geometry, so the next drag is a plain
 // move again: releasing away from an edge leaves the window where it was
 // dropped, which is how a snap is undone.
-bool CGrabbarDeco::snapToZone() {
+bool COhmTabsDeco::snapToZone() {
     if (!g_pGlobalState->config.snapLock->value())
         return false;
 
@@ -773,7 +773,7 @@ bool CGrabbarDeco::snapToZone() {
 // While a drag is in progress, track the snap zone under the pointer and drive
 // the frame-edge glow. Uses the same decideZone() as snapToZone(), so the
 // preview and the release-time snap can never disagree.
-void CGrabbarDeco::updateSnapPreview() {
+void COhmTabsDeco::updateSnapPreview() {
     m_snapFx.glowEnabled    = g_pGlobalState->config.snapGlow->value();
     m_snapFx.previewEnabled = g_pGlobalState->config.snapPreview->value();
 
@@ -810,7 +810,7 @@ void CGrabbarDeco::updateSnapPreview() {
 
 // Advance the glow/flash animation from wall-clock elapsed time. Driven from
 // renderPass; the render loop keeps running while the state is animating.
-void CGrabbarDeco::snapFxTick() {
+void COhmTabsDeco::snapFxTick() {
     const auto   NOW = Time::steadyNow();
     const double DT  = std::clamp(std::chrono::duration<double, std::milli>(NOW - m_snapFxLastTick).count(), 0.0, 100.0);
     m_snapFxLastTick = NOW;
@@ -819,7 +819,7 @@ void CGrabbarDeco::snapFxTick() {
 
 // `token` was captured at press and re-validated at release: the action
 // targets that window even if focus moved meanwhile (spec §4.1, test F02).
-void CGrabbarDeco::activate(eGrabbarButton b, const std::string& token) {
+void COhmTabsDeco::activate(eOhmTabsButton b, const std::string& token) {
     std::string err;
     eActionStatus st = ACTION_OK;
     switch (b) {
@@ -830,12 +830,12 @@ void CGrabbarDeco::activate(eGrabbarButton b, const std::string& token) {
         default: break;
     }
     if (st != ACTION_OK)
-        Log::logger->log(Log::WARN, "[grabbar] action {} failed: {} ({})", (int)b, err, (int)st);
+        Log::logger->log(Log::WARN, "[ohmtabs] action {} failed: {} ({})", (int)b, err, (int)st);
 }
 
 // -------------------------------------------------------------- rendering
 
-SP<Render::ITexture> CGrabbarDeco::glyph(eGrabbarButton b, bool maximized, int size, const CHyprColor& color) {
+SP<Render::ITexture> COhmTabsDeco::glyph(eOhmTabsButton b, bool maximized, int size, const CHyprColor& color) {
     const auto KEY  = std::format("{}:{}:{}:{:x}", (int)b, maximized ? 1 : 0, size, color.getAsHex());
     auto&      slot = g_pGlobalState->glyphCache[KEY];
     if (!slot || slot->m_texID == 0)
@@ -843,7 +843,7 @@ SP<Render::ITexture> CGrabbarDeco::glyph(eGrabbarButton b, bool maximized, int s
     return slot;
 }
 
-void CGrabbarDeco::renderTitle(const Vector2D& bufferSize, const float scale, int maxWidth) {
+void COhmTabsDeco::renderTitle(const Vector2D& bufferSize, const float scale, int maxWidth) {
     const auto COLOR = colorOf(g_pGlobalState->shell.textColor, g_pGlobalState->config.textColor);
     const auto SIZE  = std::clamp<int>(g_pGlobalState->config.textSize->value(), 6, 40);
     const auto FONT  = textFontValue();
@@ -856,7 +856,7 @@ void CGrabbarDeco::renderTitle(const Vector2D& bufferSize, const float scale, in
     m_textTex = g_pHyprRenderer->renderText(m_lastTitle, COLOR, std::round(SIZE * scale), false, FONT, maxWidth);
 }
 
-void CGrabbarDeco::renderTabs(float a, const CBox& titleBarBox, float SCALE, int PAD, const CHyprColor& textColor, bool focused) {
+void COhmTabsDeco::renderTabs(float a, const CBox& titleBarBox, float SCALE, int PAD, const CHyprColor& textColor, bool focused) {
     const auto SIZE = std::clamp<int>(g_pGlobalState->config.textSize->value(), 6, 40);
     const auto FONT = textFontValue();
     const auto HC   = colorOf(g_pGlobalState->shell.hoverColor, g_pGlobalState->config.hoverColor);
@@ -899,7 +899,7 @@ void CGrabbarDeco::renderTabs(float a, const CBox& titleBarBox, float SCALE, int
     }
 }
 
-void CGrabbarDeco::draw(PHLMONITOR pMonitor, const float& a) {
+void COhmTabsDeco::draw(PHLMONITOR pMonitor, const float& a) {
     const bool ENABLED = effectiveEnabled();
 
     if (m_lastEffectiveEnabled != ENABLED) {
@@ -922,11 +922,11 @@ void CGrabbarDeco::draw(PHLMONITOR pMonitor, const float& a) {
     if (!show)
         return;
 
-    auto data = CGrabbarPassElement::SBarData{this, a};
-    g_pHyprRenderer->m_renderPass.add(makeUnique<CGrabbarPassElement>(data));
+    auto data = COhmTabsPassElement::SBarData{this, a};
+    g_pHyprRenderer->m_renderPass.add(makeUnique<COhmTabsPassElement>(data));
 }
 
-void CGrabbarDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
+void COhmTabsDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
     const auto PWINDOW = m_window.lock();
     if (!PWINDOW)
         return;
@@ -1103,22 +1103,22 @@ void CGrabbarDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
     }
 }
 
-eDecorationType CGrabbarDeco::getDecorationType() {
+eDecorationType COhmTabsDeco::getDecorationType() {
     return DECORATION_CUSTOM;
 }
 
-void CGrabbarDeco::updateWindow(PHLWINDOW pWindow) {
+void COhmTabsDeco::updateWindow(PHLWINDOW pWindow) {
     damageEntire();
 }
 
-void CGrabbarDeco::onConfigReloaded() {
+void COhmTabsDeco::onConfigReloaded() {
     m_textTex = nullptr;
     m_showOnHover = g_pGlobalState->shell.showOnHover && g_pGlobalState->config.showOnHover && g_pGlobalState->config.showOnHover->value();
     g_pDecorationPositioner->repositionDeco(this);
     damageEntire();
 }
 
-void CGrabbarDeco::onBackendStateChanged() {
+void COhmTabsDeco::onBackendStateChanged() {
     g_pDecorationPositioner->repositionDeco(this);
     if (const auto PWINDOW = m_window.lock(); validMapped(PWINDOW)) {
         if (const auto PMONITOR = PWINDOW->m_monitor.lock(); PMONITOR)
@@ -1127,23 +1127,23 @@ void CGrabbarDeco::onBackendStateChanged() {
     damageEntire();
 }
 
-void CGrabbarDeco::damageEntire() {
+void COhmTabsDeco::damageEntire() {
     g_pHyprRenderer->damageBox(assignedBoxGlobal());
 }
 
-Vector2D CGrabbarDeco::cursorRelativeToBar() {
+Vector2D COhmTabsDeco::cursorRelativeToBar() {
     return g_pInputManager->getMouseCoordsInternal() - assignedBoxGlobal().pos();
 }
 
-eDecorationLayer CGrabbarDeco::getDecorationLayer() {
+eDecorationLayer COhmTabsDeco::getDecorationLayer() {
     return DECORATION_LAYER_UNDER;
 }
 
-uint64_t CGrabbarDeco::getDecorationFlags() {
+uint64_t COhmTabsDeco::getDecorationFlags() {
     return DECORATION_ALLOWS_MOUSE_INPUT | DECORATION_PART_OF_MAIN_WINDOW;
 }
 
-CBox CGrabbarDeco::assignedBoxGlobal() {
+CBox COhmTabsDeco::assignedBoxGlobal() {
     if (!validMapped(m_window))
         return {};
 
@@ -1156,11 +1156,11 @@ CBox CGrabbarDeco::assignedBoxGlobal() {
     return box.translate(WORKSPACEOFFSET);
 }
 
-PHLWINDOW CGrabbarDeco::getOwner() {
+PHLWINDOW COhmTabsDeco::getOwner() {
     return m_window.lock();
 }
 
-void CGrabbarDeco::updateRules() {
+void COhmTabsDeco::updateRules() {
     const auto PWINDOW    = m_window.lock();
     const auto prevHidden = m_hidden;
 

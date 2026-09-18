@@ -1,15 +1,15 @@
 # Architecture
 
-Grabbar is two cooperating parts inside processes that already exist on an
+OhmTabs is two cooperating parts inside processes that already exist on an
 Omarchy desktop, plus short-lived helpers. No daemon, no second Quickshell,
 no network.
 
 ```mermaid
 flowchart LR
   subgraph Hyprland
-    B[native backend<br/>grabbar.so]
-    S[strips<br/>CGrabbarDeco per window]
-    W[(special:grabbar-minimized)]
+    B[native backend<br/>ohmtabs.so]
+    S[strips<br/>COhmTabsDeco per window]
+    W[(special:ohmtabs-minimized)]
     B --- S
     B --- W
   end
@@ -21,29 +21,29 @@ flowchart LR
     SV --- P
   end
   B <-- "unix socket, line protocol" --> SV
-  SV -- "python3 helpers/grabbar-journal" --> J[(~/.local/state/grabbar/state.json)]
+  SV -- "python3 helpers/ohmtabs-journal" --> J[(~/.local/state/ohmtabs/state.json)]
   BW -- "theme · settings writer" --> SV
-  CLI[bin/grabbar] -- "omarchy-shell IPC" --> SV
-  CLI -- "helpers/grabbar_backend.py" --> B
+  CLI[bin/ohmtabs] -- "omarchy-shell IPC" --> SV
+  CLI -- "helpers/ohmtabs_backend.py" --> B
 ```
 
-## Native backend (`native/grabbar/`)
+## Native backend (`native/ohmtabs/`)
 
 Derived from Hyprbars (see `UPSTREAM.md`). Three responsibilities:
 
-1. **Strips.** `CGrabbarDeco` is an `IHyprWindowDecoration` with a reserved
+1. **Strips.** `COhmTabsDeco` is an `IHyprWindowDecoration` with a reserved
    top band (`DECORATION_POSITION_STICKY`, `reserved = true`). It draws the
    bar colour, the ellipsized title and the control glyphs — cairo paths,
    cached per glyph/size/colour — and handles press/release/drag. Input
    goes through the same hit validation as Hyprbars: layer surfaces above
    the window and seat grabs win.
-2. **Identity and actions.** `CGrabbarBackend` keeps `token → tracked
+2. **Identity and actions.** `COhmTabsBackend` keeps `token → tracked
    window`. Actions (`minimizeCommit`, `restore`, `setMaximized`,
    `closeWindow`, `setFloating`) resolve the token, re-check the live
    window, and call typed compositor actions (`Config::Actions::*`) with an
    explicit `PHLWINDOW`. No dispatcher strings, no shell commands.
 3. **Ownership and recovery.** Minimized windows live on
-   `special:grabbar-minimized`, which Grabbar creates and owns. The
+   `special:ohmtabs-minimized`, which OhmTabs creates and owns. The
    backend records the origin (workspace, monitor, tiled/floating,
    pinned, maximized, floating geometry) before moving. If the shell goes
    away for longer than the grace period, or the plugin is unloaded, the
@@ -51,17 +51,17 @@ Derived from Hyprbars (see `UPSTREAM.md`). Three responsibilities:
 
 The backend starts **suspended** (no strip, no reserved space) and becomes
 active only after a shell completes the readiness handshake. It writes one
-file: the boot-guard marker `<state>/grabbar/autoload/last-ok` after 15 s
+file: the boot-guard marker `<state>/ohmtabs/autoload/last-ok` after 15 s
 of uptime (see `AUTOLOAD.md`).
 
-## Shell service (`Service.qml`, `GrabbarModel.js`)
+## Shell service (`Service.qml`, `OhmTabsModel.js`)
 
 `Service.qml` is the backend's single shell client and the only writer of
-the journal. `GrabbarModel.js` holds every state transition as a pure
+the journal. `OhmTabsModel.js` holds every state transition as a pure
 function (Node tests run it directly):
 
 - **Minimize** is two-phase. `minimizeRequest` → `prepareEntry` →
-  journal written (`helpers/grabbar-journal write`: temp file, fsync,
+  journal written (`helpers/ohmtabs-journal write`: temp file, fsync,
   rename, `0600`) → `minimizeCommit` → `commitEntry` on `result ok`, or
   `cancelEntry` on refusal. A failed journal write cancels before anything
   moves.
@@ -90,12 +90,12 @@ function (Node tests run it directly):
 
 ## Helpers and CLI
 
-- `helpers/grabbar-journal` — atomic journal I/O, refuses symlinks and
+- `helpers/ohmtabs-journal` — atomic journal I/O, refuses symlinks and
   foreign-owned paths, quarantines damage.
-- `helpers/grabbar_backend.py` — socket client used by the CLI, the tests
+- `helpers/ohmtabs_backend.py` — socket client used by the CLI, the tests
   and as a stand-in shell in the G0 rig.
-- `helpers/grabbar-autoload` — the login hook and boot guard state.
-- `bin/grabbar` — user-facing CLI (see README).
+- `helpers/ohmtabs-autoload` — the login hook and boot guard state.
+- `bin/ohmtabs` — user-facing CLI (see README).
 
 ## Lifecycle summary
 
@@ -106,6 +106,6 @@ function (Node tests run it directly):
 | Shell disconnects | Minimize refused at once; after `shell_grace_ms` owned windows return and strips suspend |
 | Shell reconnects in time | New snapshot, reconcile, resume |
 | Settings → Off | `pause`: windows return, strips off, Minimize refused; `resume` on On |
-| Another tool focuses a hidden window / opens Grabbar's workspace | Deferred one turn: the focused hidden window is restored to the monitor's workspace and focused; the special workspace view is closed |
+| Another tool focuses a hidden window / opens OhmTabs's workspace | Deferred one turn: the focused hidden window is restored to the monitor's workspace and focused; the special workspace view is closed |
 | `hyprctl plugin unload` | Owned windows return before native references drop; shell shows "backend not loaded" |
 | Compositor restart | Nothing survives (as with any compositor); the journal from the old session is quarantined, not replayed |

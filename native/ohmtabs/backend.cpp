@@ -28,7 +28,7 @@ using namespace Config::Actions;
 
 // ------------------------------------------------------------- encoding
 
-std::string grabbarEncode(const std::string& v) {
+std::string ohmtabsEncode(const std::string& v) {
     static const char* HEX = "0123456789ABCDEF";
     std::string        out;
     out.reserve(v.size());
@@ -43,7 +43,7 @@ std::string grabbarEncode(const std::string& v) {
     return out;
 }
 
-std::string grabbarDecode(const std::string& v) {
+std::string ohmtabsDecode(const std::string& v) {
     std::string out;
     out.reserve(v.size());
     for (size_t i = 0; i < v.size(); ++i) {
@@ -62,7 +62,7 @@ static std::string buildLine(const std::string& type, const Fields& fields) {
         line += '\t';
         line += k;
         line += '=';
-        line += grabbarEncode(v);
+        line += ohmtabsEncode(v);
     }
     line += '\n';
     return line;
@@ -83,7 +83,7 @@ static Fields parseLine(const std::string& line, std::string& type) {
             if (eq == std::string::npos)
                 fields.emplace_back(part, "");
             else
-                fields.emplace_back(part.substr(0, eq), grabbarDecode(part.substr(eq + 1)));
+                fields.emplace_back(part.substr(0, eq), ohmtabsDecode(part.substr(eq + 1)));
         }
         if (tab == std::string::npos)
             break;
@@ -112,34 +112,34 @@ static const char* statusName(eActionStatus s) {
 // ------------------------------------------------------------ lifecycle
 
 static int onListenReadable(int, uint32_t, void* data) {
-    static_cast<CGrabbarBackend*>(data)->acceptClient();
+    static_cast<COhmTabsBackend*>(data)->acceptClient();
     return 0;
 }
 
 static int onClientReadable(int, uint32_t mask, void* data) {
-    auto c = static_cast<SGrabbarClient*>(data);
+    auto c = static_cast<SOhmTabsClient*>(data);
     g_pBackend->clientEvent(c, mask);
     return 0;
 }
 
-CGrabbarBackend::CGrabbarBackend() = default;
+COhmTabsBackend::COhmTabsBackend() = default;
 
-CGrabbarBackend::~CGrabbarBackend() {
+COhmTabsBackend::~COhmTabsBackend() {
     if (m_listenFd >= 0)
         stop(false, "destroy");
 }
 
-bool CGrabbarBackend::start() {
+bool COhmTabsBackend::start() {
     const char* RT = getenv("XDG_RUNTIME_DIR");
     if (!RT || !*RT) {
-        Log::logger->log(Log::ERR, "[grabbar] XDG_RUNTIME_DIR unset; refusing to create a socket");
+        Log::logger->log(Log::ERR, "[ohmtabs] XDG_RUNTIME_DIR unset; refusing to create a socket");
         return false;
     }
 
     m_sessionId = g_pCompositor->m_instanceSignature;
     m_epoch     = (uint64_t)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-    const std::string DIR  = std::string(RT) + "/grabbar";
+    const std::string DIR  = std::string(RT) + "/ohmtabs";
     const std::string IDIR = DIR + "/" + m_sessionId;
     if (mkdir(DIR.c_str(), 0700) != 0 && errno != EEXIST)
         return false;
@@ -153,7 +153,7 @@ bool CGrabbarBackend::start() {
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
     if (m_socketPath.size() >= sizeof(addr.sun_path)) {
-        Log::logger->log(Log::ERR, "[grabbar] socket path too long: {}", m_socketPath);
+        Log::logger->log(Log::ERR, "[ohmtabs] socket path too long: {}", m_socketPath);
         return false;
     }
     std::strncpy(addr.sun_path, m_socketPath.c_str(), sizeof(addr.sun_path) - 1);
@@ -161,7 +161,7 @@ bool CGrabbarBackend::start() {
     struct stat st{};
     if (lstat(m_socketPath.c_str(), &st) == 0) {
         if (!S_ISSOCK(st.st_mode)) {
-            Log::logger->log(Log::ERR, "[grabbar] refusing to replace non-socket at {}", m_socketPath);
+            Log::logger->log(Log::ERR, "[ohmtabs] refusing to replace non-socket at {}", m_socketPath);
             return false;
         }
         unlink(m_socketPath.c_str());
@@ -172,7 +172,7 @@ bool CGrabbarBackend::start() {
         return false;
 
     if (bind(m_listenFd, (sockaddr*)&addr, sizeof(addr)) != 0 || listen(m_listenFd, 4) != 0) {
-        Log::logger->log(Log::ERR, "[grabbar] bind/listen failed: {}", strerror(errno));
+        Log::logger->log(Log::ERR, "[ohmtabs] bind/listen failed: {}", strerror(errno));
         close(m_listenFd);
         m_listenFd = -1;
         return false;
@@ -181,14 +181,14 @@ bool CGrabbarBackend::start() {
 
     m_listenSource = wl_event_loop_add_fd(g_pCompositor->m_wlEventLoop, m_listenFd, WL_EVENT_READABLE, ::onListenReadable, this);
 
-    m_graceTimer = makeShared<CEventLoopTimer>(std::nullopt, [](SP<CEventLoopTimer>, void* data) { static_cast<CGrabbarBackend*>(data)->onGraceExpired(); }, this);
+    m_graceTimer = makeShared<CEventLoopTimer>(std::nullopt, [](SP<CEventLoopTimer>, void* data) { static_cast<COhmTabsBackend*>(data)->onGraceExpired(); }, this);
     g_pEventLoopManager->addTimer(m_graceTimer);
 
-    Log::logger->log(Log::INFO, "[grabbar] backend epoch {} listening on {}", m_epoch, m_socketPath);
+    Log::logger->log(Log::INFO, "[ohmtabs] backend epoch {} listening on {}", m_epoch, m_socketPath);
     return true;
 }
 
-void CGrabbarBackend::stop(bool restoreOwned, const char* reason) {
+void COhmTabsBackend::stop(bool restoreOwned, const char* reason) {
     if (m_stopping)
         return;
     m_stopping = true;
@@ -239,7 +239,7 @@ void CGrabbarBackend::stop(bool restoreOwned, const char* reason) {
 
 // -------------------------------------------------------------- identity
 
-std::string CGrabbarBackend::tokenFor(PHLWINDOW w) {
+std::string COhmTabsBackend::tokenFor(PHLWINDOW w) {
     if (!w)
         return "";
     const auto KEY = (uintptr_t)w.get();
@@ -262,12 +262,12 @@ std::string CGrabbarBackend::tokenFor(PHLWINDOW w) {
     return t.token;
 }
 
-STrackedWindow* CGrabbarBackend::tracked(const std::string& token) {
+STrackedWindow* COhmTabsBackend::tracked(const std::string& token) {
     auto it = m_windows.find(token);
     return it == m_windows.end() ? nullptr : &it->second;
 }
 
-PHLWINDOW CGrabbarBackend::resolve(const std::string& token) {
+PHLWINDOW COhmTabsBackend::resolve(const std::string& token) {
     auto t = tracked(token);
     if (!t)
         return nullptr;
@@ -277,7 +277,7 @@ PHLWINDOW CGrabbarBackend::resolve(const std::string& token) {
     return w;
 }
 
-void CGrabbarBackend::forgetWindow(const std::string& token) {
+void COhmTabsBackend::forgetWindow(const std::string& token) {
     auto it = m_windows.find(token);
     if (it == m_windows.end())
         return;
@@ -292,23 +292,23 @@ void CGrabbarBackend::forgetWindow(const std::string& token) {
 
 // -------------------------------------------------------------- readiness
 
-bool CGrabbarBackend::shellConnected() const {
+bool COhmTabsBackend::shellConnected() const {
     return m_shell != nullptr;
 }
 
-bool CGrabbarBackend::minimizeEnabled() const {
+bool COhmTabsBackend::minimizeEnabled() const {
     return m_shell != nullptr && m_ready && !m_stopping && !m_paused;
 }
 
-bool CGrabbarBackend::suspended() const {
+bool COhmTabsBackend::suspended() const {
     return m_suspended;
 }
 
-bool CGrabbarBackend::paused() const {
+bool COhmTabsBackend::paused() const {
     return m_paused;
 }
 
-void CGrabbarBackend::refreshBars() {
+void COhmTabsBackend::refreshBars() {
     for (auto& b : g_pGlobalState->bars) {
         if (b)
             b->onBackendStateChanged();
@@ -317,31 +317,31 @@ void CGrabbarBackend::refreshBars() {
         m->m_scheduledRecalc = true;
 }
 
-uint64_t CGrabbarBackend::epoch() const {
+uint64_t COhmTabsBackend::epoch() const {
     return m_epoch;
 }
 
-const std::string& CGrabbarBackend::socketPath() const {
+const std::string& COhmTabsBackend::socketPath() const {
     return m_socketPath;
 }
 
-void CGrabbarBackend::setSuspended(bool suspended) {
+void COhmTabsBackend::setSuspended(bool suspended) {
     if (m_suspended == suspended)
         return;
     m_suspended = suspended;
-    Log::logger->log(Log::INFO, "[grabbar] decorations {}", suspended ? "suspended" : "active");
+    Log::logger->log(Log::INFO, "[ohmtabs] decorations {}", suspended ? "suspended" : "active");
     refreshBars();
 }
 
 // ---------------------------------------------------------------- state
 
-bool CGrabbarBackend::isMaximized(PHLWINDOW w) const {
+bool COhmTabsBackend::isMaximized(PHLWINDOW w) const {
     if (!w)
         return false;
     return Fullscreen::controller()->getFullscreenModes(w).internal == Fullscreen::FSMODE_MAXIMIZED;
 }
 
-bool CGrabbarBackend::isMinimizable(PHLWINDOW w, std::string& why) const {
+bool COhmTabsBackend::isMinimizable(PHLWINDOW w, std::string& why) const {
     if (!validMapped(w)) {
         why = "The window is gone";
         return false;
@@ -369,7 +369,7 @@ bool CGrabbarBackend::isMinimizable(PHLWINDOW w, std::string& why) const {
     return true;
 }
 
-SWindowOrigin CGrabbarBackend::captureOrigin(PHLWINDOW w) const {
+SWindowOrigin COhmTabsBackend::captureOrigin(PHLWINDOW w) const {
     SWindowOrigin o;
     if (const auto WS = w->m_workspace; WS) {
         o.workspaceName = WS->m_name;
@@ -386,23 +386,23 @@ SWindowOrigin CGrabbarBackend::captureOrigin(PHLWINDOW w) const {
     return o;
 }
 
-PHLWORKSPACE CGrabbarBackend::ownedWorkspace(PHLMONITOR mon, bool create) {
-    auto ws = State::workspaceState()->query().name(GRABBAR_WORKSPACE).run();
+PHLWORKSPACE COhmTabsBackend::ownedWorkspace(PHLMONITOR mon, bool create) {
+    auto ws = State::workspaceState()->query().name(OHMTABS_WORKSPACE).run();
     if (ws || !create || !mon)
         return ws;
 
     const auto ID = State::workspaceState()->newSpecialID();
-    ws            = State::workspaceState()->create(ID, mon->m_id, GRABBAR_WORKSPACE);
+    ws            = State::workspaceState()->create(ID, mon->m_id, OHMTABS_WORKSPACE);
     if (!ws)
-        Log::logger->log(Log::ERR, "[grabbar] could not create {}", GRABBAR_WORKSPACE);
+        Log::logger->log(Log::ERR, "[ohmtabs] could not create {}", OHMTABS_WORKSPACE);
     return ws;
 }
 
-bool CGrabbarBackend::onOwnedWorkspace(PHLWINDOW w) const {
-    return w && w->m_workspace && w->m_workspace->m_name == GRABBAR_WORKSPACE;
+bool COhmTabsBackend::onOwnedWorkspace(PHLWINDOW w) const {
+    return w && w->m_workspace && w->m_workspace->m_name == OHMTABS_WORKSPACE;
 }
 
-size_t CGrabbarBackend::ownedCount() const {
+size_t COhmTabsBackend::ownedCount() const {
     size_t n = 0;
     for (const auto& [_, t] : m_windows)
         if (t.owned)
@@ -412,16 +412,16 @@ size_t CGrabbarBackend::ownedCount() const {
 
 // --------------------------------------------------------------- actions
 
-void CGrabbarBackend::requestMinimize(const std::string& token, const std::string& source) {
+void COhmTabsBackend::requestMinimize(const std::string& token, const std::string& source) {
     auto t = tracked(token);
     auto w = resolve(token);
     if (!t || !w) {
-        Log::logger->log(Log::DEBUG, "[grabbar] minimize request for stale token {}", token);
+        Log::logger->log(Log::DEBUG, "[ohmtabs] minimize request for stale token {}", token);
         return;
     }
     if (!minimizeEnabled()) {
         broadcastShell("notice", {{"text", "Minimize is unavailable until the restore drawer is ready"}, {"token", token}});
-        Log::logger->log(Log::INFO, "[grabbar] minimize refused: no ready shell");
+        Log::logger->log(Log::INFO, "[ohmtabs] minimize refused: no ready shell");
         return;
     }
     std::string why;
@@ -439,7 +439,7 @@ void CGrabbarBackend::requestMinimize(const std::string& token, const std::strin
     broadcastShell("minimizeRequest", f);
 }
 
-eActionStatus CGrabbarBackend::minimizeCommit(const std::string& token, const std::string& requestId, std::string& err) {
+eActionStatus COhmTabsBackend::minimizeCommit(const std::string& token, const std::string& requestId, std::string& err) {
     auto t = tracked(token);
     auto w = resolve(token);
     if (!t || !w) {
@@ -462,8 +462,8 @@ eActionStatus CGrabbarBackend::minimizeCommit(const std::string& token, const st
     }
     if (!isMinimizable(w, err))
         return ACTION_REFUSED;
-    if (ownedCount() >= GRABBAR_MAX_OWNED) {
-        err = "Grabbar cannot keep track of more minimized windows";
+    if (ownedCount() >= OHMTABS_MAX_OWNED) {
+        err = "OhmTabs cannot keep track of more minimized windows";
         return ACTION_REFUSED;
     }
 
@@ -472,7 +472,7 @@ eActionStatus CGrabbarBackend::minimizeCommit(const std::string& token, const st
         mon = Desktop::focusState()->monitor();
     auto ws = ownedWorkspace(mon, true);
     if (!ws) {
-        err = "could not prepare Grabbar's hidden workspace";
+        err = "could not prepare OhmTabs's hidden workspace";
         return ACTION_FAILED;
     }
 
@@ -502,11 +502,11 @@ eActionStatus CGrabbarBackend::minimizeCommit(const std::string& token, const st
 
     t->owned        = true;
     t->ownerRequest = requestId;
-    Log::logger->log(Log::INFO, "[grabbar] minimized {} ({}) from workspace {}", token, w->m_class, t->origin.workspaceName);
+    Log::logger->log(Log::INFO, "[ohmtabs] minimized {} ({}) from workspace {}", token, w->m_class, t->origin.workspaceName);
     return ACTION_OK;
 }
 
-PHLWORKSPACE CGrabbarBackend::destinationWorkspace(const STrackedWindow& t, const std::string& destination, const std::string& monitorName, std::string& note) {
+PHLWORKSPACE COhmTabsBackend::destinationWorkspace(const STrackedWindow& t, const std::string& destination, const std::string& monitorName, std::string& note) {
     PHLMONITOR mon;
     for (const auto& m : State::monitorState()->monitors()) {
         if (m->m_name == monitorName)
@@ -529,7 +529,7 @@ PHLWORKSPACE CGrabbarBackend::destinationWorkspace(const STrackedWindow& t, cons
     return mon->m_activeWorkspace;
 }
 
-bool CGrabbarBackend::returnWindow(STrackedWindow& t, PHLWORKSPACE dest, bool focus, std::string& err) {
+bool COhmTabsBackend::returnWindow(STrackedWindow& t, PHLWORKSPACE dest, bool focus, std::string& err) {
     auto w = t.window.lock();
     if (!validMapped(w) || !dest) {
         err = "window or destination gone";
@@ -583,7 +583,7 @@ bool CGrabbarBackend::returnWindow(STrackedWindow& t, PHLWORKSPACE dest, bool fo
     return true;
 }
 
-eActionStatus CGrabbarBackend::restore(const std::string& token, const std::string& destination, const std::string& monitorName, bool focus, std::string& err) {
+eActionStatus COhmTabsBackend::restore(const std::string& token, const std::string& destination, const std::string& monitorName, bool focus, std::string& err) {
     auto t = tracked(token);
     auto w = resolve(token);
     if (!t || !w) {
@@ -595,7 +595,7 @@ eActionStatus CGrabbarBackend::restore(const std::string& token, const std::stri
             err = "window is already visible";
             return ACTION_REFUSED;
         }
-        // Unrecorded window on Grabbar's workspace (spec §7.4 "Recovered"):
+        // Unrecorded window on OhmTabs's workspace (spec §7.4 "Recovered"):
         // return it as an ordinary tiled window on the requested destination.
         t->origin = SWindowOrigin{};
         t->owned  = true;
@@ -610,11 +610,11 @@ eActionStatus CGrabbarBackend::restore(const std::string& token, const std::stri
         return ACTION_FAILED;
     if (!note.empty())
         err = note;
-    Log::logger->log(Log::INFO, "[grabbar] restored {} to {}", token, dest->m_name);
+    Log::logger->log(Log::INFO, "[ohmtabs] restored {} to {}", token, dest->m_name);
     return ACTION_OK;
 }
 
-eActionStatus CGrabbarBackend::setMaximized(const std::string& token, std::optional<bool> on, std::string& err) {
+eActionStatus COhmTabsBackend::setMaximized(const std::string& token, std::optional<bool> on, std::string& err) {
     auto t = tracked(token);
     auto w = resolve(token);
     if (!t || !w) {
@@ -647,7 +647,7 @@ eActionStatus CGrabbarBackend::setMaximized(const std::string& token, std::optio
     return ACTION_OK;
 }
 
-eActionStatus CGrabbarBackend::closeOne(const std::string& token, std::string& err) {
+eActionStatus COhmTabsBackend::closeOne(const std::string& token, std::string& err) {
     auto w = resolve(token);
     if (!w) {
         err = "stale target";
@@ -662,7 +662,7 @@ eActionStatus CGrabbarBackend::closeOne(const std::string& token, std::string& e
     return ACTION_OK;
 }
 
-eActionStatus CGrabbarBackend::closeWindow(const std::string& token, std::string& err) {
+eActionStatus COhmTabsBackend::closeWindow(const std::string& token, std::string& err) {
     // Closing a tab-group host means closing the whole group: ask the shell for
     // the browser-like "close all N windows?" prompt instead of closing one tab.
     if (const auto G = m_tabs.hostGroup(token); G && G->tabs.size() > 1) {
@@ -696,7 +696,7 @@ static std::string jsonEscape(const std::string& v) {
     return out;
 }
 
-bool CGrabbarBackend::hideOwned(STrackedWindow& t, std::string& err) {
+bool COhmTabsBackend::hideOwned(STrackedWindow& t, std::string& err) {
     auto w = t.window.lock();
     if (!validMapped(w)) {
         err = "stale target";
@@ -708,8 +708,8 @@ bool CGrabbarBackend::hideOwned(STrackedWindow& t, std::string& err) {
     }
     if (!isMinimizable(w, err))
         return false;
-    if (ownedCount() >= GRABBAR_MAX_OWNED) {
-        err = "Grabbar cannot keep track of more hidden windows";
+    if (ownedCount() >= OHMTABS_MAX_OWNED) {
+        err = "OhmTabs cannot keep track of more hidden windows";
         return false;
     }
 
@@ -718,7 +718,7 @@ bool CGrabbarBackend::hideOwned(STrackedWindow& t, std::string& err) {
         mon = Desktop::focusState()->monitor();
     auto ws = ownedWorkspace(mon, true);
     if (!ws) {
-        err = "could not prepare Grabbar's hidden workspace";
+        err = "could not prepare OhmTabs's hidden workspace";
         return false;
     }
 
@@ -749,7 +749,7 @@ bool CGrabbarBackend::hideOwned(STrackedWindow& t, std::string& err) {
     return true;
 }
 
-std::string CGrabbarBackend::tabsListJson() {
+std::string COhmTabsBackend::tabsListJson() {
     std::string out = "{\"groups\":[";
     bool        firstG = true;
     for (const auto* G : m_tabs.groups()) {
@@ -770,12 +770,12 @@ std::string CGrabbarBackend::tabsListJson() {
 }
 
 
-void CGrabbarBackend::broadcastTabs() {
+void COhmTabsBackend::broadcastTabs() {
     if (m_shell)
         send(m_shell, "tabsList", {{"json", tabsListJson()}});
 }
 
-void CGrabbarBackend::requestGroupClose(const std::string& hostToken) {
+void COhmTabsBackend::requestGroupClose(const std::string& hostToken) {
     const auto G = m_tabs.hostGroup(hostToken);
     if (!G || G->tabs.size() < 2) {
         std::string err;
@@ -794,7 +794,7 @@ void CGrabbarBackend::requestGroupClose(const std::string& hostToken) {
     broadcastShell("tabsEvent", {{"json", JSON}});
 }
 
-eActionStatus CGrabbarBackend::joinTabs(const std::string& source, const std::string& host, std::string& err) {
+eActionStatus COhmTabsBackend::joinTabs(const std::string& source, const std::string& host, std::string& err) {
     auto st = tracked(source);
     if (!resolve(source) || !resolve(host)) {
         err = "stale target";
@@ -815,13 +815,13 @@ eActionStatus CGrabbarBackend::joinTabs(const std::string& source, const std::st
         err = R.error;
         return ACTION_REFUSED;
     }
-    Log::logger->log(Log::INFO, "[grabbar] tab group {}: {} joined onto host {}", R.id, source, host);
+    Log::logger->log(Log::INFO, "[ohmtabs] tab group {}: {} joined onto host {}", R.id, source, host);
     broadcastTabs();
     refreshBars();
     return ACTION_OK;
 }
 
-eActionStatus CGrabbarBackend::activateTab(uint64_t group, int index, std::string& err) {
+eActionStatus COhmTabsBackend::activateTab(uint64_t group, int index, std::string& err) {
     const auto G = m_tabs.group(group);
     if (!G) {
         err = "no such group";
@@ -845,9 +845,9 @@ eActionStatus CGrabbarBackend::activateTab(uint64_t group, int index, std::strin
         std::string herr;
         if (static_cast<int>(i) == index) {
             if (t->owned && restore(MEMBERS[i], "current", "", true, herr) != ACTION_OK)
-                Log::logger->log(Log::WARN, "[grabbar] could not show tab {}: {}", MEMBERS[i], herr);
+                Log::logger->log(Log::WARN, "[ohmtabs] could not show tab {}: {}", MEMBERS[i], herr);
         } else if (!t->owned && !hideOwned(*t, herr)) {
-            Log::logger->log(Log::WARN, "[grabbar] could not hide tab {}: {}", MEMBERS[i], herr);
+            Log::logger->log(Log::WARN, "[ohmtabs] could not hide tab {}: {}", MEMBERS[i], herr);
         }
     }
 
@@ -860,7 +860,7 @@ eActionStatus CGrabbarBackend::activateTab(uint64_t group, int index, std::strin
     return ACTION_OK;
 }
 
-eActionStatus CGrabbarBackend::activateTabByToken(const std::string& token, std::string& err) {
+eActionStatus COhmTabsBackend::activateTabByToken(const std::string& token, std::string& err) {
     const auto G = m_tabs.groupOf(token);
     if (!G) {
         err = "window is not in a tab group";
@@ -873,7 +873,7 @@ eActionStatus CGrabbarBackend::activateTabByToken(const std::string& token, std:
     return ACTION_FAILED;
 }
 
-eActionStatus CGrabbarBackend::detachTab(const std::string& token, std::string& err) {
+eActionStatus COhmTabsBackend::detachTab(const std::string& token, std::string& err) {
     const auto G = m_tabs.groupOf(token);
     if (!G) {
         err = "window is not in a tab group";
@@ -901,7 +901,7 @@ eActionStatus CGrabbarBackend::detachTab(const std::string& token, std::string& 
     return ACTION_OK;
 }
 
-eActionStatus CGrabbarBackend::ungroupTabs(uint64_t group, std::string& err) {
+eActionStatus COhmTabsBackend::ungroupTabs(uint64_t group, std::string& err) {
     const auto G = m_tabs.group(group);
     if (!G) {
         err = "no such group";
@@ -919,7 +919,7 @@ eActionStatus CGrabbarBackend::ungroupTabs(uint64_t group, std::string& err) {
     return ACTION_OK;
 }
 
-eActionStatus CGrabbarBackend::closeAllTabs(uint64_t group, bool confirm, std::string& err) {
+eActionStatus COhmTabsBackend::closeAllTabs(uint64_t group, bool confirm, std::string& err) {
     if (!confirm) {
         err = "closeAll requires confirm";
         return ACTION_REFUSED;
@@ -938,7 +938,7 @@ eActionStatus CGrabbarBackend::closeAllTabs(uint64_t group, bool confirm, std::s
     return ACTION_OK;
 }
 
-eActionStatus CGrabbarBackend::setFloating(const std::string& token, std::optional<bool> on, std::string& err) {
+eActionStatus COhmTabsBackend::setFloating(const std::string& token, std::optional<bool> on, std::string& err) {
     auto t = tracked(token);
     auto w = resolve(token);
     if (!t || !w) {
@@ -964,7 +964,7 @@ eActionStatus CGrabbarBackend::setFloating(const std::string& token, std::option
     return ACTION_OK;
 }
 
-void CGrabbarBackend::menuRequest(const std::string& token, const Vector2D& at) {
+void COhmTabsBackend::menuRequest(const std::string& token, const Vector2D& at) {
     auto t = tracked(token);
     if (!t || !resolve(token))
         return;
@@ -974,7 +974,7 @@ void CGrabbarBackend::menuRequest(const std::string& token, const Vector2D& at) 
     broadcastShell("menuRequest", f);
 }
 
-size_t CGrabbarBackend::restoreAllOwned(const char* reason) {
+size_t COhmTabsBackend::restoreAllOwned(const char* reason) {
     size_t n = 0;
     // Returning a window fires compositor events that can erase entries
     // (a client may die mid-move), so walk a snapshot of the tokens.
@@ -994,31 +994,31 @@ size_t CGrabbarBackend::restoreAllOwned(const char* reason) {
         std::string note, err;
         auto        dest = destinationWorkspace(*t, "original", "", note);
         if (!dest || !returnWindow(*t, dest, false, err)) {
-            Log::logger->log(Log::ERR, "[grabbar] could not return {}: {}", token, err);
+            Log::logger->log(Log::ERR, "[ohmtabs] could not return {}: {}", token, err);
             continue;
         }
         ++n;
     }
     if (n)
-        Log::logger->log(Log::INFO, "[grabbar] returned {} hidden window(s): {}", n, reason);
+        Log::logger->log(Log::INFO, "[ohmtabs] returned {} hidden window(s): {}", n, reason);
     return n;
 }
 
-std::string CGrabbarBackend::statusText(bool json) const {
-    const auto OWNEDWS = State::workspaceState()->query().name(GRABBAR_WORKSPACE).run();
+std::string COhmTabsBackend::statusText(bool json) const {
+    const auto OWNEDWS = State::workspaceState()->query().name(OHMTABS_WORKSPACE).run();
     if (json)
         return std::format("{{\"version\":\"{}\",\"protocol\":{},\"epoch\":{},\"sessionId\":\"{}\",\"socket\":\"{}\",\"shellConnected\":{},\"minimizeEnabled\":{},"
                            "\"suspended\":{},\"paused\":{},\"tracked\":{},\"owned\":{},\"ownedWorkspace\":{},\"apiHash\":\"{}\"}}",
-                           GRABBAR_VERSION, GRABBAR_PROTOCOL, m_epoch, m_sessionId, m_socketPath, shellConnected(), minimizeEnabled(), m_suspended, m_paused, m_windows.size(),
+                           OHMTABS_VERSION, OHMTABS_PROTOCOL, m_epoch, m_sessionId, m_socketPath, shellConnected(), minimizeEnabled(), m_suspended, m_paused, m_windows.size(),
                            ownedCount(), OWNEDWS ? "true" : "false", __hyprland_api_get_hash());
-    return std::format("Grabbar {} (protocol {})\nepoch: {}\nsocket: {}\nshell: {}\nminimize: {}\ndecorations: {}\ntracked windows: {}\nminimized (owned): {}\nowned workspace: {}\n",
-                       GRABBAR_VERSION, GRABBAR_PROTOCOL, m_epoch, m_socketPath, shellConnected() ? "connected" : "disconnected", minimizeEnabled() ? "enabled" : "disabled",
+    return std::format("OhmTabs {} (protocol {})\nepoch: {}\nsocket: {}\nshell: {}\nminimize: {}\ndecorations: {}\ntracked windows: {}\nminimized (owned): {}\nowned workspace: {}\n",
+                       OHMTABS_VERSION, OHMTABS_PROTOCOL, m_epoch, m_socketPath, shellConnected() ? "connected" : "disconnected", minimizeEnabled() ? "enabled" : "disabled",
                        m_paused ? "paused" : (m_suspended ? "suspended" : "active"), m_windows.size(), ownedCount(), OWNEDWS ? "present" : "absent");
 }
 
 // ------------------------------------------------------- window events
 
-void CGrabbarBackend::onWindowOpen(PHLWINDOW w) {
+void COhmTabsBackend::onWindowOpen(PHLWINDOW w) {
     if (!w || m_stopping)
         return;
     const auto TOKEN = tokenFor(w);
@@ -1026,7 +1026,7 @@ void CGrabbarBackend::onWindowOpen(PHLWINDOW w) {
         sendWindow(m_shell, *t, "open");
 }
 
-void CGrabbarBackend::onWindowClose(PHLWINDOW w) {
+void COhmTabsBackend::onWindowClose(PHLWINDOW w) {
     if (!w || m_stopping)
         return;
     auto it = m_tokenByWindow.find((uintptr_t)w.get());
@@ -1058,7 +1058,7 @@ void CGrabbarBackend::onWindowClose(PHLWINDOW w) {
     }
 }
 
-void CGrabbarBackend::onWindowChanged(PHLWINDOW w, const char* what) {
+void COhmTabsBackend::onWindowChanged(PHLWINDOW w, const char* what) {
     if (!w || m_stopping)
         return;
     auto it = m_tokenByWindow.find((uintptr_t)w.get());
@@ -1067,7 +1067,7 @@ void CGrabbarBackend::onWindowChanged(PHLWINDOW w, const char* what) {
     auto t = tracked(it->second);
     if (!t)
         return;
-    // Another tool moved a Grabbar-hidden window: release ownership rather
+    // Another tool moved a OhmTabs-hidden window: release ownership rather
     // than dragging it back (spec §8.1).
     if (t->owned && !t->transitioning && !onOwnedWorkspace(w) && validMapped(w)) {
         t->owned = false;
@@ -1084,14 +1084,14 @@ void CGrabbarBackend::onWindowChanged(PHLWINDOW w, const char* what) {
 
 // ------------------------------------------- reveal by another tool (§8)
 
-// Grabbar's workspace is storage, never a view. Hyprland shows a special
+// OhmTabs's workspace is storage, never a view. Hyprland shows a special
 // workspace whenever a window on it is focused, so a taskbar click (Hotbar),
 // a window switcher, Reprieve's lists or a plain `focuswindow` on a hidden
 // window would pop the whole hidden set onto the monitor. Instead, the
 // focused hidden window is restored as if its drawer row had been clicked,
 // and the workspace view is closed again. Deferred to the next event-loop
 // turn: moving windows from inside a focus event is not safe.
-void CGrabbarBackend::onOwnedWindowActivated(PHLWINDOW w) {
+void COhmTabsBackend::onOwnedWindowActivated(PHLWINDOW w) {
     if (!w || m_stopping || !onOwnedWorkspace(w))
         return;
     if (auto t = tracked(tokenFor(w)); t && t->transitioning)
@@ -1102,14 +1102,14 @@ void CGrabbarBackend::onOwnedWindowActivated(PHLWINDOW w) {
     g_pEventLoopManager->doLater([this] { handleReveal(); });
 }
 
-void CGrabbarBackend::onOwnedWorkspaceRevealed(PHLMONITOR mon) {
+void COhmTabsBackend::onOwnedWorkspaceRevealed(PHLMONITOR mon) {
     if (m_stopping || m_revealPending)
         return;
     m_revealPending = true;
     g_pEventLoopManager->doLater([this] { handleReveal(); });
 }
 
-void CGrabbarBackend::handleReveal() {
+void COhmTabsBackend::handleReveal() {
     m_revealPending = false;
     if (m_stopping)
         return;
@@ -1120,20 +1120,20 @@ void CGrabbarBackend::handleReveal() {
         const auto  TOKEN = tokenFor(w);
         auto        mon   = w->m_monitor.lock();
         const auto  ST    = restore(TOKEN, "current", mon ? mon->m_name : "", true, err);
-        Log::logger->log(Log::INFO, "[grabbar] hidden window focused by another tool; restored {} -> {} ({})", TOKEN, statusName(ST), err);
+        Log::logger->log(Log::INFO, "[ohmtabs] hidden window focused by another tool; restored {} -> {} ({})", TOKEN, statusName(ST), err);
     }
 
     // 2. Never leave the hidden workspace on screen.
     for (auto& m : State::monitorState()->monitors()) {
         const auto SPECIAL = m->m_activeSpecialWorkspace;
-        if (SPECIAL && SPECIAL->m_name == GRABBAR_WORKSPACE)
+        if (SPECIAL && SPECIAL->m_name == OHMTABS_WORKSPACE)
             m->setSpecialWorkspace(nullptr);
     }
 }
 
 // --------------------------------------------------------------- protocol
 
-Fields CGrabbarBackend::windowFields(const STrackedWindow& t) const {
+Fields COhmTabsBackend::windowFields(const STrackedWindow& t) const {
     Fields f;
     auto   w = t.window.lock();
     f.emplace_back("token", t.token);
@@ -1179,7 +1179,7 @@ Fields CGrabbarBackend::windowFields(const STrackedWindow& t) const {
     return f;
 }
 
-void CGrabbarBackend::sendWindow(SGrabbarClient* c, const STrackedWindow& t, const char* kind) {
+void COhmTabsBackend::sendWindow(SOhmTabsClient* c, const STrackedWindow& t, const char* kind) {
     if (!c)
         return;
     auto f = windowFields(t);
@@ -1187,7 +1187,7 @@ void CGrabbarBackend::sendWindow(SGrabbarClient* c, const STrackedWindow& t, con
     send(c, "window", f);
 }
 
-void CGrabbarBackend::sendState(SGrabbarClient* c) {
+void COhmTabsBackend::sendState(SOhmTabsClient* c) {
     if (!c)
         return;
     send(c, "state",
@@ -1199,23 +1199,23 @@ void CGrabbarBackend::sendState(SGrabbarClient* c) {
           {"tracked", std::to_string(m_windows.size())}});
 }
 
-void CGrabbarBackend::send(SGrabbarClient* c, const std::string& type, const Fields& fields) {
+void COhmTabsBackend::send(SOhmTabsClient* c, const std::string& type, const Fields& fields) {
     if (!c || c->dead || c->fd < 0)
         return;
     c->outbuf += buildLine(type, fields);
-    if (c->outbuf.size() > GRABBAR_MAX_OUTBUF) {
+    if (c->outbuf.size() > OHMTABS_MAX_OUTBUF) {
         dropClient(c, "output backlog");
         return;
     }
     flush(c);
 }
 
-void CGrabbarBackend::broadcastShell(const std::string& type, const Fields& fields) {
+void COhmTabsBackend::broadcastShell(const std::string& type, const Fields& fields) {
     if (m_shell)
         send(m_shell, type, fields);
 }
 
-void CGrabbarBackend::flush(SGrabbarClient* c) {
+void COhmTabsBackend::flush(SOhmTabsClient* c) {
     if (!c || c->dead || c->fd < 0)
         return;
     while (!c->outbuf.empty()) {
@@ -1236,7 +1236,7 @@ void CGrabbarBackend::flush(SGrabbarClient* c) {
         wl_event_source_fd_update(c->source, WL_EVENT_READABLE);
 }
 
-void CGrabbarBackend::dropClient(SGrabbarClient* c, const char* why) {
+void COhmTabsBackend::dropClient(SOhmTabsClient* c, const char* why) {
     if (!c || c->dead)
         return;
     c->dead = true;
@@ -1248,12 +1248,12 @@ void CGrabbarBackend::dropClient(SGrabbarClient* c, const char* why) {
         close(c->fd);
         c->fd = -1;
     }
-    Log::logger->log(Log::DEBUG, "[grabbar] client dropped: {}", why);
+    Log::logger->log(Log::DEBUG, "[ohmtabs] client dropped: {}", why);
     if (c == m_shell)
         onShellLost(why);
 }
 
-void CGrabbarBackend::acceptClient() {
+void COhmTabsBackend::acceptClient() {
     while (true) {
         const int FD = accept4(m_listenFd, nullptr, nullptr, SOCK_NONBLOCK | SOCK_CLOEXEC);
         if (FD < 0)
@@ -1262,14 +1262,14 @@ void CGrabbarBackend::acceptClient() {
             close(FD);
             continue;
         }
-        auto c    = makeUnique<SGrabbarClient>();
+        auto c    = makeUnique<SOhmTabsClient>();
         c->fd     = FD;
         c->source = wl_event_loop_add_fd(g_pCompositor->m_wlEventLoop, FD, WL_EVENT_READABLE, ::onClientReadable, c.get());
         m_clients.emplace_back(std::move(c));
     }
 }
 
-void CGrabbarBackend::clientEvent(SGrabbarClient* c, uint32_t mask) {
+void COhmTabsBackend::clientEvent(SOhmTabsClient* c, uint32_t mask) {
     if (!c || c->dead)
         return;
 
@@ -1285,7 +1285,7 @@ void CGrabbarBackend::clientEvent(SGrabbarClient* c, uint32_t mask) {
                 const auto n = ::recv(c->fd, buf, sizeof(buf), MSG_DONTWAIT);
                 if (n > 0) {
                     c->inbuf.append(buf, n);
-                    if (c->inbuf.size() > GRABBAR_MAX_INBUF) {
+                    if (c->inbuf.size() > OHMTABS_MAX_INBUF) {
                         dropClient(c, "input too large");
                         break;
                     }
@@ -1305,7 +1305,7 @@ void CGrabbarBackend::clientEvent(SGrabbarClient* c, uint32_t mask) {
             while (!c->dead && (nl = c->inbuf.find('\n')) != std::string::npos) {
                 auto line = c->inbuf.substr(0, nl);
                 c->inbuf.erase(0, nl + 1);
-                if (line.size() > GRABBAR_MAX_LINE) {
+                if (line.size() > OHMTABS_MAX_LINE) {
                     dropClient(c, "line too long");
                     break;
                 }
@@ -1321,9 +1321,9 @@ void CGrabbarBackend::clientEvent(SGrabbarClient* c, uint32_t mask) {
     std::erase_if(m_clients, [](const auto& cl) { return cl->dead; });
 }
 
-void CGrabbarBackend::onShellLost(const char* why) {
+void COhmTabsBackend::onShellLost(const char* why) {
     const auto GRACE = std::clamp<int64_t>(g_pGlobalState->config.shellGraceMs->value(), 500, 60000);
-    Log::logger->log(Log::INFO, "[grabbar] shell service lost ({}); minimize disabled, {} ms grace", why, GRACE);
+    Log::logger->log(Log::INFO, "[ohmtabs] shell service lost ({}); minimize disabled, {} ms grace", why, GRACE);
     m_shell = nullptr;
     m_ready = false;
     if (m_graceTimer && !m_stopping)
@@ -1333,22 +1333,22 @@ void CGrabbarBackend::onShellLost(const char* why) {
             b->damageEntire();
 }
 
-void CGrabbarBackend::onGraceExpired() {
+void COhmTabsBackend::onGraceExpired() {
     if (m_shell || m_stopping)
         return;
     const auto N = restoreAllOwned("shell service did not return");
     setSuspended(true);
     if (N > 0)
-        HyprlandAPI::addNotification(PHANDLE, "Your windows were restored because Grabbar stopped.", CHyprColor{0.9, 0.7, 0.2, 1.0}, 6000);
+        HyprlandAPI::addNotification(PHANDLE, "Your windows were restored because OhmTabs stopped.", CHyprColor{0.9, 0.7, 0.2, 1.0}, 6000);
 }
 
-void CGrabbarBackend::handleLine(SGrabbarClient* c, const std::string& line) {
+void COhmTabsBackend::handleLine(SOhmTabsClient* c, const std::string& line) {
     std::string type;
     const auto  F = parseLine(line, type);
 
     if (type == "hello") {
-        if (field(F, "protocol") != std::to_string(GRABBAR_PROTOCOL)) {
-            send(c, "error", {{"reason", "protocol"}, {"expected", std::to_string(GRABBAR_PROTOCOL)}});
+        if (field(F, "protocol") != std::to_string(OHMTABS_PROTOCOL)) {
+            send(c, "error", {{"reason", "protocol"}, {"expected", std::to_string(OHMTABS_PROTOCOL)}});
             dropClient(c, "protocol mismatch");
             return;
         }
@@ -1367,13 +1367,13 @@ void CGrabbarBackend::handleLine(SGrabbarClient* c, const std::string& line) {
             m_ready    = false;
             if (m_graceTimer)
                 m_graceTimer->updateTimeout(std::nullopt);
-            Log::logger->log(Log::INFO, "[grabbar] shell service connected");
+            Log::logger->log(Log::INFO, "[ohmtabs] shell service connected");
         }
         send(c, "welcome",
-             {{"protocol", std::to_string(GRABBAR_PROTOCOL)},
+             {{"protocol", std::to_string(OHMTABS_PROTOCOL)},
               {"backendEpoch", std::to_string(m_epoch)},
               {"sessionId", m_sessionId},
-              {"grabbarVersion", GRABBAR_VERSION},
+              {"ohmtabsVersion", OHMTABS_VERSION},
               {"apiHash", __hyprland_api_get_hash()},
               {"role", c->isShell ? "shell" : "observer"}});
         if (c->isShell) {
@@ -1469,7 +1469,7 @@ void CGrabbarBackend::handleLine(SGrabbarClient* c, const std::string& line) {
         else if (type == "settings")
             applySettings(F);
         else if (type == "pause") {
-            // Disable Grabbar: return everything, then keep the strip off
+            // Disable OhmTabs: return everything, then keep the strip off
             // and minimize refused until the shell resumes.
             const auto N = restoreAllOwned("disabled by the user");
             m_paused     = true;
@@ -1558,7 +1558,7 @@ static std::optional<uint64_t> parseArgb(const std::string& v) {
     return val;
 }
 
-void CGrabbarBackend::applyTheme(const Fields& f) {
+void COhmTabsBackend::applyTheme(const Fields& f) {
     auto& t = g_pGlobalState->shell;
     auto  set = [&](const char* key, std::optional<uint64_t>& slot) {
         const auto V = field(f, key);
@@ -1581,7 +1581,7 @@ void CGrabbarBackend::applyTheme(const Fields& f) {
             b->onConfigReloaded();
 }
 
-void CGrabbarBackend::applySettings(const Fields& f) {
+void COhmTabsBackend::applySettings(const Fields& f) {
     auto& t = g_pGlobalState->shell;
     if (const auto V = field(f, "buttonsLeft"); !V.empty())
         t.buttonsLeft = V == "reset" ? std::optional<bool>{} : std::optional<bool>{V == "1"};

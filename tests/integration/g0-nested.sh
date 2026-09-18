@@ -18,9 +18,9 @@ OUT="${OUT:-$(mktemp -d)}"; mkdir -p "$OUT"
 W="${NESTED_W:-1280}"
 H="${NESTED_H:-800}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-HELPER="$ROOT/helpers/grabbar_backend.py"
+HELPER="$ROOT/helpers/ohmtabs_backend.py"
 VP="$ROOT/tests/integration/vpointer/vpointer"
-PLUGIN="${PLUGIN:-$ROOT/native/grabbar/grabbar.so}"
+PLUGIN="${PLUGIN:-$ROOT/native/ohmtabs/ohmtabs.so}"
 
 hc() { hyprctl -i "$SIG" "$@"; }
 # Lua-config compositors reject the legacy `dispatch exec`; spawn through hl.dsp.exec_cmd.
@@ -32,7 +32,7 @@ pass() { echo "PASS $*"; }
 fail() { echo "FAIL $*"; exit 1; }
 say() { echo; echo "== $*"; }
 
-# window facts from the compositor, not from Grabbar
+# window facts from the compositor, not from OhmTabs
 win_json() { hc -j clients | python3 -c 'import json,sys; d=[c for c in json.load(sys.stdin) if c["mapped"]]; print(json.dumps(d[0] if d else {}))'; }
 wf() { win_json | python3 -c "import json,sys; d=json.load(sys.stdin); v=d$1; print(json.dumps(v) if not isinstance(v,str) else v)"; }
 token() { be windows | python3 -c 'import json,sys; [print(json.loads(l)["token"]) for l in sys.stdin if json.loads(l).get("alive")=="1"]' | head -1; }
@@ -46,7 +46,7 @@ standin() { HYPRLAND_INSTANCE_SIGNATURE="$SIG" python3 "$HELPER" --timeout 3 lis
 say "shell stand-in (declares restore access, commits every minimize request)"
 STANDIN=$(standin 300 "$OUT/shell-standin.log")
 sleep 1
-hc grabbar | tee "$OUT/status-active.txt" | grep -q 'decorations: active' || fail "strip not active with a ready shell"
+hc ohmtabs | tee "$OUT/status-active.txt" | grep -q 'decorations: active' || fail "strip not active with a ready shell"
 pass "backend active after readiness handshake"
 
 TOK=$(token)
@@ -90,14 +90,14 @@ vp dblclick "$TITLE_X" "$STRIP_Y" sleep 400
 [ "$(wf '["fullscreen"]')" = "0" ] || fail "second double-click did not restore"
 pass "double-click maximize/restore"
 
-say "F06: Minimize by button -> hidden on Grabbar's workspace, then restore"
+say "F06: Minimize by button -> hidden on OhmTabs's workspace, then restore"
 vp click "$MIN_X" "$STRIP_Y" sleep 600
-[ "$(wf '["workspace"]["name"]')" = "special:grabbar-minimized" ] || fail "window is not on special:grabbar-minimized"
+[ "$(wf '["workspace"]["name"]')" = "special:ohmtabs-minimized" ] || fail "window is not on special:ohmtabs-minimized"
 [ "$(gb owned)" = "1" ] || fail "backend does not own the hidden window"
 shot 04-minimized
 be restore "$TOK" | tee "$OUT/restore.json" | grep -q '"status": "ok"' || fail "restore failed"
 sleep 0.4
-[ "$(wf '["workspace"]["name"]')" != "special:grabbar-minimized" ] || fail "window still hidden after restore"
+[ "$(wf '["workspace"]["name"]')" != "special:ohmtabs-minimized" ] || fail "window still hidden after restore"
 [ "$(gb owned)" = "0" ] || fail "backend still owns the window"
 [ "$(wf '["floating"]')" = "false" ] || fail "tiled window came back floating"
 shot 05-restored
@@ -142,13 +142,13 @@ pass "F04b maximize $TILED_W -> $MAXW px wide with the strip kept; close by acti
 
 say "R02: shell service lost with a minimized window -> returned after the grace period, controls suspended"
 vp click "$MIN_X" "$STRIP_Y" sleep 600
-[ "$(wf '["workspace"]["name"]')" = "special:grabbar-minimized" ] || fail "second minimize failed"
+[ "$(wf '["workspace"]["name"]')" = "special:ohmtabs-minimized" ] || fail "second minimize failed"
 kill "$STANDIN"; wait "$STANDIN" 2>/dev/null || true
 sleep 0.5
-hc grabbar | grep -q 'minimize: disabled' || fail "minimize still enabled right after shell loss"
+hc ohmtabs | grep -q 'minimize: disabled' || fail "minimize still enabled right after shell loss"
 sleep 2.5
-[ "$(wf '["workspace"]["name"]')" != "special:grabbar-minimized" ] || fail "window still hidden after grace period"
-hc grabbar | tee "$OUT/status-suspended.txt" | grep -q 'decorations: suspended' || fail "decorations not suspended"
+[ "$(wf '["workspace"]["name"]')" != "special:ohmtabs-minimized" ] || fail "window still hidden after grace period"
+hc ohmtabs | tee "$OUT/status-suspended.txt" | grep -q 'decorations: suspended' || fail "decorations not suspended"
 shot 07-recovered-suspended
 pass "R02 hidden window returned within the 2 s grace and the strip suspended"
 
@@ -157,11 +157,11 @@ STANDIN=$(standin 60 "$OUT/shell-standin2.log")
 sleep 1
 be minimize "$TOK" > "$OUT/minimize-for-unload.json" || true
 sleep 0.6
-[ "$(wf '["workspace"]["name"]')" = "special:grabbar-minimized" ] || fail "minimize before unload failed"
+[ "$(wf '["workspace"]["name"]')" = "special:ohmtabs-minimized" ] || fail "minimize before unload failed"
 hc plugin unload "$PLUGIN" >/dev/null
 sleep 0.5
-[ "$(wf '["workspace"]["name"]')" != "special:grabbar-minimized" ] || fail "window stranded after unload"
-hc plugins list | grep -q grabbar && fail "plugin still loaded"
+[ "$(wf '["workspace"]["name"]')" != "special:ohmtabs-minimized" ] || fail "window stranded after unload"
+hc plugins list | grep -q ohmtabs && fail "plugin still loaded"
 kill "$STANDIN" 2>/dev/null || true
 shot 08-after-unload
 pass "R03 unload returned the hidden window"

@@ -6,7 +6,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "helpers"))
 
-import grabbar_backend as gb  # noqa: E402
+import ohmtabs_backend as gb  # noqa: E402
 
 
 def main():

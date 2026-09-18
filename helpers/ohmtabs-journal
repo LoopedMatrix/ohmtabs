@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Grabbar recovery journal: the only code that touches state.json.
+"""OhmTabs recovery journal: the only code that touches state.json.
 
-    grabbar-journal read        [--state-dir DIR]
-    grabbar-journal write       [--state-dir DIR]     (JSON document on stdin)
-    grabbar-journal quarantine  [--state-dir DIR] [--reason WORD]
-    grabbar-journal inspect     [--state-dir DIR]
+    ohmtabs-journal read        [--state-dir DIR]
+    ohmtabs-journal write       [--state-dir DIR]     (JSON document on stdin)
+    ohmtabs-journal quarantine  [--state-dir DIR] [--reason WORD]
+    ohmtabs-journal inspect     [--state-dir DIR]
 
 `read` prints an envelope {"status": ..., "text": "<raw contents>"} so the
-shell validates the document itself (GrabbarModel.parseJournal). `write`
+shell validates the document itself (OhmTabsModel.parseJournal). `write`
 replaces the file atomically (same-directory temp file, fsync, rename),
 keeps the previous valid file if anything fails, and refuses symlinks and
 foreign-owned paths at every step (spec §7.1, §12). `quarantine` moves a
@@ -31,7 +31,7 @@ STATE_FILE = "state.json"
 
 def default_state_dir() -> str:
     base = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
-    return os.path.join(base, "grabbar")
+    return os.path.join(base, "ohmtabs")
 
 
 def emit(payload: dict) -> None:
@@ -125,7 +125,7 @@ def write_state(state_dir: str, text: str) -> dict:
     except ValueError:
         return {"status": "error", "error": "document is not JSON"}
     if not isinstance(doc, dict) or doc.get("schema") != 1 or not isinstance(doc.get("entries"), list):
-        return {"status": "error", "error": "document is not a Grabbar journal"}
+        return {"status": "error", "error": "document is not a OhmTabs journal"}
     path = os.path.join(state_dir, STATE_FILE)
     kind, _ = classify(path)
     if kind in ("symlink", "irregular"):
@@ -202,7 +202,7 @@ def inspect(state_dir: str) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Grabbar recovery journal")
+    ap = argparse.ArgumentParser(description="OhmTabs recovery journal")
     ap.add_argument("command", choices=("read", "write", "quarantine", "inspect"))
     ap.add_argument("--state-dir", default=default_state_dir())
     ap.add_argument("--reason", default="damaged")

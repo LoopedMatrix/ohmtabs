@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""helpers/grabbar-autoload: hook install/remove is idempotent, backed up, and
+"""helpers/ohmtabs-autoload: hook install/remove is idempotent, backed up, and
 byte-exact on removal; the guard state machine reports the right states."""
 import importlib.machinery, importlib.util, os, shutil, subprocess, sys, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-HELPER = os.path.join(ROOT, "helpers", "grabbar-autoload")
+HELPER = os.path.join(ROOT, "helpers", "ohmtabs-autoload")
 spec = importlib.util.spec_from_loader("al", importlib.machinery.SourceFileLoader("al", HELPER))
 al = importlib.util.module_from_spec(spec); spec.loader.exec_module(al)
 
@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory() as td:
     assert "get_loaded_plugins" not in lua
     if shutil.which("Hyprland"):
         v = subprocess.run(["Hyprland", "--verify-config", "-c", os.path.join(ROOT, "native", "autoload.lua")],
-                           capture_output=True, text=True, env={**os.environ, "GRABBAR_SO": "/dev/null", "GRABBAR_STATE_DIR": td})
+                           capture_output=True, text=True, env={**os.environ, "OHMTABS_SO": "/dev/null", "OHMTABS_STATE_DIR": td})
         assert "config ok" in (v.stdout + v.stderr).lower(), v.stdout + v.stderr
     else:
         print("test_autoload: Hyprland not installed, skipping --verify-config")

@@ -85,7 +85,7 @@
       <path d="M-74 -28 H74" stroke="#38c8e8" stroke-opacity="0.3" stroke-width="1.5" stroke-dasharray="5 5"/>
     </g>
 
-    <!-- the window, mid-drag, with its Grabbar strip -->
+    <!-- the window, mid-drag, with its OhmTabs strip -->
     <g transform="translate(14 -14)">
       <rect x="-74" y="-52" width="148" height="104" rx="8" fill="#1a2028" stroke="url(#steel)" stroke-width="3"/>
       <path d="M-74 -44 a8 8 0 0 1 8 -8 h132 a8 8 0 0 1 8 8 v16 h-148 z" fill="url(#strip)"/>
@@ -115,7 +115,7 @@
   </g>
 
   <!-- wordmark -->
-  <text x="556" y="332" font-size="108" font-weight="800" letter-spacing="6" fill="url(#steel)">GRABBAR</text>
+  <text x="556" y="332" font-size="108" font-weight="800" letter-spacing="6" fill="url(#steel)">OHMTABS</text>
   <text x="560" y="374" font-size="21" font-weight="500" fill="#c9d1d9">Minimize, maximize, close and move windows with the mouse.</text>
   <text x="560" y="402" font-size="21" font-weight="500" fill="#c9d1d9">A minimized window always has a way back.</text>
 

@@ -5,16 +5,16 @@
 # moves to B, release on A), F05 (external maximize toggle), F08 (many
 # windows, restore all), R05 (journal write failure), R09 (origin monitor
 # removed), R10 (pinned floating window), R15 (fullscreen window), X01/X02
-# (another tool focusing a hidden window or opening Grabbar's workspace).
+# (another tool focusing a hidden window or opening OhmTabs's workspace).
 #
-#   SIG=… NESTED_DISPLAY=wayland-N STATE_DIR=<shell's grabbar state dir> tests/integration/scenarios-nested.sh
+#   SIG=… NESTED_DISPLAY=wayland-N STATE_DIR=<shell's ohmtabs state dir> tests/integration/scenarios-nested.sh
 set -u
-SIG="${SIG:?}"; NESTED_DISPLAY="${NESTED_DISPLAY:?}"; STATE_DIR="${STATE_DIR:?path of the shell grabbar state dir}"
+SIG="${SIG:?}"; NESTED_DISPLAY="${NESTED_DISPLAY:?}"; STATE_DIR="${STATE_DIR:?path of the shell ohmtabs state dir}"
 OUT="${OUT:-$(mktemp -d)}"; mkdir -p "$OUT"
 W="${NESTED_W:-1600}"; H="${NESTED_H:-1000}"; BAR_TOP="${BAR_TOP:-35}"
 MANY="${MANY:-20}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-HELPER="$ROOT/helpers/grabbar_backend.py"; VP="$ROOT/tests/integration/vpointer/vpointer"
+HELPER="$ROOT/helpers/ohmtabs_backend.py"; VP="$ROOT/tests/integration/vpointer/vpointer"
 SHELL_CONFIG="${SHELL_CONFIG:-/usr/share/omarchy/shell}"
 
 hc() { hyprctl -i "$SIG" "$@"; }
@@ -22,14 +22,14 @@ spawn() { hc dispatch "hl.dsp.exec_cmd([[ $* ]])" >/dev/null; }
 vp() { WAYLAND_DISPLAY="$NESTED_DISPLAY" "$VP" "$W" "$H" "$@"; }
 shot() { WAYLAND_DISPLAY="$NESTED_DISPLAY" grim "$OUT/$1.png"; }
 be() { HYPRLAND_INSTANCE_SIGNATURE="$SIG" python3 "$HELPER" --timeout 4 "$@"; }
-sipc() { WAYLAND_DISPLAY="$NESTED_DISPLAY" qs ipc -p "$SHELL_CONFIG" call tech.greyforge.grabbar "$@"; }
+sipc() { WAYLAND_DISPLAY="$NESTED_DISPLAY" qs ipc -p "$SHELL_CONFIG" call tech.loopedmatrix.ohmtabs "$@"; }
 pass() { echo "  PASS $*"; }
 fail() { echo "  FAIL $*"; FAILED=$((FAILED+1)); }
 say() { echo; echo "== $*"; }
 FAILED=0
 cj() { hc -j clients; }
 count() { cj | python3 -c 'import json,sys; print(len([c for c in json.load(sys.stdin) if c["mapped"]]))'; }
-hidden_count() { cj | python3 -c 'import json,sys; print(len([c for c in json.load(sys.stdin) if c["workspace"]["name"]=="special:grabbar-minimized"]))'; }
+hidden_count() { cj | python3 -c 'import json,sys; print(len([c for c in json.load(sys.stdin) if c["workspace"]["name"]=="special:ohmtabs-minimized"]))'; }
 addr_list() { cj | python3 -c 'import json,sys; [print(c["address"]) for c in json.load(sys.stdin) if c["mapped"]]'; }
 wj() { cj | python3 -c 'import json,sys; a=sys.argv[1]; d=[c for c in json.load(sys.stdin) if c["address"]==a]; print(json.dumps(d[0] if d else {}))' "$1"; }
 wf() { wj "$1" | python3 -c "import json,sys; d=json.load(sys.stdin); v=d$2 if d else ''; print(json.dumps(v) if not isinstance(v,str) else v)"; }
@@ -50,7 +50,7 @@ geom "$A"; vp move "$MIN_X" "$STRIP_Y" sleep 150 down sleep 100
 hc dispatch "hl.dsp.focus({ window = 'address:$B' })" >/dev/null; sleep 0.3
 [[ "$(hc -j activewindow | python3 -c 'import json,sys; print(json.load(sys.stdin)["address"])')" == "$B" ]] || echo "  note: focus did not move to B while pressed"
 vp up sleep 1500
-if [[ "$(wf "$A" '["workspace"]["name"]')" == "special:grabbar-minimized" && "$(wf "$B" '["workspace"]["name"]')" != "special:grabbar-minimized" ]]; then pass "F02 only A minimized"; else fail "F02 A ws=$(wf "$A" '["workspace"]["name"]') B ws=$(wf "$B" '["workspace"]["name"]')"; fi
+if [[ "$(wf "$A" '["workspace"]["name"]')" == "special:ohmtabs-minimized" && "$(wf "$B" '["workspace"]["name"]')" != "special:ohmtabs-minimized" ]]; then pass "F02 only A minimized"; else fail "F02 A ws=$(wf "$A" '["workspace"]["name"]') B ws=$(wf "$B" '["workspace"]["name"]')"; fi
 sipc restoreAll >/dev/null; sleep 1.5
 close_all
 
@@ -84,26 +84,26 @@ say "R05: journal cannot be written -> minimize refused, window stays visible"
 spawn foot; wait_count 1; sleep 1.2; A=$(addr_list); T=$(tok "$A")
 chmod 500 "$STATE_DIR"
 sipc minimize "$T" >/dev/null; sleep 1.5
-if [[ "$(wf "$A" '["workspace"]["name"]')" != "special:grabbar-minimized" && "$(shell_minimized)" == 0 ]]; then pass "R05 window visible, no row, after a failed journal write"; else fail "R05 ws=$(wf "$A" '["workspace"]["name"]') rows=$(shell_minimized)"; fi
+if [[ "$(wf "$A" '["workspace"]["name"]')" != "special:ohmtabs-minimized" && "$(shell_minimized)" == 0 ]]; then pass "R05 window visible, no row, after a failed journal write"; else fail "R05 ws=$(wf "$A" '["workspace"]["name"]') rows=$(shell_minimized)"; fi
 chmod 700 "$STATE_DIR"
 sipc minimize "$T" >/dev/null; sleep 1.5
-[[ "$(wf "$A" '["workspace"]["name"]')" == "special:grabbar-minimized" ]] && pass "R05 minimize works again once the journal is writable" || fail "R05 minimize still failing"
+[[ "$(wf "$A" '["workspace"]["name"]')" == "special:ohmtabs-minimized" ]] && pass "R05 minimize works again once the journal is writable" || fail "R05 minimize still failing"
 sipc restoreAll >/dev/null; sleep 1.2; close_all
 
 say "R09: window minimized from a second output; output removed; restore lands on the remaining output"
-hc output create headless GRABBAR-R09 >/dev/null; sleep 1
-MON2=$(hc -j monitors | python3 -c 'import json,sys; [print(m["name"]) for m in json.load(sys.stdin) if m["name"]=="GRABBAR-R09"]')
+hc output create headless OHMTABS-R09 >/dev/null; sleep 1
+MON2=$(hc -j monitors | python3 -c 'import json,sys; [print(m["name"]) for m in json.load(sys.stdin) if m["name"]=="OHMTABS-R09"]')
 if [[ -z "$MON2" ]]; then fail "R09 could not create a second output"; else
-  WS2=$(hc -j monitors | python3 -c 'import json,sys; [print(m["activeWorkspace"]["id"]) for m in json.load(sys.stdin) if m["name"]=="GRABBAR-R09"]')
+  WS2=$(hc -j monitors | python3 -c 'import json,sys; [print(m["activeWorkspace"]["id"]) for m in json.load(sys.stdin) if m["name"]=="OHMTABS-R09"]')
   spawn foot; wait_count 1; sleep 1.2; A=$(addr_list); T=$(tok "$A")
   hc dispatch "hl.dsp.window.move({ workspace = '$WS2', window = 'address:$A' })" >/dev/null; sleep 0.8
   [[ "$(wf "$A" '["monitor"]')" != "0" ]] || echo "  note: window did not move to the second output"
   sipc minimize "$T" >/dev/null; sleep 1.5
-  [[ "$(wf "$A" '["workspace"]["name"]')" == "special:grabbar-minimized" ]] || fail "R09 minimize on second output failed"
-  hc output remove GRABBAR-R09 >/dev/null; sleep 1
+  [[ "$(wf "$A" '["workspace"]["name"]')" == "special:ohmtabs-minimized" ]] || fail "R09 minimize on second output failed"
+  hc output remove OHMTABS-R09 >/dev/null; sleep 1
   sipc restore "$T" original >/dev/null; sleep 1.5
   M=$(wf "$A" '["monitor"]'); WS=$(wf "$A" '["workspace"]["name"]')
-  [[ "$WS" != "special:grabbar-minimized" && "$M" == "0" ]] && pass "R09 restored onto the remaining output (monitor $M, workspace $WS)" || fail "R09 monitor=$M ws=$WS"
+  [[ "$WS" != "special:ohmtabs-minimized" && "$M" == "0" ]] && pass "R09 restored onto the remaining output (monitor $M, workspace $WS)" || fail "R09 monitor=$M ws=$WS"
   close_all
 fi
 
@@ -113,7 +113,7 @@ hc dispatch "hl.dsp.window.float({ action = 'enable', window = 'address:$A' })" 
 hc dispatch "hl.dsp.window.pin({ action = 'enable', window = 'address:$A' })" >/dev/null; sleep 0.5
 [[ "$(wf "$A" '["pinned"]')" == "true" ]] || echo "  note: pin did not apply"
 sipc minimize "$T" >/dev/null; sleep 1.5
-if [[ "$(wf "$A" '["workspace"]["name"]')" == "special:grabbar-minimized" && "$(wf "$A" '["pinned"]')" == "false" ]]; then pass "R10 pinned window hidden with pin cleared"; else fail "R10 ws=$(wf "$A" '["workspace"]["name"]') pinned=$(wf "$A" '["pinned"]')"; fi
+if [[ "$(wf "$A" '["workspace"]["name"]')" == "special:ohmtabs-minimized" && "$(wf "$A" '["pinned"]')" == "false" ]]; then pass "R10 pinned window hidden with pin cleared"; else fail "R10 ws=$(wf "$A" '["workspace"]["name"]') pinned=$(wf "$A" '["pinned"]')"; fi
 sipc restore "$T" current >/dev/null; sleep 1.5
 [[ "$(wf "$A" '["pinned"]')" == "true" && "$(wf "$A" '["floating"]')" == "true" && "$(wf "$A" '["workspace"]["name"]')" == "1" ]] && pass "R10 restored pinned + floating on workspace 1" || fail "R10 pinned=$(wf "$A" '["pinned"]') floating=$(wf "$A" '["floating"]') ws=$(wf "$A" '["workspace"]["name"]')"
 close_all
@@ -125,7 +125,7 @@ shot "r15-fullscreen"
 FY=$(wf "$A" '["at"][1]')
 [[ "$FY" == "0" ]] && pass "R15 fullscreen client occupies y=0 (no reserved strip)" || fail "R15 fullscreen client at y=$FY"
 sipc minimize "$T" >/dev/null; sleep 1.2
-[[ "$(wf "$A" '["workspace"]["name"]')" != "special:grabbar-minimized" ]] && pass "R15 minimize refused while fullscreen" || fail "R15 fullscreen window was minimized"
+[[ "$(wf "$A" '["workspace"]["name"]')" != "special:ohmtabs-minimized" ]] && pass "R15 minimize refused while fullscreen" || fail "R15 fullscreen window was minimized"
 hc dispatch "hl.dsp.window.fullscreen_state({ internal = 0, client = 0, action = 'set', window = 'address:$A' })" >/dev/null; sleep 1
 [[ "$(wf "$A" '["at"][1]')" -ge $((BAR_TOP + 44)) ]] && pass "R15 strip reserved again after leaving fullscreen (y=$(wf "$A" '["at"][1]'))" || fail "R15 y=$(wf "$A" '["at"][1]') after fullscreen"
 close_all
@@ -134,16 +134,16 @@ say "X01: another tool focuses a hidden window (Hotbar click, window switcher, f
 spawn foot; wait_count 1; spawn foot; wait_count 2; sleep 2.5
 A=$(addr_list | head -1); T=$(tok "$A")
 sipc minimize "$T" >/dev/null; sleep 1.5
-[[ "$(wf "$A" '["workspace"]["name"]')" == "special:grabbar-minimized" ]] || fail "X01 minimize failed"
+[[ "$(wf "$A" '["workspace"]["name"]')" == "special:ohmtabs-minimized" ]] || fail "X01 minimize failed"
 hc dispatch "hl.dsp.focus({ window = 'address:$A' })" >/dev/null; sleep 1.2
 SPECIAL=$(hc -j monitors | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["specialWorkspace"]["name"])')
 FOC=$(hc -j activewindow | python3 -c 'import json,sys; print(json.load(sys.stdin)["address"])')
 if [[ "$(wf "$A" '["workspace"]["name"]')" == "1" && "$SPECIAL" == "" && "$FOC" == "$A" && "$(shell_minimized)" == 0 ]]; then pass "X01 focus by another tool restored the window to workspace 1, focused it, no special workspace shown, row cleared"; else fail "X01 ws=$(wf "$A" '["workspace"]["name"]') special='$SPECIAL' focused=$FOC rows=$(shell_minimized)"; fi
-say "X02: Grabbar's workspace toggled like a scratchpad -> closed again, focused window restored"
+say "X02: OhmTabs's workspace toggled like a scratchpad -> closed again, focused window restored"
 sipc minimize "$T" >/dev/null; sleep 1.5
-hc dispatch "hl.dsp.workspace.toggle_special('grabbar-minimized')" >/dev/null; sleep 1.2
+hc dispatch "hl.dsp.workspace.toggle_special('ohmtabs-minimized')" >/dev/null; sleep 1.2
 SPECIAL=$(hc -j monitors | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["specialWorkspace"]["name"])')
-[[ "$SPECIAL" == "" && "$(wf "$A" '["workspace"]["name"]')" == "1" ]] && pass "X02 toggle_special on Grabbar's workspace did not leave it on screen" || fail "X02 special='$SPECIAL' ws=$(wf "$A" '["workspace"]["name"]')"
+[[ "$SPECIAL" == "" && "$(wf "$A" '["workspace"]["name"]')" == "1" ]] && pass "X02 toggle_special on OhmTabs's workspace did not leave it on screen" || fail "X02 special='$SPECIAL' ws=$(wf "$A" '["workspace"]["name"]')"
 close_all
 
 echo; echo "scenarios: $FAILED failure(s); evidence in $OUT"

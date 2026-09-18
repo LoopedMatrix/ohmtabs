@@ -1,14 +1,14 @@
-# SYSTEM-BREAKING BUG — GRABBAR native plugin (incident record)
+# SYSTEM-BREAKING BUG — OHMTABS native plugin (incident record)
 
 Status: **RESOLVED.** Root cause found and fixed in source 2026-09-15 02:30 EDT
 (`docs/AUTOLOAD.md`), regression suite `tests/integration/startup-nested.sh`,
-controlled host trial passed the same day (`grabbar autoload enable` with the
+controlled host trial passed the same day (`ohmtabs autoload enable` with the
 guarded loader; compositor pid unchanged across config evaluations). This file
 is kept as the incident record; the earlier text below is unedited history.
-Owner: GRABBAR development and the operator.
+Owner: OHMTABS development and the operator.
 Review: before any further native plugin testing or installation.
 
-GRABBAR's native load/reload and autostart path is implicated in a failure
+OHMTABS's native load/reload and autostart path is implicated in a failure
 that made GreyArch's desktop unusable. After login, the screen stayed black
 and flickered. Restarting did not clear it because the plugin remained in
 Hyprland's startup configuration.
@@ -22,27 +22,27 @@ On the next boot, Hyprland repeatedly failed to finish startup; UWSM timed
 out waiting for WAYLAND_DISPLAY and HYPRLAND_INSTANCE_SIGNATURE, and systemd
 forcibly killed the compositor.
 
-An offline recovery removed the GRABBAR autoload block and verified that the
+An offline recovery removed the OHMTABS autoload block and verified that the
 configuration exactly matched its pre-change backup. Successful desktop
 login after this recovery has NOT yet been confirmed. This is containment,
-not a verified fix to GRABBAR.
+not a verified fix to OHMTABS.
 
 The native initialization function calls `HyprlandAPI::reloadConfig()`;
 the added Lua configuration calls `hl.plugin.load()`. Reentrant loading is
 a suspected mechanism, not an established root cause.
 
 Detailed evidence and the preserved failing configuration are in:
-`~/.local/state/greyarch-recovery/20260915-grabbar/RECOVERY.md` and
+`~/.local/state/greyarch-recovery/20260915-ohmtabs/RECOVERY.md` and
 `hyprland.lua.failed` beside it.
 
 ## Development precautions
 
 The operator requested special caution and suggested a VM sandbox after this
 incident. Use a disposable VM with a snapshot as the default environment for
-native GRABBAR development and execution. Source inspection and edits can
+native OHMTABS development and execution. Source inspection and edits can
 remain on the host; loading the native plugin must stay inside the VM.
 
-- Keep GRABBAR native autoload disabled on the working desktop.
+- Keep OHMTABS native autoload disabled on the working desktop.
 - Do not run plugin load/unload/reload tests against the host Hyprland instance.
 - Do not treat earlier nested-compositor G0/G1 results as proof of safe startup.
   Those tests did not establish this autoload path's safety.
@@ -60,10 +60,10 @@ startup block associated with the failure.
 
 ## Handoff
 
-changed: documented the incident in source and installed GRABBAR directories
+changed: documented the incident in source and installed OHMTABS directories
 current state: native autoload disabled; plugin defect open; login unverified
 next step: confirm desktop recovery, then investigate native behavior in a VM
-read next: the recovery record above; native/grabbar/main.cpp; this warning
+read next: the recovery record above; native/ohmtabs/main.cpp; this warning
 
 ## Update 2026-09-15 02:30 EDT — root cause, reproduction, fix
 
@@ -83,7 +83,7 @@ minor contributor only and is also removed.
 
 Fixed in source: unconditional declaration in `native/autoload.lua`, a boot
 guard that disarms autoload if the previous start never reached a health
-marker (verified end to end in the nested rig), `grabbar autoload
+marker (verified end to end in the nested rig), `ohmtabs autoload
 enable|disable|retry|status`, and `tests/integration/startup-nested.sh`.
 
 Still true: nothing native is loaded on this desktop, and nothing will be

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for looking at Grabbar. Two ground rules keep this project safe to
+Thanks for looking at OhmTabs. Two ground rules keep this project safe to
 work on:
 
 1. **Never load, reload or test the native plugin in the compositor you are
@@ -9,7 +9,7 @@ work on:
    your session.
 2. **Never condition `hl.plugin.load()` on whether the plugin is already
    loaded.** Read `docs/AUTOLOAD.md` before touching `native/autoload.lua`
-   or `helpers/grabbar-autoload`.
+   or `helpers/ohmtabs-autoload`.
 
 ## Agent and automation guardrails
 
@@ -20,7 +20,7 @@ root-level agent files can be auto-interpreted as trusted instructions.
 
 - Read `docs/AUTOLOAD.md` and `SYSTEM-BREAKING-BUG.md` before touching
   anything that loads the native plugin.
-- The installed copy under `~/.config/omarchy/plugins/tech.greyforge.grabbar`
+- The installed copy under `~/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs`
   is the operator's live plugin. Syncing it is the operator's call.
 - Never `cat >` over a loaded `.so`; building writes a new inode, which is
   safe while an old copy is mapped.
@@ -30,16 +30,16 @@ root-level agent files can be auto-interpreted as trusted instructions.
 ## Layout
 
 See the table in `README.md` and `docs/ARCHITECTURE.md`. Pure logic lives in
-`GrabbarModel.js` so it can be tested with Node; the QML files are thin.
+`OhmTabsModel.js` so it can be tested with Node; the QML files are thin.
 
 ## Building
 
 ```sh
-make -C native/grabbar CXX=g++       # against the installed hyprland headers
+make -C native/ohmtabs CXX=g++       # against the installed hyprland headers
 tests/run.sh                          # offline suite
 ```
 
-Building writes a new `grabbar.so` inode; a compositor that has the old file
+Building writes a new `ohmtabs.so` inode; a compositor that has the old file
 mapped keeps running. Load the new file into the nested session with
 `hyprctl -i <nested sig> plugin load …`.
 
@@ -57,7 +57,7 @@ mapped keeps running. Load the new file into the nested session with
 
 - Match the surrounding code. C++ follows the Hyprland plugin style
   (`.clang-format` from upstream); QML/JS use two-space indent and ES5-style
-  JavaScript in `GrabbarModel.js` (it runs in Quickshell's engine).
+  JavaScript in `OhmTabsModel.js` (it runs in Quickshell's engine).
 - User-facing text is plain: no dispatcher syntax, no internal workspace
   names, no success messages before the state change is observed.
 - Never build shell commands from window titles or classes; never resolve

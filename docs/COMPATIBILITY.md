@@ -1,8 +1,8 @@
 # Compatibility
 
-Grabbar's native backend is only valid for the exact compositor build it was
+OhmTabs's native backend is only valid for the exact compositor build it was
 compiled against; `PLUGIN_INIT` compares the API hash and refuses anything
-else with "Grabbar needs an update for this desktop version". Nothing below
+else with "OhmTabs needs an update for this desktop version". Nothing below
 is a promise for other versions (spec §10.2).
 
 ## Qualified for 0.1.0 (2026-09-15)
@@ -28,18 +28,18 @@ the same window, title drag detaching a tiled window, Close by button.
 | Application | Toolkit / path | Notes |
 | --- | --- | --- |
 | foot | Wayland, no CSD | reference client |
-| Chromium | Wayland (Ozone) | draws its own close button in the tab strip; coexists with the Grabbar strip; excludable per app |
+| Chromium | Wayland (Ozone) | draws its own close button in the tab strip; coexists with the OhmTabs strip; excludable per app |
 | Chromium | **XWayland** (`--ozone-platform=x11`) | class `Chromium` |
 | Firefox | Wayland | |
 | Konsole | Qt 6 | |
 | Dolphin | Qt 6 | |
 | Kate | Qt 6, menu bar + toolbar | |
 | Nautilus (Files) | GTK 4, client-side decoration | its own header bar stays fully visible under the strip |
-| mpv | Wayland, `--force-window` | media app; Grabbar performs no audio/pause operation (F07 by construction) |
+| mpv | Wayland, `--force-window` | media app; OhmTabs performs no audio/pause operation (F07 by construction) |
 
 ## Other window tools (tested together in the sandboxed shell)
 
-Grabbar's hidden workspace is storage, never a view. Hyprland shows a
+OhmTabs's hidden workspace is storage, never a view. Hyprland shows a
 special workspace whenever a window on it is focused, so any tool that
 focuses a hidden window would otherwise pop the whole hidden set onto the
 monitor. The backend listens for that (`window.active`,
@@ -49,17 +49,17 @@ its drawer row had been clicked, then closing the workspace view
 
 | Tool | Interaction | Result |
 | --- | --- | --- |
-| **Hotbar** (`greyforge.hotbar`) | Lists hidden windows in their app group; clicking/cycling to one calls `hl.dsp.focus` | The window is restored to the current workspace and focused; the drawer row clears; `special:grabbar-minimized` is not shown |
-| **Reprieve** (`tech.greyforge.reprieve`) | `Super+W` / `parkWindow` on a window with a Grabbar strip | Parked on `special:reprieve` and returned by Reprieve's undo; Grabbar does not interfere |
-| Reprieve | `parkWindow` aimed at a Grabbar-minimized window | Reprieve refuses windows on special workspaces (`passthrough`); nothing moves |
-| Any tool | Moves a Grabbar-minimized window somewhere else | Grabbar releases ownership (`released`) and drops the row; it never drags the window back |
+| **Hotbar** (`greyforge.hotbar`) | Lists hidden windows in their app group; clicking/cycling to one calls `hl.dsp.focus` | The window is restored to the current workspace and focused; the drawer row clears; `special:ohmtabs-minimized` is not shown |
+| **Reprieve** (`tech.greyforge.reprieve`) | `Super+W` / `parkWindow` on a window with a OhmTabs strip | Parked on `special:reprieve` and returned by Reprieve's undo; OhmTabs does not interfere |
+| Reprieve | `parkWindow` aimed at a OhmTabs-minimized window | Reprieve refuses windows on special workspaces (`passthrough`); nothing moves |
+| Any tool | Moves a OhmTabs-minimized window somewhere else | OhmTabs releases ownership (`released`) and drops the row; it never drags the window back |
 | Omarchy scratchpad (`Super+S`, `Super+Alt+S`) | `special:scratchpad` | Separate workspace; no interaction |
-| Keybind or tool toggling `special:grabbar-minimized` itself | `toggle_special` | Closed again at once; the window Hyprland focused meanwhile is restored |
+| Keybind or tool toggling `special:ohmtabs-minimized` itself | `toggle_special` | Closed again at once; the window Hyprland focused meanwhile is restored |
 | Window switchers / overviews | Focus a hidden window | Same as Hotbar: restored, not revealed |
-| Hyprbars, `omarchy-window-controls` | Another decorator on the same windows | Not handled automatically; `grabbar doctor` reports them so you can disable one |
+| Hyprbars, `omarchy-window-controls` | Another decorator on the same windows | Not handled automatically; `ohmtabs doctor` reports them so you can disable one |
 
 A brief flash of the hidden workspace is possible on slow frames: Hyprland
-opens it inside the focus call and Grabbar closes it on the next event-loop
+opens it inside the focus call and OhmTabs closes it on the next event-loop
 turn.
 
 ## Known exclusions and open questions
