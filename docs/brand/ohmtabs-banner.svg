@@ -117,7 +117,7 @@
   <!-- wordmark -->
   <text x="556" y="332" font-size="108" font-weight="800" letter-spacing="6" fill="url(#steel)">OHMTABS</text>
   <text x="560" y="374" font-size="21" font-weight="500" fill="#c9d1d9">Minimize, maximize, close and move windows with the mouse.</text>
-  <text x="560" y="402" font-size="21" font-weight="500" fill="#c9d1d9">A minimized window always has a way back.</text>
+  <text x="560" y="402" font-size="21" font-weight="500" fill="#c9d1d9">A Windows-style taskbar, and browser-style tabs on any window.</text>
 
   <!-- product line -->
   <text x="560" y="203" font-size="16" font-weight="600" letter-spacing="5" fill="#38c8e8">FAMILIAR WINDOW CONTROLS FOR OMARCHY</text>
@@ -126,7 +126,8 @@
   <g transform="translate(560 478)">
     <polygon points="0,-9 7.8,-4.5 7.8,4.5 0,9 -7.8,4.5 -7.8,-4.5" fill="none" stroke="#aab3bc" stroke-width="1.4"/>
     <circle cx="0" cy="0" r="2" fill="#fda52b"/>
-    <text x="20" y="5.5" font-size="15" font-weight="700" letter-spacing="4.5" fill="#aab3bc">GREYFORGE LABS</text>
+    <text x="20" y="5.5" font-size="15" font-weight="700" letter-spacing="4.5" fill="#aab3bc">LOOPEDMATRIX</text>
   </g>
+  <text x="560" y="505" font-size="14" letter-spacing="1.2" fill="#5b646e">based on grabbar by Greyforge Labs</text>
   <text x="1185" y="483" font-size="15" letter-spacing="2" fill="#5b646e" text-anchor="end">Hyprland · Quickshell · MIT + BSD-3</text>
 </svg>
