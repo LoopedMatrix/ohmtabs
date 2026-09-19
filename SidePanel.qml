@@ -35,7 +35,7 @@ Item {
   // ---- settings (from this plugin's shell.json entry) ----
   property bool panelEnabled: true
   property string panelPosition: "bottom"    // "left" | "right" | "bottom"
-  property bool panelAutoHide: true
+  property bool panelAutoHide: false   // opt-in: the edge reveal is unreliable
   property bool panelIcons: true       // draw resolved app icons; off -> letter tile
 
   // ---- state ----

@@ -497,7 +497,9 @@ function normalizeSettings(raw) {
     // other than an explicit off value keeps it enabled.
     sidePanel: (r.sidePanel === false || r.sidePanel === "0" || r.sidePanel === "off" || r.sidePanel === "false") ? false : true,
     panelPosition: (r.panelPosition === "left" || r.panelPosition === "right" || r.panelPosition === "bottom") ? r.panelPosition : "bottom",
-    panelAutoHide: (r.panelAutoHide === false || r.panelAutoHide === "0" || r.panelAutoHide === "off" || r.panelAutoHide === "false") ? false : true
+    // Auto-hide is opt-in: the reveal is unreliable (see README "Known issues"),
+    // so the panel stays visible unless the user explicitly asks for hiding.
+    panelAutoHide: (r.panelAutoHide === true || r.panelAutoHide === "1" || r.panelAutoHide === "on" || r.panelAutoHide === "true") ? true : false
   }
 }
 

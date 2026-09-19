@@ -229,8 +229,8 @@ test("originLabel and statusSummary", () => {
 
 test("normalizeSettings validates and bounds; readOwnEntry finds the plugin entry", () => {
   const s = M.normalizeSettings({ enabled: false, buttonsLeft: true, controlSize: "huge", excludedClasses: ["chromium", "bad class; rm", "chromium", 42] })
-  assert.deepStrictEqual(s, { enabled: false, buttonsLeft: true, showOnHover: false, controlSize: "standard", excludedClasses: ["chromium", "badclassrm", "42"], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: true })
-  assert.deepStrictEqual(M.normalizeSettings(null), { enabled: true, buttonsLeft: false, showOnHover: false, controlSize: "standard", excludedClasses: [], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: true })
+  assert.deepStrictEqual(s, { enabled: false, buttonsLeft: true, showOnHover: false, controlSize: "standard", excludedClasses: ["chromium", "badclassrm", "42"], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false })
+  assert.deepStrictEqual(M.normalizeSettings(null), { enabled: true, buttonsLeft: false, showOnHover: false, controlSize: "standard", excludedClasses: [], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false })
   const doc = JSON.stringify({ bar: { layout: { left: [{ id: "x" }], right: [{ id: "tech.loopedmatrix.ohmtabs", controlSize: "large", excludedClasses: ["foot"] }] } } })
   assert.deepStrictEqual(M.readOwnEntry(doc, "tech.loopedmatrix.ohmtabs"), { controlSize: "large", excludedClasses: ["foot"] })
   assert.strictEqual(M.readOwnEntry(doc, "nope"), null)

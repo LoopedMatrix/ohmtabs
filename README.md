@@ -15,7 +15,6 @@
 
 It is a [Quickshell](https://github.com/outfoxxed/quickshell) plugin paired with a native Hyprland plugin that draws the strips and moves the windows.
 
-<img src="docs/screenshots/desktop.png" alt="OhmTabs title strips on focused and unfocused windows" width="100%">
 
 ## Requirements
 
@@ -126,13 +125,9 @@ Hovering or clicking a button gives the panel keyboard focus:
 
 ## Screenshots
 
-| | |
-| --- | --- |
-| <img src="docs/screenshots/drawer.png" alt="The minimized-windows drawer"> | <img src="docs/screenshots/window-menu.png" alt="The window menu on a title strip"> |
-| The drawer | The window menu |
-| <img src="docs/screenshots/settings.png" alt="OhmTabs settings"> | <img src="docs/screenshots/drawer-card.png" alt="Minimized-window card"> |
-| Settings | A minimized-window card |
-
+Screenshots are being re-captured on a current build — this machine's compositor
+(Hyprland 0.56) has no `wlr-screencopy`, so `grim` cannot capture here and the
+upstream captures that used to sit here were from a different desktop.
 ## Configuration
 
 Settings live in the plugin's `shell.json` entry — edit them in **Settings** (bar widget → right-click → Settings) or directly in the shell config. All of them hot-apply; no shell restart.

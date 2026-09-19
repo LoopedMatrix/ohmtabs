@@ -132,6 +132,6 @@ BarWidget {
     service: root.service
     panelEnabled: root.sidePanelEnabled
     panelPosition: root.settings ? String(root.settings.panelPosition || "bottom") : "bottom"
-    panelAutoHide: root.settings ? root.settings.panelAutoHide !== false : true
+    panelAutoHide: root.settings ? root.settings.panelAutoHide === true : false
   }
 }

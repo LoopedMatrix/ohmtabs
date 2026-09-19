@@ -564,7 +564,7 @@ Item {
         }
         SettingRow {
           label: "Panel auto-hide"
-          hint: "Parked off the edge until the pointer reaches it"
+          hint: "Parked off the edge until the pointer reaches it — off by default while the reveal is unreliable"
           options: ["On", "Off"]
           current: root.settings.panelAutoHide ? 0 : 1
           onChosen: function(i) { if (service) service.saveSettings({ panelAutoHide: i === 0 }) }
