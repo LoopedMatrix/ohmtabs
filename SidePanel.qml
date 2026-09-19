@@ -36,6 +36,11 @@ Item {
   property bool panelEnabled: true
   property string panelPosition: "bottom"    // "left" | "right" | "bottom"
   property bool panelAutoHide: false   // opt-in: the edge reveal is unreliable
+  // A taskbar that is always there must not sit on top of windows: it reserves
+  // its own strip the way the Windows taskbar does, and tiled windows end above
+  // it. Auto-hide deliberately overlays instead - reserving space that appears
+  // and disappears under the pointer would relayout windows on every hover.
+  readonly property bool panelReserveSpace: !root.panelAutoHide
   property bool panelIcons: true       // draw resolved app icons; off -> letter tile
 
   // ---- state ----
@@ -149,6 +154,41 @@ Item {
   }
 
   // ------------------------------------------------------------- behaviour
+
+  // The global position of an item inside this layer surface. Layer surfaces
+  // have no mapToGlobal, so the panel's own anchor geometry is added to the
+  // item's position within the surface.
+  function pointOnScreen(item) {
+    var p = item.mapToItem(panel.contentItem, item.width / 2, item.height / 2)
+    var sc = panel.screen
+    if (!sc) return { x: p.x, y: p.y }
+    var dx = root.panelPosition === "right" ? (sc.width - root.panelSize) : 0
+    var dy = root.panelPosition === "bottom" ? (sc.height - root.panelSize) : 0
+    return { x: sc.x + p.x + dx, y: sc.y + p.y + dy }
+  }
+
+  // A right-click on a taskbar button opens the window menu for that window -
+  // the same menu the strip shows - instead of restoring it outright. Grouped
+  // buttons target their newest member, the one a left-click would restore.
+  function openEntryMenu(row, item) {
+    if (!service || !row || !item) return false
+    var tok = String(row.token || "")
+    if (!tok && row.members && row.members.length) tok = String(row.members[0].token || "")
+    if (!tok) return false
+    var pt = root.pointOnScreen(item)
+    var live = service.liveWindow ? service.liveWindow(tok) : null
+    if (!live) {
+      var m = (row.members && row.members.length) ? row.members[0] : null
+      live = { token: tok, class: m ? String(m.class || "") : "", title: m ? String(m.title || "") : "",
+               floating: m ? !!m.floating : false, minimized: true }
+    }
+    service.menuWindow = live
+    service.menuX = pt.x
+    service.menuY = pt.y
+    service.openOverlay({ view: "menu", token: tok, x: pt.x, y: pt.y })
+    root.selectedIndex = -1
+    return true
+  }
 
   function restoreRow(row, original) {
     if (!service || !row) return
@@ -272,7 +312,8 @@ Item {
     id: panel
     visible: root.live
     color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
+    exclusionMode: (root.panelReserveSpace && !root.parked) ? ExclusionMode.Normal : ExclusionMode.Ignore
+    exclusiveZone: (root.panelReserveSpace && !root.parked) ? root.panelSize : 0
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "ohmtabs-taskbar"
     WlrLayershell.keyboardFocus: root.selectedIndex >= 0 ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
@@ -509,8 +550,13 @@ Item {
       ? root.resolveIcon(btn.first ? String(btn.first.class || "") : "")
       : ""
 
-    width: btn.horizontal ? btn.length : (btn.parent ? btn.parent.width : 0)
-    height: btn.horizontal ? (btn.parent ? btn.parent.height : 0) : btn.thickness
+    // `horizontal` is passed as root.vertical (the panel's orientation), so the
+    // true branch is the vertical panel.  Deriving the size from parent.width on
+    // the horizontal axis is circular inside a ListView (its contentItem width
+    // is the sum of the delegates' widths) and settled at 0 -> invisible,
+    // unclickable buttons.  Use the explicit extents instead.
+    width: btn.length
+    height: btn.thickness
     radius: root.radius
     color: btn.selected ? root.activeFill : (btnArea.containsMouse ? root.hoverFill : "transparent")
 
@@ -540,7 +586,10 @@ Item {
       acceptedButtons: Qt.LeftButton | Qt.RightButton
       onEntered: { btn.hovered(); if (btn.grouped) root.flyoutOpen(btn.entry, btn) }
       onExited: { if (btn.grouped) root.flyoutMaybeClose() }
-      onClicked: function(m) { btn.activated(m.button === Qt.RightButton) }
+      onClicked: function(m) {
+        if (m.button === Qt.RightButton) { root.openEntryMenu(btn.entry, btn); return }
+        btn.activated(false)
+      }
     }
 
     Row {
@@ -751,7 +800,11 @@ Item {
       hoverEnabled: true
       acceptedButtons: Qt.LeftButton | Qt.RightButton
       onClicked: function(m) {
-        root.restoreRow(frow.entry, m.button === Qt.RightButton)
+        if (m.button === Qt.RightButton) {
+          root.openEntryMenu(frow.entry, frowArea)
+        } else {
+          root.restoreRow(frow.entry, false)
+        }
         root.flyoutGroup = null
         root.flyoutButton = null
       }

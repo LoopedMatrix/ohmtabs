@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Taskbar: clickable buttons, right-click window menu, reserved space
+
+- Taskbar buttons no longer collapse to zero width on a horizontal (top or
+  bottom) panel. Their width was derived from the ListView's contentItem width,
+  which is itself the sum of the delegates' widths - circular, so it settled at
+  0 and the buttons were invisible and unclickable. This was the cause of the
+  "I can't click the items in the side bar" report. Buttons now take their
+  explicit extents (`length` by `thickness`).
+- Right-clicking a taskbar button opens the window menu for that entry - the
+  same menu the title strip shows - instead of restoring the window outright.
+  A minimized window has no live surface for the menu to bind to, so the model
+  snapshot (token, class, title, floating) is handed over; every menu action is
+  token-based, so they all work on a parked window.
+- Left-clicking a taskbar button restores that window (unchanged contract, now
+  actually reachable).
+- While the taskbar is shown and auto-hide is off, it reserves its strip
+  (`exclusiveZone`), so a fixed taskbar no longer covers the bottom of another
+  window. Compositors take the zone when the layer surface is mapped, so this
+  applies from the next shell start, not on a live QML edit.
+
 ### Renamed: Grabbar / omarchy-tab -> OhmTabs
 
 - Project, repository and plugin identity renamed: plugin id is now

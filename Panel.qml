@@ -158,6 +158,10 @@ Item {
       : (w.fullscreen ? "Leave fullscreen first" : (w.modal ? "Dialogs are minimized with their window" : ""))
     return [
       { id: "minimize", label: "Minimize", enabled: !!minimizeOk, why: minimizeWhy },
+      // Parked windows keep their origin; the taskbar's right-click used to
+      // reach this directly, so the menu carries it now that right-click
+      // opens the menu instead.
+      { id: "original", label: "Restore to original workspace", enabled: !!w.origin, why: w.origin ? "" : "Only minimized windows have an origin" },
       { id: "maximize", label: w.maximized ? "Restore size" : "Maximize", enabled: !w.fullscreen, why: w.fullscreen ? "Leave fullscreen first" : "" },
       { id: "float", label: "Move freely", enabled: true, checked: !!w.floating },
       { id: "close", label: "Close", enabled: true },
@@ -173,6 +177,7 @@ Item {
     var token = root.menuLive.token
     switch (item.id) {
       case "minimize": service.minimizeToken(token); root.dismiss(); break
+      case "original": service.restore(token, "original", ""); root.dismiss(); break
       case "maximize": service.toggleMaximize(token); root.dismiss(); break
       case "float": service.setFloating(token, !root.menuLive.floating); root.dismiss(); break
       case "close": service.closeWindow(token); root.dismiss(); break
