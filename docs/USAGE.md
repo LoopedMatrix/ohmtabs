@@ -36,8 +36,9 @@ Configuration for the bar lives in the bar's own entry in the shell layout (`~/.
 | `excludedClasses` | string[] | `[]` | App classes whose windows get no strip. Same effect as the `ohmtabs:no_bar` window rule but settable per-bar from the shell config. |
 | `sidePanel` | bool | `true` | Windows-style taskbar (`true`) vs the in-bar drawer only (`false`). |
 | `panelPosition` | `"bottom"` \| `"left"` \| `"right"` | `"bottom"` | Screen edge the taskbar sits on. |
-| `panelAutoHide` | bool | `true` | Park the taskbar off the edge until the pointer reaches it. |
-| `tabGroups` | bool | `false` | If `true`, the bar accepts window-tab grouping: dropping one window onto another hosts a tab group, alt-tab within a group is exposed as the opt-in `groupCycle` method (no keybind is installed by default), and closing a group with more than one window asks "are you sure you want to close all N windows?" before closing them. The tab strip itself is drawn by the native backend on the host window's title strip; the shell side is the IPC wiring, the group state in `OhmTabsModel.js`, and the close-all confirm prompt. When `tabGroups` is off (the default), the tab verbs are silently ignored and the panel behaves as before — turning it on does not, by itself, change the panel's appearance. |
+| `panelAutoHide` | bool | `false` | Opt-in. Park the taskbar off the edge until the pointer reaches it. When it is on, the panel shows only its reveal sliver until the pointer arrives, so it reserves nothing while parked. |
+| `browserClasses` | string[] | `[]` (built-in list) | Window-class fragments the `alttab` helper treats as browsers, matched case-insensitively as substrings. Empty means the built-in list (Brave, Chrome, Chromium, Edge, Vivaldi, Opera, Firefox, LibreWolf, Waterfox, Zen, Floorp, qutebrowser, Epiphany, Falkon). This key is read by the `alttab` helper directly, so it is not part of the shell's own settings schema. |
+| `tabGroups` | bool | `false` | If `true`, the bar accepts window-tab grouping: dropping one window onto another hosts a tab group, the `alttab` helper cycles a group's tabs when the pointer is on its host or the group is focused (see **Alt-tab** below), and closing a group with more than one window asks "are you sure you want to close all N windows?" before closing them. The tab strip itself is drawn by the native backend on the host window's title strip; the shell side is the IPC wiring, the group state in `OhmTabsModel.js`, and the close-all confirm prompt. When `tabGroups` is off (the default), the tab verbs are silently ignored and the panel behaves as before — turning it on does not, by itself, change the panel's appearance. |
 
 Unknown keys are ignored; invalid values fall back to the default. Values are validated in [`OhmTabsModel.js`](OhmTabsModel.js) (`normalizeSettings`).
 
@@ -46,7 +47,13 @@ Unknown keys are ignored; invalid values fall back to the default. Values are va
 When `tabGroups: true` is set on the bar's layout entry:
 
 - **Dropping a window onto another** makes the target the *host* and turns the dragged window into a tab in the host's group. The host's native title strip gains the tab strip (drawn natively). The shell keeps the group state and the window list; the visual strip is the backend's.
-- **Alt-tab within a group** is a decision the shell exposes, not a binding this plugin installs. `omarchy-shell tech.loopedmatrix.ohmtabs groupCycle <hostToken> <prev|next> <true|false>` returns the token of the tab it switched to, or `fallthrough` when the group holds fewer than two tabs or the pointer is not over the host's strip. Browser-like alt-tab is therefore opt-in: bind a key (e.g. SUPER+TAB) that calls `groupCycle` and, on `fallthrough`, hands alt-tab back to the compositor (e.g. `hyprctl cyclenext`). Hyprland's built-in alt-tab is a compositor binding the plugin cannot intercept, so nothing changes until you add that binding.
+- **Alt-tab is smart, and it is one key for three jobs.** `ohmtabs alttab next|prev` decides, every press, in this order:
+  1. **A tab group** — if the focused window is in a tab group, or the pointer is on a host window (on its client box or on the tab strip above it), the group's tabs cycle. This is the `groupCycle` IPC call, and it works whether the pointer is inside the window or the window is simply focused.
+  2. **A browser** — if the focused window's class matches the browser list, the helper sends the browser its own `Ctrl+PageDown` / `Ctrl+PageUp`, the keystroke every Chromium- and Firefox-family browser uses for next/previous tab. Brave and Chrome switch tabs without an extension or a second process.
+  3. **Anything else** — the normal window cycle: Omarchy's own `hl.dsp.window.cycle_next()` followed by `bring_to_top()`, which is exactly what the stock `ALT + TAB` bindings did (both of them), so plain-desktop behaviour is unchanged.
+
+  The decision tree is a pure function with its own unit tests (`tests/unit/test_alttab.py`), and `ohmtabs alttab --decide` prints the decision it would take without doing anything - the way to see why a press went where it went.
+
 - **Closing a group** with more than one window triggers a confirm prompt: "are you sure you want to close all N windows?" with the tab titles listed, like a browser. Yes closes all the group's windows; Cancel/Escape dismisses the prompt with no action. There is no focus steal from the rest of the shell for the prompt.
 - The `tabGroups` setting is off by default. Until it is turned on explicitly in the bar's layout entry, the tab verbs are not wired and nothing about the panel changes.
 
@@ -55,6 +62,26 @@ When `tabGroups: true` is set on the bar's layout entry:
 When the shell isn't connected yet, the native backend falls back to `plugin:ohmtabs:*` keys in `hyprland.lua` (these are overridden by the shell theme/settings once connected):
 
 `enabled`, `buttons_left`, `bar_height` (34), `button_size` (32), `padding` (4), `text_size` (11), `text_font` (`"Sans"`), `bar_color`, `inactive_bar_color`, `text_color`, `hover_color`, `close_hover_color`, `shell_grace_ms` (2000). Per-window opt-out via the `ohmtabs:no_bar` window rule.
+
+## Alt-tab
+
+`ohmtabs alttab next|prev [--decide]` is the whole interface; bind it yourself:
+
+```lua
+-- in ~/.config/hypr/bindings.lua
+local ohmtabs = os.getenv("HOME") .. "/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs/bin/ohmtabs"
+hl.unbind("ALT + TAB")
+hl.unbind("ALT + SHIFT + TAB")
+hl.bind("ALT + TAB", hl.dsp.exec_cmd(ohmtabs .. " alttab next"), { description = "OhmTabs: alt-tab" })
+hl.bind("ALT + SHIFT + TAB", hl.dsp.exec_cmd(ohmtabs .. " alttab prev"), { description = "OhmTabs: alt-tab (back)" })
+```
+
+The `hl.unbind` lines matter: Omarchy binds `ALT + TAB` twice ("Focus on next window" and "Reveal active window on top"), and the helper's fallback reproduces both, so replacing them loses nothing. Delete the block to get the defaults back. Nothing here needs sudo, a daemon or a browser extension.
+
+Two honest limitations:
+
+- A **browser window inside a tab group** follows the group (job 1), not the browser (job 2): a group is an explicit instruction about where that window's tabs live.
+- Case 2 asks the browser to switch its tab, so it does nothing in a browser that has only one tab open - which is also what pressing `Ctrl+PageDown` there would do.
 
 ## Command line & scripting
 

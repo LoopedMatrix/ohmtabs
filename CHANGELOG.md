@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Alt-tab: tab groups, browser tabs, then the window cycle
+
+- New `ohmtabs alttab next|prev` (helper `helpers/ohmtabs_alttab.py`), one key
+  with three jobs decided per press: a tab group the pointer is on or that is
+  focused cycles its tabs (`groupCycle`); a focused browser gets its own
+  `Ctrl+PageDown`/`Ctrl+PageUp`, so Brave and Chrome switch tabs with no
+  extension and no second process; anything else runs the compositor's window
+  cycle (`hl.dsp.window.cycle_next()` + `bring_to_top()`), which is what the
+  stock Omarchy `ALT + TAB` bindings did — this helper is a superset of them.
+- The decision tree is a pure function with unit coverage
+  (`tests/unit/test_alttab.py`, wired into `tests/run.sh`); `--decide` prints
+  the decision as JSON without acting on it.
+- The browser list is configurable (`browserClasses` in the plugin's shell.json
+  entry, or `OHMTABS_ALTTAB_BROWSER_CLASSES` in the environment) and matches
+  window classes case-insensitively as substrings.
+- The compositor's own alt-tab cannot be intercepted by a plugin, so this is
+  opt-in: the keybind is added by the user (see `docs/USAGE.md` → Alt-tab),
+  replacing Omarchy's two `ALT + TAB` binds.
+- Docs: `docs/USAGE.md` gains an **Alt-tab** section (including the two honest
+  limitations) and documents `browserClasses`; `panelAutoHide`'s documented
+  default is corrected to `false` (it had said `true` since auto-hide became
+  opt-in).
+
 ### Taskbar: clickable buttons, right-click window menu, reserved space
 
 - Taskbar buttons no longer collapse to zero width on a horizontal (top or

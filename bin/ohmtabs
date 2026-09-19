@@ -43,6 +43,10 @@ Usage: ohmtabs <command>
   autoload status|enable|disable|retry
                        Native autoload hook in ~/.config/hypr/hyprland.lua (see docs/AUTOLOAD.md);
                        enable never loads anything itself
+  alttab [next|prev]   Smart alt-tab for a keybinding: switches tabs when the pointer is on a
+                       tab group's host or the group is focused, switches the browser's own tab
+                       when a browser is focused (Ctrl+PageDown / Ctrl+PageUp), and otherwise
+                       runs the normal window cycle. Add --decide to print the decision only
   disable              Restore minimized windows, then turn OhmTabs off (strip gone, Minimize refused)
   enable               Turn OhmTabs back on
   uninstall            Restore windows, turn OhmTabs off, remove the autoload hook and the
@@ -169,6 +173,8 @@ print(sum(1 for c in d if c.get("workspace",{}).get("name")=="special:ohmtabs-mi
   enable)
     need_shell; R="$(ipc enable)"; echo "ohmtabs: ${R:-no answer}"
     case "$R" in resumed) exit 0 ;; offline) echo "ohmtabs: native backend not loaded; setting saved" >&2; exit 3 ;; *) exit 7 ;; esac ;;
+  alttab)
+    exec python3 "$HERE/helpers/ohmtabs_alttab.py" "$@" ;;
   uninstall)
     # Order matters: windows back first, then no more native loads, then the
     # shell plugin. Native files in the removed checkout are inactive remnants

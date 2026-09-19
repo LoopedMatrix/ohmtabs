@@ -29,7 +29,7 @@ OhmTabs is a personal fork of [GreyforgeLabs/omarchy-grabbar](https://github.com
 | Area | What changed |
 | --- | --- |
 | **Minimized-window taskbar** | A Windows-style taskbar ([`SidePanel.qml`](SidePanel.qml)) replaces the drawer-first UX: bottom/left/right placement, app icon + title + origin workspace, **Restore all**, optional auto-hide with a 4 px reveal sliver, and *no surface at all* when nothing is minimized (`live = panelEnabled && count > 0`). |
-| **Window tabs** | Dropping a window onto another makes the target the **host** and gives its title strip a tab strip (drawn natively), browser-style: per-group alt-tab (`groupCycle`), drag a tab out to detach, and a **"close all N window(s)?"** confirmation before a group closes — see [Tab groups](#tab-groups). |
+| **Window tabs** | Dropping a window onto another makes the target the **host** and gives its title strip a tab strip (drawn natively), browser-style: smart alt-tab (`ohmtabs alttab`: a group's tabs when the pointer is on its host, the browser's own tab switching in Brave/Chrome, otherwise the normal window cycle), drag a tab out to detach, and a **"close all N window(s)?"** confirmation before a group closes — see [Tab groups](#tab-groups). |
 | **Hot-applied settings** | The plugin's settings entry is watched and applied live — changing `panelPosition` or `panelAutoHide` takes effect with **no shell restart**. |
 | **Scripting / IPC surface** | A complete command surface plus the `bin/ohmtabs` CLI and a stable token format. |
 | **The freeze fix** | Upstream's bar assigns `settings`/`moduleName`/`bar` onto every widget. Those are writable here, fixing a `TypeError: Cannot assign to read-only property "settings"` that wedged the whole shell (commit `0d79811`). See [Troubleshooting](#troubleshooting). |
@@ -99,7 +99,7 @@ Tab grouping is opt-in: set `tabGroups: true` on the plugin's settings entry.
 
 - **Drop a window onto another** — the target becomes the **host**, its title strip gains a tab strip, and the dropped window becomes a tab. Tab titles come from the windows themselves.
 - **Click a tab** to switch to it; **drag a tab out** to detach it back into a normal window. A group that drops to one window dissolves.
-- **Alt-tab inside a group** is exposed as `groupCycle <hostToken> <prev|next> <pointerInside>`, not as an installed keybind. Bind a key (e.g. `SUPER+TAB`) that calls it and falls back to the compositor (`hyprctl cyclenext`) when it returns `fallthrough` — i.e. when the pointer is not over the host's tab strip. Hyprland's built-in alt-tab is a compositor binding no plugin can intercept, so nothing changes until you add that binding.
+- **Alt-tab** is one helper with three jobs, in order: a focused/pointed-at tab group cycles its tabs, a focused browser gets its own `Ctrl+PageDown`/`Ctrl+PageUp` (Brave and Chrome switch tabs with no extension), and everything else falls back to the compositor's window cycle — the same `cycle_next` + `bring_to_top` pair Omarchy's stock `ALT + TAB` bindings ran, so nothing is lost. `ohmtabs alttab next|prev` does it and `--decide` prints the decision without acting; the keybind is yours to add (see [Alt-tab](docs/USAGE.md#alt-tab)).
 - **Closing a group** with more than one window asks first — *"are you sure you want to close all N windows?"* — listing the tab titles, with **Cancel** and **Close all**. Cancel/Escape dismisses it with no action, and it does not steal focus from the rest of the shell.
 
 ### The bar drawer
