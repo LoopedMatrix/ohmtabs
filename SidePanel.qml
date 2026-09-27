@@ -418,8 +418,8 @@ Item {
     id: panel
     visible: root.live
     color: "transparent"
-    exclusionMode: (root.fullLength && root.panelReserveSpace && !root.parked) ? ExclusionMode.Normal : ExclusionMode.Ignore
-    exclusiveZone: (root.fullLength && root.panelReserveSpace && !root.parked) ? root.panelSize : 0
+    exclusionMode: (root.panelReserveSpace && !root.parked) ? ExclusionMode.Normal : ExclusionMode.Ignore
+    exclusiveZone: (root.panelReserveSpace && !root.parked) ? root.panelSize : 0
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "ohmtabs-taskbar"
     WlrLayershell.keyboardFocus: root.selectedIndex >= 0 ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
