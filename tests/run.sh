@@ -28,7 +28,7 @@ bash tests/integration/vpointer/build.sh
 if command -v qmllint >/dev/null 2>&1; then
   # Host modules (qs.Commons, qs.Ui, Quickshell.*) are not resolvable offline;
   # only syntax-level problems are reported.
-  for f in Service.qml BarWidget.qml Panel.qml AltTabOverlay.qml TintedIcon.qml SidePanel.qml; do
+  for f in Service.qml BarWidget.qml Panel.qml AltTabOverlay.qml TintedIcon.qml SidePanel.qml DockSettingsUi.qml; do
     if qmllint "$f" 2>&1 | grep -E '^Error' | grep -viE 'import|module' | grep -q .; then
       echo "qmllint: $f has syntax problems"; qmllint "$f" 2>&1 | grep -E '^Error' | head -20; exit 1
     fi

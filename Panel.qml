@@ -521,204 +521,38 @@ Item {
     Rectangle {
       id: settingsCard
       visible: root.view === "settings"
-      width: root.cardWidth
-      height: Math.min(panel.height - Style.gapsOut * 2, settingsColumn.implicitHeight + root.contentMargin * 2)
+      width: 360
+      height: Math.min(panel.height - Style.gapsOut * 2, dockSettings.implicitHeight)
       anchors.horizontalCenter: parent.horizontalCenter
       y: Style.gapsOut + Style.space(8)
-      radius: root.cornerRadius
-      color: root.background
-      border.color: root.border
-      border.width: 1
+      radius: 18
+      color: "transparent"
 
       MouseArea { anchors.fill: parent; onClicked: function(m) { m.accepted = true } }
 
-      Column {
-        id: settingsColumn
+      Flickable {
         anchors.fill: parent
-        anchors.margins: root.contentMargin
-        spacing: Style.space(10)
+        contentWidth: width
+        contentHeight: dockSettings.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
 
-        Item {
-          width: parent.width
-          height: Style.space(32)
-          Text {
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: "OhmTabs settings"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            font.weight: Font.Medium
-          }
-          Row {
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(6)
-            PillButton { label: "Restore all" + (root.rows.length ? " (" + root.rows.length + ")" : ""); visible: root.rows.length > 0; onActivated: root.restoreAll() }
-            PillButton { label: "Minimized windows"; onActivated: root.switchView("drawer") }
-          }
-        }
-
-        SettingRow {
-          label: "OhmTabs"
-          hint: root.ohmtabsOn ? "Off returns minimized windows, then drops the title strips" : "Off: no title strips, Minimize refused"
-          options: ["On", "Off"]
-          current: root.ohmtabsOn ? 0 : 1
-          onChosen: function(i) { root.setOhmTabsOn(i === 0) }
-        }
-        SettingRow {
-          label: "Window controls"
-          hint: "Minimize / maximize / close on the title strip"
-          options: ["Right", "Left"]
-          current: root.settings.buttonsLeft ? 1 : 0
-          onChosen: function(i) { if (service) service.saveSettings({ buttonsLeft: i === 1 }) }
-        }
-        SettingRow {
-          label: "Omarchy bar controls"
-          hint: "− □ × on the OhmTabs bar widget for the focused window (not only the per-window strip)"
-          options: ["On", "Off"]
-          current: root.settings.barWindowControls === false ? 1 : 0
-          onChosen: function(i) { if (service) service.saveSettings({ barWindowControls: i === 0 }) }
-        }
-        SettingRow {
-          label: "Title strip on hover"
-          hint: "Show the window title strip only when the pointer is near the top of a window"
-          options: ["Off", "On"]
-          current: !root.settings.showOnHover ? 0 : 1
-          onChosen: function(i) { if (service) service.saveSettings({ showOnHover: i === 1 }) }
-        }
-        SettingRow {
-          label: "Taskbar"
-          hint: "Icon strip for open and minimized windows. Drawer keeps the list in this overlay instead."
-          options: ["Icon strip", "Drawer only"]
-          current: root.settings.sidePanel ? 0 : 1
-          onChosen: function(i) { if (service) service.saveSettings({ sidePanel: i === 0 }) }
-        }
-        SettingRow {
-          label: "Taskbar edge"
-          hint: "Same 46 px icon strip on every edge. Left/right is no longer a wide title column."
-          options: ["Bottom", "Left", "Right"]
-          current: root.settings.panelPosition === "left" ? 1 : (root.settings.panelPosition === "right" ? 2 : 0)
-          onChosen: function(i) { if (service) service.saveSettings({ panelPosition: i === 0 ? "bottom" : (i === 1 ? "left" : "right") }) }
-        }
-        SettingRow {
-          label: "Taskbar auto-hide"
-          hint: "Off (default): strip stays docked and shows running windows. On: parks off the edge until the pointer reaches it."
-          options: ["Off", "On"]
-          current: root.settings.panelAutoHide ? 1 : 0
-          onChosen: function(i) { if (service) service.saveSettings({ panelAutoHide: i === 1 }) }
-        }
-        SettingRow {
-          label: "Taskbar icon size"
-          hint: "App icons on the strip. Small 16 · Medium 32 · Large 40."
-          options: ["Small", "Medium", "Large"]
-          current: root.settings.iconSize >= 40 ? 2 : (root.settings.iconSize <= 16 ? 0 : 1)
-          onChosen: function(i) { if (service) service.saveSettings({ iconSize: i === 0 ? 16 : (i === 2 ? 40 : 32) }) }
-        }
-        SettingRow {
-          label: "Icon magnify"
-          hint: "animated.dock-style hover zoom on the bottom strip. Off keeps icons flat."
-          options: ["On", "Off"]
-          current: root.settings.magnify === false ? 1 : 0
-          onChosen: function(i) { if (service) service.saveSettings({ magnify: i === 0 }) }
-        }
-        SettingRow {
-          label: "Magnify amount"
-          hint: "How far icons grow under the pointer (20% / 48% / 80%)."
-          options: ["Low", "Medium", "High"]
-          current: root.settings.iconZoom >= 0.7 ? 2 : (root.settings.iconZoom <= 0.25 ? 0 : 1)
-          onChosen: function(i) { if (service) service.saveSettings({ iconZoom: i === 0 ? 0.2 : (i === 2 ? 0.8 : 0.48) }) }
-        }
-        SettingRow {
-          label: "Taskbar icon tint"
-          hint: "Colorize app icons to the theme ink (animated.dock style). Off keeps original artwork."
-          options: ["Off", "On"]
-          current: root.settings.tintIcons ? 1 : 0
-          onChosen: function(i) { if (service) service.saveSettings({ tintIcons: i === 1 }) }
-        }
-        SettingRow {
-          label: "Icon name on hover"
-          hint: "Show the window title when the pointer is on a taskbar icon."
-          options: ["Off", "On"]
-          current: root.settings.showIconName ? 1 : 0
-          onChosen: function(i) { if (service) service.saveSettings({ showIconName: i === 1 }) }
-        }
-        SettingRow {
-          label: "Title strip size"
-          hint: "Standard 34 px · Large 46 px, applied to the window chrome immediately"
-          options: ["Standard", "Large"]
-          current: root.settings.controlSize === "large" ? 1 : 0
-          onChosen: function(i) { if (service) service.saveSettings({ controlSize: i === 1 ? "large" : "standard" }) }
-        }
-
-        Column {
-          width: parent.width
-          spacing: Style.space(4)
-          Text {
-            text: "Excluded applications"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-          }
-          Text {
-            visible: root.settings.excludedClasses.length === 0
-            text: "None. Use “Hide OhmTabs for …” in a window's menu to add one."
-            color: root.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-          Repeater {
-            model: root.settings.excludedClasses
-            delegate: Row {
-              required property var modelData
-              spacing: Style.space(8)
-              height: Style.space(26)
-              Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: modelData
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-              PillButton { label: "Show OhmTabs again"; onActivated: if (service) service.includeClass(modelData) }
-            }
-          }
-        }
-
-        Column {
-          width: parent.width
-          spacing: Style.space(4)
-          Text {
-            text: "Setup check"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-          }
-          Repeater {
-            model: root.setupLines
-            delegate: Text {
-              required property var modelData
-              width: settingsColumn.width
-              text: (modelData.ok ? "✓ " : "✗ ") + modelData.text
-              wrapMode: Text.WordWrap
-              color: modelData.ok ? root.foreground : Color.urgent
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-          }
-          PillButton { label: root.showTechnical ? "Hide technical details" : "Technical details"; onActivated: root.showTechnical = !root.showTechnical }
-          Text {
-            visible: root.showTechnical && !!service
-            width: settingsColumn.width
-            text: service ? ("plugin " + service.pluginDir + "\nbackend epoch " + service.backendEpoch + " · socket " + service.socketPath + "\njournal " + service.stateDir + "/state.json (" + service.journalStatus + ")\nCLI: ohmtabs status · ohmtabs doctor · ohmtabs autoload status") : ""
-            wrapMode: Text.WrapAnywhere
-            color: root.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
+        DockSettingsUi {
+          id: dockSettings
+          width: 360
+          service: root.service
+          settings: root.settings
+          ohmtabsOn: root.ohmtabsOn
+          minimizedCount: root.rows.length
+          excludedClasses: root.settings.excludedClasses || []
+          onCloseRequested: root.dismiss()
+          onRestoreAll: root.restoreAll()
+          onOpenDrawer: root.switchView("drawer")
+          onSetOhmTabsOn: function(on) { root.setOhmTabsOn(on) }
         }
       }
     }
+
   }
 
   // ---------------------------------------------------------- components

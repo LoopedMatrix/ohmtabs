@@ -206,5 +206,10 @@ BarWidget {
     showIconName: root.settings ? root.settings.showIconName === true : false
     magnify: root.settings ? root.settings.magnify !== false : true
     iconZoom: root.settings && root.settings.iconZoom !== undefined ? Number(root.settings.iconZoom) : 0.48
+    panelBorder: root.settings ? root.settings.panelBorder !== false : true
+    panelBorderOpacity: root.settings && root.settings.panelBorderOpacity !== undefined ? Number(root.settings.panelBorderOpacity) : 0.14
+    panelBgOpacity: root.settings && root.settings.panelBgOpacity !== undefined ? Number(root.settings.panelBgOpacity) : 1
+    fullLength: root.settings ? root.settings.fullLength !== false : true
+    cornerShape: root.settings ? String(root.settings.cornerShape || "rounded") : "rounded"
   }
 }

@@ -496,7 +496,7 @@ function normalizeSettings(raw) {
     // On by default: the side panel is the Windows-style restore UI. Anything
     // other than an explicit off value keeps it enabled.
     sidePanel: (r.sidePanel === false || r.sidePanel === "0" || r.sidePanel === "off" || r.sidePanel === "false") ? false : true,
-    panelPosition: (r.panelPosition === "left" || r.panelPosition === "right" || r.panelPosition === "bottom") ? r.panelPosition : "bottom",
+    panelPosition: (r.panelPosition === "left" || r.panelPosition === "right" || r.panelPosition === "bottom" || r.panelPosition === "top") ? r.panelPosition : "bottom",
     // Auto-hide is opt-in: the reveal is unreliable (see README "Known issues"),
     // so the panel stays visible unless the user explicitly asks for hiding.
     panelAutoHide: (r.panelAutoHide === true || r.panelAutoHide === "1" || r.panelAutoHide === "on" || r.panelAutoHide === "true") ? true : false,
@@ -509,7 +509,7 @@ function normalizeSettings(raw) {
       var n = parseInt(r.iconSize, 10)
       if (!(n > 0)) n = 32
       if (n < 16) n = 16
-      if (n > 40) n = 40
+      if (n > 48) n = 48
       return n
     })(),
     tintIcons: (r.tintIcons === true || r.tintIcons === "1" || r.tintIcons === "on" || r.tintIcons === "true") ? true : false,
@@ -520,7 +520,23 @@ function normalizeSettings(raw) {
       if (!(z >= 0)) z = 0.48
       if (z > 1) z = 1
       return z
-    })()
+    })(),
+    panelBorder: (r.panelBorder === false || r.panelBorder === "0" || r.panelBorder === "off" || r.panelBorder === "false") ? false : true,
+    panelBorderOpacity: (function() {
+      var n = parseFloat(r.panelBorderOpacity)
+      if (!(n >= 0)) n = 0.14
+      if (n > 1) n = 1
+      return n
+    })(),
+    panelBgOpacity: (function() {
+      var n = parseFloat(r.panelBgOpacity)
+      if (!(n >= 0)) n = 1
+      if (n < 0.15) n = 0.15
+      if (n > 1) n = 1
+      return n
+    })(),
+    fullLength: (r.fullLength === false || r.fullLength === "0" || r.fullLength === "off" || r.fullLength === "false") ? false : true,
+    cornerShape: (r.cornerShape === "square" || r.cornerShape === "pill") ? r.cornerShape : "rounded"
   }
 }
 

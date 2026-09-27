@@ -41,6 +41,11 @@ Item {
   property bool showIconName: false    // hover label above the icon
   property bool magnify: true          // animated.dock-style hover zoom
   property real iconZoom: 0.48         // extra scale on hover (0–1)
+  property bool panelBorder: true
+  property real panelBorderOpacity: 0.14
+  property real panelBgOpacity: 1
+  property bool fullLength: true
+  property string cornerShape: "rounded"  // rounded | square | pill
   // A taskbar that is always there must not sit on top of windows: it reserves
   // its own strip the way the Windows taskbar does, and tiled windows end above
   // it. Auto-hide deliberately overlays instead - reserving space that appears
@@ -53,6 +58,7 @@ Item {
   property int selectedIndex: -1
 
   readonly property bool vertical: panelPosition === "left" || panelPosition === "right"
+  readonly property int dockRadius: cornerShape === "square" ? 0 : (cornerShape === "pill" ? Math.round(root.panelSize / 2) : root.radius)
   // Same thickness on every edge — a Windows-style icon strip, not a 268px
   // title column. Left/right used to show a title next to each icon and ate
   // a quarter of the screen.
@@ -404,14 +410,15 @@ Item {
     // of it stays on screen. The margin change is animated, so the reveal reads
     // as a slide rather than a pop; parking animates the same way for symmetry.
     anchors {
-      top: root.vertical
+      top: root.vertical || root.panelPosition === "top"
       bottom: root.vertical || root.panelPosition === "bottom"
-      left: root.panelPosition === "left" || root.panelPosition === "bottom"
-      right: root.panelPosition === "right" || root.panelPosition === "bottom"
+      left: root.panelPosition === "left" || root.panelPosition === "bottom" || root.panelPosition === "top"
+      right: root.panelPosition === "right" || root.panelPosition === "bottom" || root.panelPosition === "top"
     }
 
     margins {
       bottom: root.parked && root.panelPosition === "bottom" ? -(root.panelSize - root.revealSliver) : 0
+      top: root.parked && root.panelPosition === "top" ? -(root.panelSize - root.revealSliver) : 0
       left: root.parked && root.panelPosition === "left" ? -(root.panelSize - root.revealSliver) : 0
       right: root.parked && root.panelPosition === "right" ? -(root.panelSize - root.revealSliver) : 0
     }
@@ -430,15 +437,18 @@ Item {
 
       Rectangle {
         id: dockBand
-        anchors.left: parent.left
-        anchors.right: root.vertical ? undefined : parent.right
-        anchors.top: root.vertical ? parent.top : undefined
-        anchors.bottom: parent.bottom
-        width: root.vertical ? root.panelSize : undefined
-        height: root.vertical ? undefined : root.panelSize
-        color: root.background
-        border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.14)
-        border.width: 1
+        anchors.left: (root.fullLength || root.vertical) ? parent.left : undefined
+        anchors.right: (root.fullLength && !root.vertical) || root.panelPosition === "right" ? parent.right : undefined
+        anchors.horizontalCenter: (!root.fullLength && !root.vertical) ? parent.horizontalCenter : undefined
+        anchors.top: root.vertical ? parent.top : (root.panelPosition === "top" ? parent.top : undefined)
+        anchors.bottom: root.vertical ? parent.bottom : (root.panelPosition === "top" ? undefined : parent.bottom)
+        anchors.verticalCenter: (!root.fullLength && root.vertical) ? parent.verticalCenter : undefined
+        width: root.vertical ? root.panelSize : ((!root.fullLength) ? Math.min(parent.width - 32, Math.max(280, list.contentWidth + 56)) : undefined)
+        height: root.vertical ? ((!root.fullLength) ? Math.min(parent.height - 32, Math.max(280, list.contentHeight + 56)) : undefined) : root.panelSize
+        radius: root.dockRadius
+        color: Qt.rgba(root.background.r, root.background.g, root.background.b, root.panelBgOpacity)
+        border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, root.panelBorder ? root.panelBorderOpacity : 0)
+        border.width: root.panelBorder ? 1 : 0
       }
 
       MouseArea {
