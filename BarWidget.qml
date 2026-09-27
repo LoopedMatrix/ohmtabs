@@ -211,5 +211,8 @@ BarWidget {
     panelBgOpacity: root.settings && root.settings.panelBgOpacity !== undefined ? Number(root.settings.panelBgOpacity) : 0.78
     fullLength: root.settings ? root.settings.fullLength === true : false
     cornerShape: root.settings ? String(root.settings.cornerShape || "pill") : "pill"
+    pinnedApps: root.settings && root.settings.pinnedApps ? root.settings.pinnedApps : []
+    showAppsButton: root.settings ? root.settings.showAppsButton !== false : true
+    dockDodge: root.settings ? root.settings.dockDodge === true : false
   }
 }

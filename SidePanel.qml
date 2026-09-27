@@ -3,6 +3,7 @@ import Quickshell.Wayland
 import QtQuick
 import QtQuick.Controls
 import qs.Commons
+import "OhmTabsModel.js" as Model
 
 // SidePanel — the Windows-11-style minimized-window taskbar for OhmTabs.
 //
@@ -46,6 +47,10 @@ Item {
   property real panelBgOpacity: 0.78
   property bool fullLength: false
   property string cornerShape: "pill"
+  property var pinnedApps: []
+  property bool showAppsButton: true
+  property bool dockDodge: false
+  property bool windowsOverlapDock: false
   // A taskbar that is always there must not sit on top of windows: it reserves
   // its own strip the way the Windows taskbar does, and tiled windows end above
   // it. Auto-hide deliberately overlays instead - reserving space that appears
@@ -73,36 +78,64 @@ Item {
   // leftover grouped-flyout path still compiles; the model itself does not
   // fold by class (that plus a full-width Restore-all hid every icon).
   property int toplevelGen: 0
+  // Apps button + pinned + running (grouped by class) + leftover minimized.
+  // Pinned icons stay even with no window (omadock launch-from-dock).
   readonly property var items: {
     var gen = root.toplevelGen
     var out = []
     var seen = {}
+    function norm(c) {
+      return Model.sanitizeAppId(c).toLowerCase()
+    }
+    if (root.showAppsButton)
+      out.push({ key: "apps", kind: "apps", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
+
+    var minBy = {}
     var list = root.rows
     for (var i = 0; i < list.length; i++) {
       var r = list[i]
-      var tok = String(r.token || "")
-      var cls = String(r.class || "").toLowerCase()
-      var title = String(r.title || r.label || "")
-      if (tok) seen[tok] = true
-      seen[cls + "\n" + title] = true
-      out.push({ key: tok || ("m" + i), members: [r], kind: "minimized" })
+      var cls = norm(r.class)
+      if (!cls) cls = "__min" + i
+      if (!minBy[cls]) minBy[cls] = []
+      minBy[cls].push(r)
     }
-    if (!root.panelAutoHide) {
-      var tops = []
-      try { tops = ToplevelManager.toplevels.values } catch (e) { tops = [] }
-      for (var j = 0; j < tops.length; j++) {
-        var t = tops[j]
-        if (!t) continue
-        var app = String(t.appId || "").toLowerCase()
-        var tt = String(t.title || "")
-        if (seen[app + "\n" + tt]) continue
-        if (app === "" && tt === "") continue
-        out.push({
-          key: "live:" + j + ":" + app,
-          members: [{ class: t.appId || "", title: tt, label: tt, token: "", status: "live" }],
-          kind: "open",
-          toplevel: t
-        })
+    var liveBy = {}
+    var tops = []
+    try { tops = ToplevelManager.toplevels.values } catch (e) { tops = [] }
+    for (var j = 0; j < tops.length; j++) {
+      var t = tops[j]
+      if (!t) continue
+      var app = norm(t.appId)
+      if (!app) continue
+      if (!liveBy[app]) liveBy[app] = []
+      liveBy[app].push(t)
+    }
+    function pushApp(appId, pinned) {
+      var id = norm(appId)
+      if (!id || seen[id]) return
+      seen[id] = true
+      var mem = minBy[id] || []
+      var lt = liveBy[id] || []
+      var stub = mem.length ? mem : [{ class: appId, title: appId, label: appId, token: "", status: lt.length ? "live" : "pinned" }]
+      out.push({
+        key: (pinned ? "pin:" : "run:") + id,
+        kind: "app",
+        appId: id,
+        pinned: pinned,
+        members: stub,
+        toplevel: lt.length ? lt[0] : null,
+        liveCount: lt.length,
+        minCount: mem.length
+      })
+    }
+    var pins = root.pinnedApps || []
+    for (var p = 0; p < pins.length; p++) pushApp(pins[p], true)
+    for (var app in liveBy) pushApp(app, false)
+    for (var mc in minBy) {
+      if (seen[mc]) continue
+      var mem3 = minBy[mc]
+      for (var k = 0; k < mem3.length; k++) {
+        out.push({ key: String(mem3[k].token || ("m" + k)), kind: "minimized", appId: mc, pinned: false, members: [mem3[k]], toplevel: null, liveCount: 0, minCount: 1 })
       }
     }
     return out
@@ -113,8 +146,7 @@ Item {
   // off), in which case it stays mapped so running windows have somewhere to
   // sit and tiled windows keep the reserved edge.
   readonly property bool live: panelEnabled && (root.items.length > 0 || !panelAutoHide)
-  // Auto-hide parks it while the pointer is away and nothing is selected.
-  readonly property bool parked: panelAutoHide && !hovered && selectedIndex < 0
+  readonly property bool parked: (root.panelAutoHide || (root.dockDodge && root.windowsOverlapDock)) && !hovered && selectedIndex < 0
 
   // The group currently expanded in the hover flyout, and the button it
   // anchored to. Kept as plain state so the flyout can be dismissed from
@@ -249,29 +281,35 @@ Item {
   }
 
   function openEntryMenu(row, item) {
-    if (!service || !row || !item) return false
+    if (!row || !item) return false
+    if (row.kind === "apps") { root.openBarMenu(item); return true }
     var tok = root.resolveToken(row)
-    if (!tok) return false
-    var pt = root.pointOnScreen(item)
-    var live = service.liveWindow ? service.liveWindow(tok) : null
-    if (!live) {
-      var m = (row.members && row.members.length) ? row.members[0] : row
-      live = {
-        token: tok,
-        class: m ? String(m.class || "") : "",
-        title: m ? String(m.title || m.label || "") : "",
-        floating: m ? !!m.floating : false,
-        minimized: true,
-        origin: m ? (m.origin || "") : "",
-        maximized: m ? !!m.maximized : false,
-        fullscreen: false,
-        modal: false
+    if (tok && service) {
+      var pt = root.pointOnScreen(item)
+      var live = service.liveWindow ? service.liveWindow(tok) : null
+      if (!live) {
+        var m = (row.members && row.members.length) ? row.members[0] : row
+        live = {
+          token: tok,
+          class: m ? String(m.class || "") : "",
+          title: m ? String(m.title || m.label || "") : "",
+          floating: m ? !!m.floating : false,
+          minimized: true,
+          origin: m ? (m.origin || "") : "",
+          maximized: m ? !!m.maximized : false,
+          fullscreen: false,
+          modal: false
+        }
       }
+      service.menuWindow = live
+      service.menuX = pt.x
+      service.menuY = pt.y
+      service.openOverlay({ view: "menu", token: tok, x: pt.x, y: pt.y })
+      root.selectedIndex = -1
+      return true
     }
-    service.menuWindow = live
-    service.menuX = pt.x
-    service.menuY = pt.y
-    service.openOverlay({ view: "menu", token: tok, x: pt.x, y: pt.y })
+    root.menuEntry = row
+    dockItemMenu.popup()
     root.selectedIndex = -1
     return true
   }
@@ -291,6 +329,20 @@ Item {
 
   function activateItem(item, original) {
     if (!item) return
+    if (item.kind === "apps") { root.openAppsMenu(); root.selectedIndex = -1; return }
+    if (item.kind === "app") {
+      if (item.toplevel) {
+        try { item.toplevel.activate() } catch (e) {}
+        root.selectedIndex = -1
+        return
+      }
+      if (item.minCount > 0 && item.members && item.members.length)
+        root.restoreRow(item.members[0], original)
+      else
+        root.launchApp(item.appId)
+      root.selectedIndex = -1
+      return
+    }
     if (item.kind === "open" && item.toplevel) {
       try { item.toplevel.activate() } catch (e) {}
       root.selectedIndex = -1
@@ -299,6 +351,30 @@ Item {
     if (!item.members || item.members.length === 0) return
     root.restoreRow(item.members[0], original)
   }
+
+  function openAppsMenu() {
+    try { Quickshell.execDetached(["omarchy-menu", "toggle", "root"]) } catch (e) {}
+  }
+
+  function launchApp(appId) {
+    var id = Model.sanitizeAppId(appId)
+    if (!id) return
+    var desk = id
+    try {
+      if (typeof DesktopEntries !== "undefined" && DesktopEntries) {
+        var entry = DesktopEntries.heuristicLookup(id) || DesktopEntries.byId(id)
+        if (entry && entry.id) desk = String(entry.id)
+      }
+    } catch (e) {}
+    try { Quickshell.execDetached(["gtk-launch", desk]) } catch (e2) {}
+  }
+
+  function togglePinned(appId) {
+    if (!service || typeof service.saveSettings !== "function") return
+    service.saveSettings({ pinnedApps: Model.togglePinned(root.pinnedApps, appId) })
+  }
+
+  property var menuEntry: null
 
   function restoreAll() {
     if (!service) return
@@ -673,6 +749,7 @@ Item {
     // Grouped buttons name the app; a lone window keeps its own title so the
     // button still says something useful before the flyout exists.
     readonly property string title: {
+      if (btn.entry && btn.entry.kind === "apps") return "Apps"
       if (btn.first === null) return "Window"
       if (btn.grouped) {
         var c = String(btn.first.class || "")
@@ -681,16 +758,16 @@ Item {
       return String(btn.first.label || btn.first.title || btn.first.class || "Window")
     }
     readonly property string badge: {
+      if (btn.entry && btn.entry.kind === "apps") return "▦"
       var c = btn.first ? String(btn.first.class || btn.first.title || "?") : "?"
       return c.length ? c.charAt(0).toUpperCase() : "?"
     }
-    // Resolved app icon for this button's representative window — the group's
-    // first member, so a grouped button shows one icon exactly like a grouped
-    // Windows taskbar button (the count chip still rides the corner). "" when
-    // icons are disabled or nothing resolves -> the letter tile shows instead.
-    readonly property string iconSource: root.panelIcons
-      ? root.resolveIcon(btn.first ? String(btn.first.class || "") : "")
-      : ""
+    readonly property string iconSource: {
+      if (!root.panelIcons) return ""
+      if (btn.entry && btn.entry.kind === "apps") return ""
+      var cls = btn.entry && btn.entry.appId ? String(btn.entry.appId) : (btn.first ? String(btn.first.class || "") : "")
+      return root.resolveIcon(cls)
+    }
 
     // `horizontal` is passed as root.vertical (the panel's orientation), so the
     // true branch is the vertical panel.  Deriving the size from parent.width on
@@ -987,6 +1064,20 @@ Item {
       anchors.fill: parent
       hoverEnabled: true
       onClicked: function(m) { m.accepted = true; all.activated() }
+    }
+  }
+
+  Menu {
+    id: dockItemMenu
+    MenuItem {
+      text: (root.menuEntry && root.menuEntry.pinned) ? "Unpin from dock" : "Pin to dock"
+      enabled: !!(root.menuEntry && root.menuEntry.appId)
+      onTriggered: root.togglePinned(root.menuEntry.appId)
+    }
+    MenuItem {
+      text: "Launch"
+      enabled: !!(root.menuEntry && root.menuEntry.appId)
+      onTriggered: root.launchApp(root.menuEntry.appId)
     }
   }
 }

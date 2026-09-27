@@ -536,8 +536,61 @@ function normalizeSettings(raw) {
       return n
     })(),
     fullLength: (r.fullLength === true || r.fullLength === "1" || r.fullLength === "on" || r.fullLength === "true") ? true : false,
-    cornerShape: (r.cornerShape === "square" || r.cornerShape === "rounded") ? r.cornerShape : "pill"
+    cornerShape: (r.cornerShape === "square" || r.cornerShape === "rounded") ? r.cornerShape : "pill",
+    pinnedApps: normalizePinned(r.pinnedApps),
+    showAppsButton: (r.showAppsButton === false || r.showAppsButton === "0" || r.showAppsButton === "off" || r.showAppsButton === "false") ? false : true,
+    dockDodge: (r.dockDodge === true || r.dockDodge === "1" || r.dockDodge === "on" || r.dockDodge === "true") ? true : false
   }
+}
+
+function sanitizeAppId(id) {
+  var s = String(id || "").trim()
+  if (s.slice(-8).toLowerCase() === ".desktop") s = s.slice(0, -8)
+  s = s.replace(/[^A-Za-z0-9._+-]/g, "")
+  if (s.length > 80) s = s.slice(0, 80)
+  return s
+}
+
+function normalizePinned(list) {
+  var src = []
+  if (list && typeof list === "object" && typeof list.length === "number") {
+    for (var i = 0; i < list.length; i++) src.push(list[i])
+  }
+  var out = []
+  var seen = {}
+  for (var j = 0; j < src.length; j++) {
+    var id = sanitizeAppId(src[j])
+    if (!id || seen[id.toLowerCase()]) continue
+    seen[id.toLowerCase()] = true
+    out.push(id)
+    if (out.length >= 24) break
+  }
+  return out
+}
+
+function togglePinned(pinnedIds, appId) {
+  var id = sanitizeAppId(appId)
+  if (!id) return normalizePinned(pinnedIds)
+  var arr = normalizePinned(pinnedIds)
+  var key = id.toLowerCase()
+  var next = []
+  var found = false
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].toLowerCase() === key) { found = true; continue }
+    next.push(arr[i])
+  }
+  if (!found) next.push(id)
+  return next
+}
+
+function isPinned(pinnedIds, appId) {
+  var id = sanitizeAppId(appId).toLowerCase()
+  if (!id) return false
+  var arr = normalizePinned(pinnedIds)
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].toLowerCase() === id) return true
+  }
+  return false
 }
 
 // Find this plugin's entry in a shell.json document and return its settings
@@ -792,6 +845,7 @@ if (typeof module !== "undefined" && module.exports) {
     toJournal: toJournal, parseJournal: parseJournal, reconcile: reconcile,
     restoreDestination: restoreDestination, clampBox: clampBox, originLabel: originLabel, rowsWithOrdinals: rowsWithOrdinals,
     statusSummary: statusSummary, normalizeSettings: normalizeSettings, readOwnEntry: readOwnEntry,
+    sanitizeAppId: sanitizeAppId, normalizePinned: normalizePinned, togglePinned: togglePinned, isPinned: isPinned,
     TAB_CYCLE_FALLTHROUGH: TAB_CYCLE_FALLTHROUGH,
     createGroup: createGroup, removeGroup: removeGroup, addMember: addMember, removeMember: removeMember,
     moveMember: moveMember, getActiveMember: getActiveMember, setActiveMember: setActiveMember,

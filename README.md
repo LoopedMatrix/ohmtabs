@@ -172,6 +172,9 @@ Settings live in the plugin's `shell.json` entry — edit them in **Settings** (
 | `iconSize` | 16–32 | `24` | Taskbar app-icon pixel size (Small / Medium / Large in settings). |
 | `tintIcons` | bool | `false` | Colorize taskbar icons to the theme ink (`TintedIcon`, from animated.dock). |
 | `showIconName` | bool | `false` | Show the window title when hovering a taskbar icon. |
+| `pinnedApps` | string[] | `[]` | App ids kept on the dock with no window open. Right-click an icon → Pin / Unpin. Click launches or focuses. |
+| `showAppsButton` | bool | `true` | Grid button on the dock that opens the Omarchy menu. |
+| `dockDodge` | bool | `false` | Opt-in. Park the dock if a window covers it. Off (default) keeps the reserved bottom strip so windows are not clipped. |
 | `tabGroups` | bool | `false` | Enable window tabs (host/tab creation, `groupCycle`, close-all confirmation). The tab strip itself is drawn natively on the host's title strip. |
 
 Unknown keys are ignored and invalid values fall back to the default; validation lives in [`OhmTabsModel.js`](OhmTabsModel.js) (`normalizeSettings`).
@@ -300,4 +303,4 @@ A rebuilt `.so` is not picked up while it is mapped into the running compositor:
 
 ## License & credits
 
-MIT — see [LICENSE](LICENSE). The native title-strip backend derives from **hyprbars** and is BSD-3-Clause (see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)). OhmTabs is a fork of **grabbar by [Greyforge Labs](https://github.com/GreyforgeLabs/omarchy-grabbar)**; both upstream notices are retained intact, as required for a fork. Taskbar icon tinting (`TintedIcon.qml`) is adapted from [Davedes83/animated-dock](https://github.com/Davedes83/animated-dock) (MIT). Fork maintained by [LoopedMatrix](https://github.com/LoopedMatrix).
+MIT — see [LICENSE](LICENSE). The native title-strip backend derives from **hyprbars** and is BSD-3-Clause (see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)). OhmTabs is a fork of **grabbar by [Greyforge Labs](https://github.com/GreyforgeLabs/omarchy-grabbar)**; both upstream notices are retained intact, as required for a fork. Taskbar icon tinting (`TintedIcon.qml`) is adapted from [Davedes83/animated-dock](https://github.com/Davedes83/animated-dock) (MIT). Pin-to-dock / launch-from-icon follow [thepathless/omadock](https://github.com/thepathless/omadock) (MIT). Caelestia-like dock *behaviors* are reimplemented independently; no code is copied from [caelestia-dots/shell](https://github.com/caelestia-dots/shell) (GPL-3.0). Fork maintained by [LoopedMatrix](https://github.com/LoopedMatrix).

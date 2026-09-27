@@ -163,6 +163,18 @@ Item {
       onToggled: ui.save({ tintIcons: !ui.settings.tintIcons })
     }
     DockToggle {
+      title: "Apps button"
+      hint: "Grid icon that opens the Omarchy menu."
+      checked: ui.settings.showAppsButton !== false
+      onToggled: ui.save({ showAppsButton: ui.settings.showAppsButton === false })
+    }
+    DockToggle {
+      title: "Hide when windows overlap"
+      hint: "Park the dock if a window covers it. Off keeps the reserved strip."
+      checked: ui.settings.dockDodge === true
+      onToggled: ui.save({ dockDodge: !ui.settings.dockDodge })
+    }
+    DockToggle {
       title: "Icon name on hover"
       hint: "Show the window title on a taskbar icon."
       checked: ui.settings.showIconName === true

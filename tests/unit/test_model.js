@@ -229,8 +229,8 @@ test("originLabel and statusSummary", () => {
 
 test("normalizeSettings validates and bounds; readOwnEntry finds the plugin entry", () => {
   const s = M.normalizeSettings({ enabled: false, buttonsLeft: true, controlSize: "huge", excludedClasses: ["chromium", "bad class; rm", "chromium", 42] })
-  assert.deepStrictEqual(s, { enabled: false, buttonsLeft: true, showOnHover: false, controlSize: "standard", excludedClasses: ["chromium", "badclassrm", "42"], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: true, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill" })
-  assert.deepStrictEqual(M.normalizeSettings(null), { enabled: true, buttonsLeft: false, showOnHover: false, controlSize: "standard", excludedClasses: [], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: true, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill" })
+  assert.deepStrictEqual(s, { enabled: false, buttonsLeft: true, showOnHover: false, controlSize: "standard", excludedClasses: ["chromium", "badclassrm", "42"], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: true, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill", pinnedApps: [], showAppsButton: true, dockDodge: false })
+  assert.deepStrictEqual(M.normalizeSettings(null), { enabled: true, buttonsLeft: false, showOnHover: false, controlSize: "standard", excludedClasses: [], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: true, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill", pinnedApps: [], showAppsButton: true, dockDodge: false })
   const doc = JSON.stringify({ bar: { layout: { left: [{ id: "x" }], right: [{ id: "tech.loopedmatrix.ohmtabs", controlSize: "large", excludedClasses: ["foot"] }] } } })
   assert.deepStrictEqual(M.readOwnEntry(doc, "tech.loopedmatrix.ohmtabs"), { controlSize: "large", excludedClasses: ["foot"] })
   assert.strictEqual(M.readOwnEntry(doc, "nope"), null)
@@ -380,6 +380,60 @@ test("group operations never mutate the input state", () => {
   M.addMember(s, "g1-1", "g1-3")
   M.moveMember(s, "g1-2", "g1-9")
   assert.strictEqual(JSON.stringify(s.groups), before)
+})
+
+test("pin-to-dock helpers: sanitizeAppId strips .desktop, drops illegal chars, caps length 80", () => {
+  assert.strictEqual(M.sanitizeAppId("firefox.desktop"), "firefox")
+  assert.strictEqual(M.sanitizeAppId("org.gnome.Firefox.desktop"), "org.gnome.Firefox")
+  assert.strictEqual(M.sanitizeAppId("app-name_1.0+build.desktop"), "app-name_1.0+build")
+  assert.strictEqual(M.sanitizeAppId("bad; rm -rf /"), "badrm-rf")
+  assert.strictEqual(M.sanitizeAppId("x".repeat(90)), "x".repeat(80))
+  assert.strictEqual(M.sanitizeAppId(""), "")
+  assert.strictEqual(M.sanitizeAppId(null), "")
+  assert.strictEqual(M.sanitizeAppId(undefined), "")
+})
+
+test("normalizePinned dedups case-insensitively, drops junk, caps at 24", () => {
+  assert.deepStrictEqual(M.normalizePinned([]), [])
+  assert.deepStrictEqual(M.normalizePinned(null), [])
+  assert.deepStrictEqual(M.normalizePinned(undefined), [])
+  assert.deepStrictEqual(M.normalizePinned(["firefox", "FIREFOX", "chrome"]), ["firefox", "chrome"])
+  assert.deepStrictEqual(M.normalizePinned(["app.desktop", "app"]), ["app"])
+  assert.deepStrictEqual(M.normalizePinned(["a", "b", "c", null, undefined, "", "d"]), ["a", "b", "c", "d"])
+  const long = []
+  for (let i = 0; i < 30; i++) long.push("app" + i)
+  const normalized = M.normalizePinned(long)
+  assert.strictEqual(normalized.length, 24)
+  assert.deepStrictEqual(normalized, long.slice(0, 24).map(s => M.sanitizeAppId(s)))
+})
+
+test("togglePinned adds then removes", () => {
+  assert.deepStrictEqual(M.togglePinned([], "firefox"), ["firefox"])
+  assert.deepStrictEqual(M.togglePinned(["firefox"], "firefox"), [])
+  assert.deepStrictEqual(M.togglePinned(["firefox", "chrome"], "firefox"), ["chrome"])
+  assert.deepStrictEqual(M.togglePinned(["chrome"], "firefox"), ["chrome", "firefox"])
+  assert.deepStrictEqual(M.togglePinned(["firefox"], "Firefox"), [], "case-insensitive removal")
+  assert.deepStrictEqual(M.togglePinned([], ""), [])
+  assert.deepStrictEqual(M.togglePinned([], null), [])
+})
+
+test("isPinned true/false", () => {
+  assert.strictEqual(M.isPinned(["firefox", "chrome"], "firefox"), true)
+  assert.strictEqual(M.isPinned(["firefox", "chrome"], "FIREFOX"), true, "case-insensitive match")
+  assert.strictEqual(M.isPinned(["firefox", "chrome"], "chrome"), true)
+  assert.strictEqual(M.isPinned(["firefox", "chrome"], "firefox.desktop"), true, "appId .desktop sanitization")
+  assert.strictEqual(M.isPinned(["firefox", "chrome"], "thunderbird"), false)
+  assert.strictEqual(M.isPinned([], "firefox"), false)
+  assert.strictEqual(M.isPinned(null, "firefox"), false)
+  assert.strictEqual(M.isPinned(["firefox"], ""), false)
+  assert.strictEqual(M.isPinned(["firefox"], null), false)
+})
+
+test("normalizeSettings empty object includes pinnedApps, showAppsButton, dockDodge defaults", () => {
+  const s = M.normalizeSettings({})
+  assert.deepStrictEqual(s.pinnedApps, [])
+  assert.strictEqual(s.showAppsButton, true)
+  assert.strictEqual(s.dockDodge, false)
 })
 
 console.log("test_model: " + passed + " passed")
