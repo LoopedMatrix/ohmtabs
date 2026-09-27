@@ -183,8 +183,8 @@ Item {
     DockToggle {
       title: "Active window"
       hint: "Show the focused window title on the dock."
-      checked: ui.settings.showActiveWindow !== false
-      onToggled: ui.save({ showActiveWindow: ui.settings.showActiveWindow === false })
+      checked: ui.settings.showActiveWindow === true
+      onToggled: ui.save({ showActiveWindow: !ui.settings.showActiveWindow })
     }
     DockToggle {
       title: "Clock"

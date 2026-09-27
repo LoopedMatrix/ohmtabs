@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import QtQuick
 import QtQuick.Controls
 import qs.Commons
@@ -55,7 +56,7 @@ Item {
   property bool showWorkspaces: false
   property bool showClock: false
   property bool showStatus: false
-  property bool showActiveWindow: true
+  property bool showActiveWindow: false
   property int workspaceCount: 5
   property bool showNotifs: false
   property bool showDashboard: false
@@ -110,15 +111,32 @@ Item {
       minBy[cls].push(r)
     }
     var liveBy = {}
-    var tops = []
-    try { tops = ToplevelManager.toplevels.values } catch (e) { tops = [] }
-    for (var j = 0; j < tops.length; j++) {
-      var t = tops[j]
-      if (!t) continue
-      var app = norm(t.appId)
-      if (!app) continue
-      if (!liveBy[app]) liveBy[app] = []
-      liveBy[app].push(t)
+    function addLive(id, t) {
+      if (!id || !t) return
+      if (id === "electron" || id === "chromium") return
+      if (!liveBy[id]) liveBy[id] = []
+      liveBy[id].push(t)
+    }
+    try {
+      var hts = Hyprland.toplevels.values
+      for (var h = 0; h < hts.length; h++) {
+        var ht = hts[h]
+        if (!ht) continue
+        var cls = norm(ht.class || (ht.lastIpcObject ? ht.lastIpcObject.class : "") || "")
+        var way = null
+        try { way = ht.wayland } catch (e1) { way = null }
+        var app = way ? norm(way.appId) : ""
+        var hid = (cls && cls !== "electron" && cls !== "chromium") ? cls : app
+        addLive(hid, way || ht)
+      }
+    } catch (e2) {
+      var tops = []
+      try { tops = ToplevelManager.toplevels.values } catch (e3) { tops = [] }
+      for (var j = 0; j < tops.length; j++) {
+        var t = tops[j]
+        if (!t) continue
+        addLive(norm(t.appId), t)
+      }
     }
     function pushApp(appId, pinned) {
       var id = norm(appId)
