@@ -738,10 +738,10 @@ Item {
       height: btn.horizontal ? 3 : (btn.selected ? 18 : 10)
       color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, btn.selected ? 0.95 : 0.45)
 
-      anchors.horizontalCenter: btn.horizontal ? tileBox.horizontalCenter : undefined
+      anchors.horizontalCenter: btn.horizontal ? parent.horizontalCenter : undefined
       anchors.bottom: btn.horizontal ? parent.bottom : undefined
       anchors.bottomMargin: btn.horizontal ? 2 : undefined
-      anchors.verticalCenter: btn.horizontal ? undefined : tileBox.verticalCenter
+      anchors.verticalCenter: btn.horizontal ? undefined : parent.verticalCenter
       anchors.left: btn.horizontal ? undefined : parent.left
       anchors.leftMargin: btn.horizontal ? undefined : 2
 
