@@ -218,7 +218,7 @@ Item {
     }
     DockToggle {
       title: "Icon name on hover"
-      hint: "Show the window title on a taskbar icon."
+      hint: "Glassy title card above a dock icon."
       checked: ui.settings.showIconName === true
       onToggled: ui.save({ showIconName: !ui.settings.showIconName })
     }

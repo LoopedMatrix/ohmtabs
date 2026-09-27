@@ -169,6 +169,8 @@ Item {
   property var flyoutGroup: null
   property var flyoutButton: null
   property bool flyoutHovered: false
+  property var hoverButton: null
+  property bool hoverCardHovered: false
 
   // ---- palette (bar surfaces: it lives on a screen edge) ----
   readonly property color background: Color.bar.background
@@ -472,6 +474,16 @@ Item {
     if (root.flyoutGroup) flyoutHideDelay.restart()
   }
 
+  function hoverOpen(button) {
+    if (!root.showIconName || !button) return
+    hoverHideDelay.stop()
+    root.hoverButton = button
+  }
+
+  function hoverMaybeClose() {
+    if (root.hoverButton) hoverHideDelay.restart()
+  }
+
   Timer {
     id: flyoutHideDelay
     interval: 240
@@ -481,6 +493,14 @@ Item {
         root.flyoutGroup = null
         root.flyoutButton = null
       }
+    }
+  }
+  Timer {
+    id: hoverHideDelay
+    interval: 160
+    repeat: false
+    onTriggered: {
+      if (!root.hoverCardHovered) root.hoverButton = null
     }
   }
 
@@ -839,6 +859,58 @@ Item {
     }
   }
 
+  PopupWindow {
+    id: hoverCard
+    visible: root.showIconName && root.hoverButton !== null
+    color: "transparent"
+    implicitWidth: Math.min(280, hoverLabel.implicitWidth + 24)
+    implicitHeight: 32
+    anchor {
+      id: hoverAnchor
+      window: panel
+      edges: Edges.Top | Edges.Left
+      gravity: Edges.Top | Edges.Left
+      adjustment: PopupAdjustment.Slide
+      rect.width: 1
+      rect.height: 1
+      onAnchoring: {
+        if (!root.hoverButton) return
+        var b = root.hoverButton
+        var lx = Math.round((b.width - hoverCard.implicitWidth) / 2)
+        var ly = -hoverCard.implicitHeight - 8
+        if (root.panelPosition === "top") ly = b.height + 8
+        else if (root.panelPosition === "left") { lx = b.width + 8; ly = Math.round((b.height - hoverCard.implicitHeight) / 2) }
+        else if (root.panelPosition === "right") { lx = -hoverCard.implicitWidth - 8; ly = Math.round((b.height - hoverCard.implicitHeight) / 2) }
+        var p = panel.contentItem.mapFromItem(b, lx, ly)
+        hoverAnchor.rect.x = Math.round(p.x)
+        hoverAnchor.rect.y = Math.round(p.y)
+      }
+    }
+    Rectangle {
+      anchors.fill: parent
+      radius: 16
+      color: Qt.rgba(root.background.r, root.background.g, root.background.b, 0.94)
+      border.color: Qt.rgba(root.dockAccent.r, root.dockAccent.g, root.dockAccent.b, 0.45)
+      border.width: 1
+      MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        onEntered: { hoverHideDelay.stop(); root.hoverCardHovered = true }
+        onExited: { root.hoverCardHovered = false; root.hoverMaybeClose() }
+      }
+      Text {
+        id: hoverLabel
+        anchors.centerIn: parent
+        text: root.hoverButton ? String(root.hoverButton.title || "") : ""
+        color: root.foreground
+        font.pixelSize: 12
+        elide: Text.ElideRight
+        width: Math.min(implicitWidth, 256)
+      }
+    }
+  }
+
   // ------------------------------------------------------------ components
 
   // A taskbar button: a rounded app tile carrying the class initial, an
@@ -938,15 +1010,19 @@ Item {
       anchors.fill: parent
       hoverEnabled: true
       acceptedButtons: Qt.LeftButton | Qt.RightButton
-      onEntered: { btn.hovered(); if (btn.grouped) root.flyoutOpen(btn.entry, btn) }
-      onExited: { if (btn.grouped) root.flyoutMaybeClose() }
+      onEntered: {
+        btn.hovered()
+        if (btn.grouped) root.flyoutOpen(btn.entry, btn)
+        else root.hoverOpen(btn)
+      }
+      onExited: {
+        if (btn.grouped) root.flyoutMaybeClose()
+        else root.hoverMaybeClose()
+      }
       onClicked: function(m) {
         if (m.button === Qt.RightButton) { m.accepted = true; root.openEntryMenu(btn.entry, btn); return }
         btn.activated(false)
       }
-      ToolTip.visible: root.showIconName && btnArea.containsMouse && btn.title !== ""
-      ToolTip.text: btn.title
-      ToolTip.delay: 350
     }
 
     Item {
