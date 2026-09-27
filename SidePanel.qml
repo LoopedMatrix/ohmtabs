@@ -101,44 +101,55 @@ Item {
   // leftover grouped-flyout path still compiles; the model itself does not
   // fold by class (that plus a full-width Restore-all hid every icon).
   property int toplevelGen: 0
-  // Apps button + pinned + running (grouped by class) + leftover minimized.
-  // Pinned icons stay even with no window (omadock launch-from-dock).
+  // Apps button + one tile per window + pinned stubs with no window.
+  // Same-class windows stay separate so two Brave windows are two icons.
+  // A pin only adds a stub when that app has no live or minimized window.
   readonly property var items: {
     var gen = root.toplevelGen
     var out = []
-    var seen = {}
     function norm(c) {
       return Model.dockAppId(c)
     }
     if (root.showAppsButton)
       out.push({ key: "apps", kind: "apps", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
 
-    var minBy = {}
+    var minList = []
     var list = root.rows
     for (var i = 0; i < list.length; i++) {
       var r = list[i]
       var cls = norm(r.class)
       if (!cls) cls = "__min" + i
-      if (!minBy[cls]) minBy[cls] = []
-      minBy[cls].push(r)
+      minList.push({ id: cls, row: r })
     }
-    var liveBy = {}
+    var lives = []
+    function isParked(t) {
+      try {
+        var n = t.workspace ? (t.workspace.name || t.workspace) : ""
+        if (String(n).indexOf("ohmtabs-minimized") >= 0) return true
+      } catch (e8) {}
+      try {
+        var w = t.lastIpcObject && t.lastIpcObject.workspace
+        var nn = w && (w.name || w)
+        if (String(nn).indexOf("ohmtabs-minimized") >= 0) return true
+      } catch (e9) {}
+      return false
+    }
     function addLive(id, t) {
       if (!id || !t) return
       if (id === "electron" || id === "chromium") return
-      if (!liveBy[id]) liveBy[id] = []
-      liveBy[id].push(t)
+      if (isParked(t)) return
+      lives.push({ id: id, t: t })
     }
     try {
       var hts = Hyprland.toplevels.values
       for (var h = 0; h < hts.length; h++) {
         var ht = hts[h]
         if (!ht) continue
-        var cls = norm(ht.class || (ht.lastIpcObject ? ht.lastIpcObject.class : "") || "")
+        var cls2 = norm(ht.class || (ht.lastIpcObject ? ht.lastIpcObject.class : "") || "")
         var way = null
         try { way = ht.wayland } catch (e1) { way = null }
         var app = way ? norm(way.appId) : ""
-        var hid = (cls && cls !== "electron" && cls !== "chromium") ? cls : app
+        var hid = (cls2 && cls2 !== "electron" && cls2 !== "chromium") ? cls2 : app
         addLive(hid, way || ht)
       }
     } catch (e2) {
@@ -150,35 +161,66 @@ Item {
         addLive(norm(t.appId), t)
       }
     }
-    function pushApp(appId, pinned) {
-      var id = norm(appId)
-      if (!id || seen[id]) return
-      seen[id] = true
-      var mem = minBy[id] || []
-      var lt = liveBy[id] || []
-      var stub = mem.length ? mem : [{ class: appId, title: appId, label: appId, token: "", status: lt.length ? "live" : "pinned" }]
-      out.push({
-        key: (pinned ? "pin:" : "run:") + id,
-        kind: "app",
-        appId: id,
-        pinned: pinned,
-        members: stub,
-        toplevel: lt.length ? lt[0] : null,
-        liveCount: lt.length,
-        minCount: mem.length
-      })
+    var covered = {}
+    function titleOf(t, fallback) {
+      try { if (t && t.title) return String(t.title) } catch (e4) {}
+      try { if (t && t.lastIpcObject && t.lastIpcObject.title) return String(t.lastIpcObject.title) } catch (e5) {}
+      return fallback
+    }
+    function liveKey(t, idx, id) {
+      try { if (t && t.address) return String(t.address) } catch (e6) {}
+      try {
+        if (t && t.lastIpcObject && t.lastIpcObject.address) return String(t.lastIpcObject.address)
+      } catch (e7) {}
+      return "live:" + id + ":" + idx
     }
     var pins = root.pinnedApps || []
-    for (var p = 0; p < pins.length; p++) pushApp(pins[p], true)
     if (root.showRunning) {
-      for (var app in liveBy) pushApp(app, false)
-    }
-    for (var mc in minBy) {
-      if (seen[mc]) continue
-      var mem3 = minBy[mc]
-      for (var k = 0; k < mem3.length; k++) {
-        out.push({ key: String(mem3[k].token || ("m" + k)), kind: "minimized", appId: mc, pinned: false, members: [mem3[k]], toplevel: null, liveCount: 0, minCount: 1 })
+      for (var li = 0; li < lives.length; li++) {
+        var L = lives[li]
+        covered[L.id] = true
+        var ttl = titleOf(L.t, L.id)
+        out.push({
+          key: liveKey(L.t, li, L.id),
+          kind: "app",
+          appId: L.id,
+          pinned: Model.isPinned(pins, L.id),
+          members: [{ class: L.id, title: ttl, label: ttl, token: "", status: "live" }],
+          toplevel: L.t,
+          liveCount: 1,
+          minCount: 0
+        })
       }
+    }
+    for (var mi = 0; mi < minList.length; mi++) {
+      var M = minList[mi]
+      covered[M.id] = true
+      var row = M.row
+      out.push({
+        key: String(row.token || ("m" + mi)),
+        kind: "minimized",
+        appId: M.id,
+        pinned: Model.isPinned(pins, M.id),
+        members: [row],
+        toplevel: null,
+        liveCount: 0,
+        minCount: 1
+      })
+    }
+    for (var p = 0; p < pins.length; p++) {
+      var pid = norm(pins[p])
+      if (!pid || covered[pid]) continue
+      covered[pid] = true
+      out.push({
+        key: "pin:" + pid,
+        kind: "app",
+        appId: pid,
+        pinned: true,
+        members: [{ class: pid, title: pid, label: pid, token: "", status: "pinned" }],
+        toplevel: null,
+        liveCount: 0,
+        minCount: 0
+      })
     }
     if (root.showNotifs)
       out.push({ key: "notifs", kind: "notifs", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
