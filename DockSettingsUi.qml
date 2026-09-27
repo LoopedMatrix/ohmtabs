@@ -99,19 +99,19 @@ Item {
 
     DockSlider {
       label: "Border opacity"
-      valueText: String(Math.round((ui.settings.panelBorderOpacity !== undefined ? ui.settings.panelBorderOpacity : 0.14) * 100)) + "%"
+      valueText: String(Math.round((ui.settings.panelBorderOpacity !== undefined ? ui.settings.panelBorderOpacity : 0.95) * 100)) + "%"
       from: 0
       to: 1
-      value: ui.settings.panelBorderOpacity !== undefined ? Number(ui.settings.panelBorderOpacity) : 0.14
+      value: ui.settings.panelBorderOpacity !== undefined ? Number(ui.settings.panelBorderOpacity) : 0.95
       onReleased: function(v) { ui.save({ panelBorderOpacity: Math.round(v * 100) / 100 }) }
     }
 
     DockSlider {
       label: "Background opacity"
-      valueText: String(Math.round((ui.settings.panelBgOpacity !== undefined ? ui.settings.panelBgOpacity : 1) * 100)) + "%"
+      valueText: String(Math.round((ui.settings.panelBgOpacity !== undefined ? ui.settings.panelBgOpacity : 0.78) * 100)) + "%"
       from: 0.15
       to: 1
-      value: ui.settings.panelBgOpacity !== undefined ? Number(ui.settings.panelBgOpacity) : 1
+      value: ui.settings.panelBgOpacity !== undefined ? Number(ui.settings.panelBgOpacity) : 0.78
       onReleased: function(v) { ui.save({ panelBgOpacity: Math.round(v * 100) / 100 }) }
     }
 
@@ -132,7 +132,7 @@ Item {
     DockToggle {
       title: "Full length"
       hint: "Span the whole edge of the screen."
-      checked: ui.settings.fullLength !== false
+      checked: ui.settings.fullLength === true
       onToggled: ui.save({ fullLength: ui.settings.fullLength === false })
     }
 
@@ -144,7 +144,7 @@ Item {
     }
     DockSegment {
       options: ["Rounded", "Square", "Pill"]
-      current: ui.settings.cornerShape === "square" ? 1 : (ui.settings.cornerShape === "pill" ? 2 : 0)
+      current: ui.settings.cornerShape === "square" ? 1 : (ui.settings.cornerShape === "rounded" ? 0 : 2)
       onChosen: function(i) {
         ui.save({ cornerShape: i === 1 ? "square" : (i === 2 ? "pill" : "rounded") })
       }

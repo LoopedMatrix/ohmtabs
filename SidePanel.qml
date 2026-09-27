@@ -36,16 +36,16 @@ Item {
   property bool panelEnabled: true
   property string panelPosition: "bottom"    // "left" | "right" | "bottom"
   property bool panelAutoHide: false   // opt-in: the edge reveal is unreliable
-  property int iconPixelSize: 32       // 16–40, from settings.iconSize
+  property int iconPixelSize: 38
   property bool tintIcons: false       // colorize app icons to theme ink
   property bool showIconName: false    // hover label above the icon
   property bool magnify: true          // animated.dock-style hover zoom
   property real iconZoom: 0.48         // extra scale on hover (0–1)
   property bool panelBorder: true
-  property real panelBorderOpacity: 0.14
-  property real panelBgOpacity: 1
-  property bool fullLength: true
-  property string cornerShape: "rounded"  // rounded | square | pill
+  property real panelBorderOpacity: 0.95
+  property real panelBgOpacity: 0.78
+  property bool fullLength: false
+  property string cornerShape: "pill"
   // A taskbar that is always there must not sit on top of windows: it reserves
   // its own strip the way the Windows taskbar does, and tiled windows end above
   // it. Auto-hide deliberately overlays instead - reserving space that appears
@@ -58,11 +58,11 @@ Item {
   property int selectedIndex: -1
 
   readonly property bool vertical: panelPosition === "left" || panelPosition === "right"
-  readonly property int dockRadius: cornerShape === "square" ? 0 : (cornerShape === "pill" ? Math.round(root.panelSize / 2) : root.radius)
-  // Same thickness on every edge — a Windows-style icon strip, not a 268px
-  // title column. Left/right used to show a title next to each icon and ate
-  // a quarter of the screen.
-  readonly property int panelSize: 46
+  readonly property int dockPad: 12
+  readonly property int panelSize: Math.max(48, root.iconSize + root.dockPad * 2)
+  readonly property int dockRadius: cornerShape === "square" ? 0 : (cornerShape === "pill" ? Math.round(root.panelSize / 2) : Math.max(root.radius, 14))
+  readonly property color dockAccent: Color.accent
+  readonly property int buttonLength: root.iconSize + 16
   // Pixels of the parked surface left on screen so the pointer can find it.
   readonly property int revealSliver: 4
 
@@ -132,7 +132,6 @@ Item {
   readonly property color urgent: Color.urgent
   readonly property int radius: Style.cornerRadius
   readonly property string fontFamily: Style.font.menuFamily
-  readonly property int buttonLength: 40
 
   // ------------------------------------------------- app-icon resolution
   //
@@ -419,8 +418,8 @@ Item {
     id: panel
     visible: root.live
     color: "transparent"
-    exclusionMode: (root.panelReserveSpace && !root.parked) ? ExclusionMode.Normal : ExclusionMode.Ignore
-    exclusiveZone: (root.panelReserveSpace && !root.parked) ? root.panelSize : 0
+    exclusionMode: (root.fullLength && root.panelReserveSpace && !root.parked) ? ExclusionMode.Normal : ExclusionMode.Ignore
+    exclusiveZone: (root.fullLength && root.panelReserveSpace && !root.parked) ? root.panelSize : 0
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "ohmtabs-taskbar"
     WlrLayershell.keyboardFocus: root.selectedIndex >= 0 ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
@@ -463,12 +462,29 @@ Item {
         anchors.top: root.vertical ? parent.top : (root.panelPosition === "top" ? parent.top : undefined)
         anchors.bottom: root.vertical ? parent.bottom : (root.panelPosition === "top" ? undefined : parent.bottom)
         anchors.verticalCenter: (!root.fullLength && root.vertical) ? parent.verticalCenter : undefined
-        width: root.vertical ? root.panelSize : ((!root.fullLength) ? Math.min(parent.width - 32, Math.max(280, list.contentWidth + 56)) : undefined)
-        height: root.vertical ? ((!root.fullLength) ? Math.min(parent.height - 32, Math.max(280, list.contentHeight + 56)) : undefined) : root.panelSize
+        width: root.vertical ? root.panelSize : ((!root.fullLength) ? Math.min(parent.width - 48, Math.max(root.panelSize, list.contentWidth + 28)) : undefined)
+        height: root.vertical ? ((!root.fullLength) ? Math.min(parent.height - 48, Math.max(root.panelSize, list.contentHeight + 28)) : undefined) : root.panelSize
         radius: root.dockRadius
         color: Qt.rgba(root.background.r, root.background.g, root.background.b, root.panelBgOpacity)
-        border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, root.panelBorder ? root.panelBorderOpacity : 0)
-        border.width: root.panelBorder ? 1 : 0
+        border.color: root.panelBorder ? Qt.rgba(root.dockAccent.r, root.dockAccent.g, root.dockAccent.b, root.panelBorderOpacity) : "transparent"
+        border.width: root.panelBorder ? 2 : 0
+        z: 1
+      }
+
+      Repeater {
+        model: root.panelBorder ? 4 : 0
+        Rectangle {
+          required property int index
+          x: dockBand.x - (index + 2)
+          y: dockBand.y - (index + 2)
+          width: dockBand.width + (index + 2) * 2
+          height: dockBand.height + (index + 2) * 2
+          radius: dockBand.radius + index + 2
+          color: "transparent"
+          border.width: 2
+          border.color: Qt.rgba(root.dockAccent.r, root.dockAccent.g, root.dockAccent.b, (0.42 - index * 0.09) * root.panelBorderOpacity)
+          z: 0
+        }
       }
 
       MouseArea {
@@ -503,7 +519,7 @@ Item {
       // "Restore all" sits at the far end of the strip, out of the button run.
       RestoreAllButton {
         id: allButton
-        visible: root.count > 1
+        visible: root.fullLength && root.count > 1
         horizontal: root.vertical
         anchors.right: root.vertical ? undefined : parent.right
         anchors.verticalCenter: root.vertical ? undefined : dockBand.verticalCenter
@@ -517,16 +533,9 @@ Item {
       ListView {
         id: list
         orientation: root.vertical ? ListView.Vertical : ListView.Horizontal
-        anchors.left: parent.left
-        anchors.right: root.vertical ? undefined : parent.right
-        anchors.bottom: parent.bottom
-        anchors.top: root.vertical ? parent.top : undefined
-        width: root.vertical ? root.panelSize : undefined
-        height: root.vertical ? undefined : root.panelSize
-        anchors.margins: 5
-        anchors.rightMargin: (!root.vertical && allButton.visible) ? allButton.width + 12 : 5
-        anchors.bottomMargin: (root.vertical && allButton.visible) ? allButton.height + 12 : 5
-        spacing: 4
+        anchors.fill: dockBand
+        anchors.margins: 8
+        spacing: 6
         clip: false
         z: 2
         model: root.items
@@ -539,7 +548,7 @@ Item {
           selected: index === root.selectedIndex
           horizontal: root.vertical
           length: root.buttonLength
-          thickness: root.panelSize - 10
+          thickness: root.panelSize - 16
           onActivated: function(original) { root.activateItem(modelData, original) }
           onHovered: root.selectedIndex = index
         }
@@ -690,8 +699,8 @@ Item {
     // unclickable buttons.  Use the explicit extents instead.
     width: btn.length
     height: btn.thickness
-    radius: root.radius
-    color: btn.selected ? root.activeFill : (btnArea.containsMouse ? root.hoverFill : "transparent")
+    radius: Math.round(Math.min(btn.length, btn.thickness) / 4)
+    color: "transparent"
 
     Behavior on color { ColorAnimation { duration: 110 } }
 
@@ -728,27 +737,19 @@ Item {
       ToolTip.delay: 350
     }
 
-    Row {
+    Item {
       anchors.fill: parent
-      anchors.leftMargin: 6
-      anchors.rightMargin: 8
-      spacing: 8
-
-      // App tile: the app's real icon (Windows-taskbar style), with the
-      // class-initial letter as the fallback when no icon resolves. A second
-      // sliver peeks out behind it and a count chip rides its corner when the
-      // button is a group.
       Item {
         id: tileBox
-        anchors.verticalCenter: parent.verticalCenter
+        anchors.centerIn: parent
         width: root.iconSize + 6
         height: root.iconSize + 6
 
         Rectangle {
           id: tile
           anchors.fill: parent
-          radius: 7
-          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, btn.iconSource !== "" ? 0 : 0.16)
+          radius: 9
+          color: "transparent"
           scale: (root.magnify && btnArea.containsMouse) ? (1 + root.iconZoom) : 1
           transformOrigin: root.vertical
             ? (root.panelPosition === "left" ? Item.Left : Item.Right)
@@ -830,24 +831,20 @@ Item {
     // closest thing to focus a minimized-only list has.
     Rectangle {
       id: indicator
-      radius: 2
-      // Horizontal strip: a bar under the tile; vertical strip: a bar along
-      // the leading (inner) edge. Size and anchoring follow the orientation
-      // with plain bindings so nothing can fall out of sync at runtime.
-      width: btn.horizontal ? (btn.selected ? 18 : 10) : 3
-      height: btn.horizontal ? 3 : (btn.selected ? 18 : 10)
-      color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, btn.selected ? 0.95 : 0.45)
+      radius: 4
+      width: 8
+      height: 8
+      visible: btn.entry && btn.entry.kind !== "minimized"
+      color: Qt.rgba(root.dockAccent.r, root.dockAccent.g, root.dockAccent.b, btn.selected ? 1 : 0.75)
 
       anchors.horizontalCenter: btn.horizontal ? parent.horizontalCenter : undefined
       anchors.bottom: btn.horizontal ? parent.bottom : undefined
-      anchors.bottomMargin: btn.horizontal ? 2 : undefined
+      anchors.bottomMargin: btn.horizontal ? 0 : undefined
       anchors.verticalCenter: btn.horizontal ? undefined : parent.verticalCenter
       anchors.left: btn.horizontal ? undefined : parent.left
-      anchors.leftMargin: btn.horizontal ? undefined : 2
+      anchors.leftMargin: btn.horizontal ? undefined : 0
 
       Behavior on color { ColorAnimation { duration: 110 } }
-      Behavior on width { NumberAnimation { duration: 110 } }
-      Behavior on height { NumberAnimation { duration: 110 } }
     }
   }
 

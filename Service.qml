@@ -1049,6 +1049,13 @@ Item {
     function disable(): string { return root.disable() }
     function enable(): string { return root.enable() }
     function ping(): string { return root.backendConnected ? "connected" : "disconnected" }
+    function settingsDump(): string { return JSON.stringify(root.settings) }
+    function applySettings(json: string): string {
+      try {
+        var p = JSON.parse(json)
+        return root.saveSettings(p) ? "ok" : "failed"
+      } catch (e) { return "bad-json" }
+    }
     function groupCreate(token: string): string { return root.groupCreate(token) }
     function groupRemove(token: string): string { return root.groupRemove(token) }
     function groupAddMember(hostToken: string, memberToken: string): string { return root.groupAddMember(hostToken, memberToken) }
