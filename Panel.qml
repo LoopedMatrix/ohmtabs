@@ -82,7 +82,7 @@ Item {
     var payload = {}
     try { payload = JSON.parse(String(payloadJson || "{}")) || {} } catch (e) {}
     var wanted = String(payload.view || "drawer")
-    if (wanted !== "menu" && wanted !== "settings") wanted = "drawer"
+    if (wanted !== "menu" && wanted !== "settings" && wanted !== "notifs" && wanted !== "dashboard") wanted = "drawer"
     root.confirmHide = false
     root.confirmClose = false
     root.selectedIndex = 0
@@ -572,6 +572,45 @@ Item {
           onOpenDrawer: root.switchView("drawer")
           onSetOhmTabsOn: function(on) { root.setOhmTabsOn(on) }
         }
+      }
+    }
+
+    Rectangle {
+      id: notifsCard
+      visible: root.view === "notifs"
+      width: 360
+      height: Math.min(panel.height - Style.gapsOut * 2, notifsUi.implicitHeight)
+      anchors.horizontalCenter: parent.horizontalCenter
+      y: Style.gapsOut + Style.space(8)
+      radius: 18
+      color: root.background
+      border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.45)
+      border.width: 1
+      MouseArea { anchors.fill: parent; onClicked: function(m) { m.accepted = true } }
+      OverlayNotifs {
+        id: notifsUi
+        anchors.fill: parent
+        notifService: (root.shell && typeof root.shell.serviceFor === "function") ? root.shell.serviceFor("omarchy.notifications") : null
+        onCloseRequested: root.dismiss()
+      }
+    }
+
+    Rectangle {
+      id: dashCard
+      visible: root.view === "dashboard"
+      width: Math.min(560, panel.width - Style.gapsOut * 2)
+      height: Math.min(460, panel.height - Style.gapsOut * 2)
+      anchors.horizontalCenter: parent.horizontalCenter
+      y: Style.gapsOut + Style.space(8)
+      radius: 18
+      color: root.background
+      border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.45)
+      border.width: 1
+      MouseArea { anchors.fill: parent; onClicked: function(m) { m.accepted = true } }
+      OverlayDashboard {
+        id: dashUi
+        anchors.fill: parent
+        onCloseRequested: root.dismiss()
       }
     }
 

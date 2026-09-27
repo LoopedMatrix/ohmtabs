@@ -218,5 +218,11 @@ BarWidget {
     showRunning: root.settings ? root.settings.showRunning !== false : true
     showWorkspaces: root.settings ? root.settings.showWorkspaces === true : false
     showClock: root.settings ? root.settings.showClock === true : false
+    showNotifs: root.settings ? root.settings.showNotifs === true : false
+    showDashboard: root.settings ? root.settings.showDashboard === true : false
+  }
+
+  OverlayOsd {
+    enabled: root.settings ? root.settings.showOsd === true : false
   }
 }

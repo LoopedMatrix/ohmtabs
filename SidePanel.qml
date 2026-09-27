@@ -54,6 +54,8 @@ Item {
   property bool showRunning: true
   property bool showWorkspaces: false
   property bool showClock: false
+  property bool showNotifs: false
+  property bool showDashboard: false
   property string clockText: Qt.formatTime(new Date(), "hh:mm")
   property bool windowsOverlapDock: false
   // A taskbar that is always there must not sit on top of windows: it reserves
@@ -145,8 +147,10 @@ Item {
         out.push({ key: String(mem3[k].token || ("m" + k)), kind: "minimized", appId: mc, pinned: false, members: [mem3[k]], toplevel: null, liveCount: 0, minCount: 1 })
       }
     }
-    if (root.showClock)
-      out.push({ key: "clock", kind: "clock", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
+    if (root.showNotifs)
+      out.push({ key: "notifs", kind: "notifs", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
+    if (root.showDashboard)
+      out.push({ key: "dash", kind: "dashboard", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
     return out
   }
   readonly property var groups: root.items
@@ -306,6 +310,8 @@ Item {
       root.openBarMenu(item)
       return true
     }
+    if (row.kind === "notifs") { root.openNotifs(); return true }
+    if (row.kind === "dashboard") { root.openDashboard(); return true }
     root.suppressBandMenu = true
     if (openEntryMenuClear.running) openEntryMenuClear.restart()
     else openEntryMenuClear.start()
@@ -369,6 +375,9 @@ Item {
   function activateItem(item, original) {
     if (!item) return
     if (item.kind === "apps") { root.openAppsMenu(); root.selectedIndex = -1; return }
+    if (item.kind === "notifs") { root.openNotifs(); root.selectedIndex = -1; return }
+    if (item.kind === "dashboard") { root.openDashboard(); root.selectedIndex = -1; return }
+    if (item.kind === "clock") { root.selectedIndex = -1; return }
     if (item.kind === "app") {
       if (item.toplevel) {
         try { item.toplevel.activate() } catch (e) {}
@@ -393,6 +402,18 @@ Item {
 
   function openAppsMenu() {
     try { Quickshell.execDetached(["omarchy-menu", "toggle", "root"]) } catch (e) {}
+  }
+
+  function openNotifs() {
+    if (!service) return
+    var name = panel.screen ? String(panel.screen.name) : ""
+    service.openOverlay({ view: "notifs", monitor: name })
+  }
+
+  function openDashboard() {
+    if (!service) return
+    var name = panel.screen ? String(panel.screen.name) : ""
+    service.openOverlay({ view: "dashboard", monitor: name })
   }
 
   function launchApp(appId) {
@@ -684,6 +705,12 @@ Item {
           width: root.showWorkspaces ? implicitWidth : 0
           height: root.vertical ? (root.showWorkspaces ? implicitHeight : 0) : (root.panelSize - 16)
         }
+        footer: DockClock {
+          visible: root.showClock
+          ink: root.foreground
+          width: root.showClock ? implicitWidth : 0
+          height: root.vertical ? (root.showClock ? implicitHeight : 0) : (root.panelSize - 16)
+        }
 
         delegate: TaskButton {
           required property var modelData
@@ -819,6 +846,8 @@ Item {
     readonly property string title: {
       if (btn.entry && btn.entry.kind === "apps") return "Apps"
       if (btn.entry && btn.entry.kind === "clock") return root.clockText
+      if (btn.entry && btn.entry.kind === "notifs") return "Notifs"
+      if (btn.entry && btn.entry.kind === "dashboard") return "Overview"
       if (btn.entry && btn.entry.kind === "workspaces") return "WS"
       if (btn.first === null) return "Window"
       if (btn.grouped) {
@@ -830,6 +859,8 @@ Item {
     readonly property string badge: {
       if (btn.entry && btn.entry.kind === "apps") return "▦"
       if (btn.entry && btn.entry.kind === "clock") return root.clockText
+      if (btn.entry && btn.entry.kind === "notifs") return "🔔"
+      if (btn.entry && btn.entry.kind === "dashboard") return "▣"
       if (btn.entry && btn.entry.kind === "workspaces") return "W"
       var c = btn.first ? String(btn.first.class || btn.first.title || "?") : "?"
       return c.length ? c.charAt(0).toUpperCase() : "?"

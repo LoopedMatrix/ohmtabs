@@ -6,6 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 node tests/unit/test_model.js
+node tests/unit/test_osd.js
 python3 tests/unit/test_journal.py
 python3 tests/unit/test_autoload.py
 python3 tests/unit/test_loader.py
@@ -28,7 +29,7 @@ bash tests/integration/vpointer/build.sh
 if command -v qmllint >/dev/null 2>&1; then
   # Host modules (qs.Commons, qs.Ui, Quickshell.*) are not resolvable offline;
   # only syntax-level problems are reported.
-  for f in Service.qml BarWidget.qml Panel.qml AltTabOverlay.qml TintedIcon.qml SidePanel.qml DockSettingsUi.qml DockWorkspaces.qml; do
+  for f in Service.qml BarWidget.qml Panel.qml AltTabOverlay.qml TintedIcon.qml SidePanel.qml DockSettingsUi.qml DockWorkspaces.qml DockClock.qml OverlayOsd.qml OverlayNotifs.qml OverlayDashboard.qml; do
     if qmllint "$f" 2>&1 | grep -E '^Error' | grep -viE 'import|module' | grep -q .; then
       echo "qmllint: $f has syntax problems"; qmllint "$f" 2>&1 | grep -E '^Error' | head -20; exit 1
     fi

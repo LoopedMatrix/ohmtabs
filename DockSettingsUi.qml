@@ -188,19 +188,19 @@ Item {
     }
     DockToggle {
       title: "Notifications"
-      hint: "Drawer overlay (OhmTabs). Off until built out."
+      hint: "Bell on the dock. Opens OhmTabs drawer (uses Omarchy history)."
       checked: ui.settings.showNotifs === true
       onToggled: ui.save({ showNotifs: !ui.settings.showNotifs })
     }
     DockToggle {
       title: "Dashboard"
-      hint: "Overview overlay (OhmTabs). Off until built out."
+      hint: "Overview overlay of open windows."
       checked: ui.settings.showDashboard === true
       onToggled: ui.save({ showDashboard: !ui.settings.showDashboard })
     }
     DockToggle {
       title: "OSD"
-      hint: "Volume/brightness overlay (OhmTabs). Off until built out."
+      hint: "Volume/brightness pill above the dock when they change."
       checked: ui.settings.showOsd === true
       onToggled: ui.save({ showOsd: !ui.settings.showOsd })
     }

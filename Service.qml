@@ -1038,6 +1038,8 @@ Item {
     function minimize(token: string): string { return root.minimizeToken(token) }
     function openDrawer(): string { root.openDrawer(); return "ok" }
     function openSettings(): string { root.openSettings(); return "ok" }
+    function openNotifs(): string { root.openOverlay({ view: "notifs" }); return "ok" }
+    function openDashboard(): string { root.openOverlay({ view: "dashboard" }); return "ok" }
     function reconcile(): string {
       root.journalConsumed = false
       root.snapshotDone = false

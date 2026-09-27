@@ -838,6 +838,30 @@ function listGroups(state) {
   return out
 }
 
+function parseBrightness(cur, max) {
+  var c = Number(cur)
+  var m = Number(max)
+  if (!isFinite(c) || !isFinite(m) || m <= 0) return { percent: 0 }
+  var pct = Math.round((c / m) * 100)
+  if (pct < 0) pct = 0
+  if (pct > 100) pct = 100
+  return { percent: pct }
+}
+
+function parseWpctlVolume(text) {
+  var s = String(text === undefined || text === null ? "" : text)
+  var m = s.match(/^Volume:\s+([0-9]+(?:\.[0-9]+)?)/m)
+  var pct = 0
+  if (m && m[1] !== undefined) {
+    var v = parseFloat(m[1])
+    if (isFinite(v)) pct = Math.round(v * 100)
+  }
+  if (pct < 0) pct = 0
+  if (pct > 100) pct = 100
+  var muted = /\[MUTED\]/i.test(s)
+  return { percent: pct, muted: muted }
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PLUGIN_ID: PLUGIN_ID, PROTOCOL: PROTOCOL, JOURNAL_SCHEMA: JOURNAL_SCHEMA, JOURNAL_MAX_BYTES: JOURNAL_MAX_BYTES,
@@ -850,8 +874,9 @@ if (typeof module !== "undefined" && module.exports) {
     finishRestore: finishRestore, updateTitle: updateTitle, removeDead: removeDead,
     toJournal: toJournal, parseJournal: parseJournal, reconcile: reconcile,
     restoreDestination: restoreDestination, clampBox: clampBox, originLabel: originLabel, rowsWithOrdinals: rowsWithOrdinals,
-    statusSummary: statusSummary, normalizeSettings: normalizeSettings, readOwnEntry: readOwnEntry,
-    sanitizeAppId: sanitizeAppId, normalizePinned: normalizePinned, togglePinned: togglePinned, isPinned: isPinned,
+ statusSummary: statusSummary, normalizeSettings: normalizeSettings, readOwnEntry: readOwnEntry,
+ sanitizeAppId: sanitizeAppId, normalizePinned: normalizePinned, togglePinned: togglePinned, isPinned: isPinned,
+ parseWpctlVolume: parseWpctlVolume, parseBrightness: parseBrightness,
     TAB_CYCLE_FALLTHROUGH: TAB_CYCLE_FALLTHROUGH,
     createGroup: createGroup, removeGroup: removeGroup, addMember: addMember, removeMember: removeMember,
     moveMember: moveMember, getActiveMember: getActiveMember, setActiveMember: setActiveMember,
