@@ -574,6 +574,13 @@ Item {
           onChosen: function(i) { if (service) service.saveSettings({ buttonsLeft: i === 1 }) }
         }
         SettingRow {
+          label: "Omarchy bar controls"
+          hint: "− □ × on the OhmTabs bar widget for the focused window (not only the per-window strip)"
+          options: ["On", "Off"]
+          current: root.settings.barWindowControls === false ? 1 : 0
+          onChosen: function(i) { if (service) service.saveSettings({ barWindowControls: i === 0 }) }
+        }
+        SettingRow {
           label: "Title strip on hover"
           hint: "Show the window title strip only when the pointer is near the top of a window"
           options: ["Off", "On"]

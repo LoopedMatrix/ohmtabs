@@ -499,7 +499,10 @@ function normalizeSettings(raw) {
     panelPosition: (r.panelPosition === "left" || r.panelPosition === "right" || r.panelPosition === "bottom") ? r.panelPosition : "bottom",
     // Auto-hide is opt-in: the reveal is unreliable (see README "Known issues"),
     // so the panel stays visible unless the user explicitly asks for hiding.
-    panelAutoHide: (r.panelAutoHide === true || r.panelAutoHide === "1" || r.panelAutoHide === "on" || r.panelAutoHide === "true") ? true : false
+    panelAutoHide: (r.panelAutoHide === true || r.panelAutoHide === "1" || r.panelAutoHide === "on" || r.panelAutoHide === "true") ? true : false,
+    // On by default: min/max/close on the Omarchy bar for the focused window,
+    // not only on the per-window title strip.
+    barWindowControls: (r.barWindowControls === false || r.barWindowControls === "0" || r.barWindowControls === "off" || r.barWindowControls === "false") ? false : true
   }
 }
 

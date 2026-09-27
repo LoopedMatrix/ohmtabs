@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import Quickshell.Widgets
 import qs.Commons
 import qs.Ui
@@ -31,6 +32,45 @@ BarWidget {
   readonly property bool sidePanelEnabled: settings ? settings.sidePanel !== false : false
   readonly property string glyph: String.fromCodePoint(0xF05B2)   // nf-md-window_restore: a window stack
   property bool pulse: false
+
+  readonly property bool barWindowControls: settings ? settings.barWindowControls !== false : true
+  readonly property var focusedToplevel: {
+    try { return ToplevelManager.activeToplevel } catch (e) { return null }
+  }
+  readonly property bool haveFocusedWindow: !!(root.focusedToplevel)
+
+  function focusedToken() {
+    var t = root.focusedToplevel
+    if (!t || !service || !service.live) return ""
+    var app = String(t.appId || "").toLowerCase()
+    var title = String(t.title || "")
+    var live = service.live
+    var classHits = []
+    for (var k in live) {
+      var w = live[k]
+      if (!w || !w.token) continue
+      var cls = String(w.class || "").toLowerCase()
+      var wt = String(w.title || "")
+      if (cls === app && wt === title) return w.token
+      if (cls === app) classHits.push(w.token)
+    }
+    return classHits.length === 1 ? classHits[0] : ""
+  }
+
+  function focusedMinimize() {
+    var tok = root.focusedToken()
+    if (tok && service && service.minimizeToken) { service.minimizeToken(tok); return }
+  }
+  function focusedMaximize() {
+    var tok = root.focusedToken()
+    if (tok && service && service.toggleMaximize) { service.toggleMaximize(tok); return }
+  }
+  function focusedClose() {
+    var tok = root.focusedToken()
+    if (tok && service && service.closeWindow) { service.closeWindow(tok); return }
+    var t = root.focusedToplevel
+    if (t && typeof t.close === "function") t.close()
+  }
 
   visible: true
   implicitWidth: vertical ? barSize : layout.implicitWidth
@@ -121,6 +161,34 @@ BarWidget {
         // the widget opens the drawer for the detail view instead.
         root.openDrawer()
       }
+    }
+
+    WidgetButton {
+      visible: root.barWindowControls && !root.vertical
+      bar: root.bar
+      text: "−"
+      fontSize: Style.font.caption
+      dimmed: !root.haveFocusedWindow
+      tooltipText: "Minimize focused window"
+      onPressed: function(button) { if (button === Qt.LeftButton) root.focusedMinimize() }
+    }
+    WidgetButton {
+      visible: root.barWindowControls && !root.vertical
+      bar: root.bar
+      text: "□"
+      fontSize: Style.font.caption
+      dimmed: !root.haveFocusedWindow
+      tooltipText: "Maximize / restore focused window"
+      onPressed: function(button) { if (button === Qt.LeftButton) root.focusedMaximize() }
+    }
+    WidgetButton {
+      visible: root.barWindowControls && !root.vertical
+      bar: root.bar
+      text: "×"
+      fontSize: Style.font.caption
+      dimmed: !root.haveFocusedWindow
+      tooltipText: "Close focused window"
+      onPressed: function(button) { if (button === Qt.LeftButton) root.focusedClose() }
     }
   }
 

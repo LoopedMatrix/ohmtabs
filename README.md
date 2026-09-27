@@ -82,6 +82,8 @@ Every ordinary application window gets a strip above its top edge:
 
 Controls sit on the right by default; `buttonsLeft` moves them to the left. Hide the strip per app with `excludedClasses`.
 
+The OhmTabs **bar widget** also has **− □ ×** for the focused window (same actions, on the Omarchy top bar). Turn that off with **Omarchy bar controls** in Settings.
+
 ### Minimizing and the taskbar
 
 Minimizing moves a window to the special workspace `special:ohmtabs-minimized`. The taskbar is a **46 px icon strip** on the bottom, left, or right — one icon per window, not a Restore-all bar.
