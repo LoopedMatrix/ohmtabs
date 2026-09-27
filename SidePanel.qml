@@ -177,11 +177,31 @@ Item {
     var key = String(cls || "")
     if (key === "") return ""
     var cached = root.iconCache[key]
-    if (cached !== undefined) return cached
+    if (cached) return cached
+    var names = []
+    function add(n) {
+      n = String(n || "")
+      if (!n) return
+      if (names.indexOf(n) < 0) names.push(n)
+    }
+    add(key)
+    var parts = key.split(".")
+    if (parts.length > 1) add(parts[parts.length - 1])
+    var lower = key.toLowerCase()
+    if (lower.indexOf("hermes") >= 0) {
+      add("hermes")
+      add("hermes-desktop")
+    }
     var path = ""
-    var entry = DesktopEntries.heuristicLookup(key)
-    if (entry && entry.icon) path = Quickshell.iconPath(String(entry.icon), true)
-    root.iconCache[key] = path
+    for (var i = 0; i < names.length && !path; i++) {
+      var entry = null
+      try { entry = DesktopEntries.heuristicLookup(names[i]) } catch (e) { entry = null }
+      if (entry && entry.icon)
+        path = Quickshell.iconPath(String(entry.icon), true)
+      if (!path)
+        path = Quickshell.iconPath(names[i], true)
+    }
+    root.iconCache[key] = path || ""
     return path
   }
 
