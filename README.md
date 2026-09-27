@@ -128,10 +128,10 @@ Hovering or clicking a button gives the panel keyboard focus:
 Live OhmTabs 0.1.1 on Omarchy 4 / Hyprland 0.56. The plugin-store card uses [`preview.png`](preview.png).
 
 <p align="center">
-  <img src="docs/screenshots/desktop.png" alt="OhmTabs title strip and 46px icon taskbar on a blank Brave window" width="100%">
+  <img src="docs/screenshots/desktop.png" alt="OhmTabs title strip and 46px icon taskbar" width="100%">
 </p>
 
-<p align="center"><sub>Title strip on the window · 46 px icon taskbar along the bottom (one icon per open or minimized window)</sub></p>
+<p align="center"><sub>Title strip (− □ ×) · 46 px icon taskbar. Gallery frames are diagrams — no live desktop.</sub></p>
 
 <p align="center">
   <img src="docs/screenshots/title-strip.png" alt="OhmTabs title strip: menu, title, minimize, maximize, close" width="100%">
