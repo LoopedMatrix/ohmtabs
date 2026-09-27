@@ -31,6 +31,7 @@ Item {
   property real menuX: 0
   property real menuY: 0
   property bool confirmHide: false
+  property bool confirmClose: false
   property bool showTechnical: false
 
   readonly property color background: Color.menu.background
@@ -83,6 +84,7 @@ Item {
     var wanted = String(payload.view || "drawer")
     if (wanted !== "menu" && wanted !== "settings") wanted = "drawer"
     root.confirmHide = false
+    root.confirmClose = false
     root.selectedIndex = 0
     // The destination is captured when the drawer opens, not when a row is
     // hovered or focus changes later (spec §5.2).
@@ -120,6 +122,7 @@ Item {
 
   function switchView(name) {
     root.confirmHide = false
+    root.confirmClose = false
     root.selectedIndex = 0
     root.view = name
     var ms = root.screenNamed(root.monitorName)
@@ -153,22 +156,20 @@ Item {
   readonly property var menuItems: {
     var w = root.menuLive
     if (!w) return []
-    var minimizeOk = service && service.minimizeEnabled && !w.fullscreen && !w.modal
-    var minimizeWhy = !service || !service.minimizeEnabled ? "Minimize is unavailable until the drawer is ready"
-      : (w.fullscreen ? "Leave fullscreen first" : (w.modal ? "Dialogs are minimized with their window" : ""))
+    var parked = !!w.minimized
+    var minimizeOk = service && service.minimizeEnabled && !w.fullscreen && !w.modal && !parked
+    var minimizeWhy = parked ? "This window is already minimized"
+      : (!service || !service.minimizeEnabled ? "Minimize is unavailable until the taskbar is ready"
+      : (w.fullscreen ? "Leave fullscreen first" : (w.modal ? "Dialogs are minimized with their window" : "")))
+    var parkedWhy = "Restore the window first"
     return [
       { id: "minimize", label: "Minimize", enabled: !!minimizeOk, why: minimizeWhy },
-      // Parked windows keep their origin; the taskbar's right-click used to
-      // reach this directly, so the menu carries it now that right-click
-      // opens the menu instead.
-      { id: "original", label: "Restore to original workspace", enabled: !!w.origin, why: w.origin ? "" : "Only minimized windows have an origin" },
-      { id: "maximize", label: w.maximized ? "Restore size" : "Maximize", enabled: !w.fullscreen, why: w.fullscreen ? "Leave fullscreen first" : "" },
-      { id: "float", label: "Move freely", enabled: true, checked: !!w.floating },
+      { id: "original", label: "Restore", enabled: parked && !!w.origin, why: parked ? (w.origin ? "" : "No original workspace recorded") : "Only minimized windows can restore" },
+      { id: "maximize", label: w.maximized ? "Restore size" : "Maximize", enabled: !w.fullscreen && !parked, why: w.fullscreen ? "Leave fullscreen first" : (parked ? parkedWhy : "") },
+      { id: "float", label: "Move freely", enabled: !parked, checked: !!w.floating, why: parked ? parkedWhy : "" },
       { id: "close", label: "Close", enabled: true },
       { id: "sep" },
-      { id: "drawer", label: "Minimized windows", enabled: true },
-      { id: "hide", label: "Hide OhmTabs for " + (w.class || "this app"), enabled: !!w.class, why: w.class ? "" : "This window has no application class" },
-      { id: "settings", label: "OhmTabs settings", enabled: true }
+      { id: "hide", label: "Hide OhmTabs for " + (w.class || "this window"), enabled: !!w.class, why: w.class ? "" : "This window has no application class" }
     ]
   }
 
@@ -180,10 +181,10 @@ Item {
       case "original": service.restore(token, "original", ""); root.dismiss(); break
       case "maximize": service.toggleMaximize(token); root.dismiss(); break
       case "float": service.setFloating(token, !root.menuLive.floating); root.dismiss(); break
-      case "close": service.closeWindow(token); root.dismiss(); break
-      case "drawer": root.switchView("drawer"); break
+      case "close":
+        if (root.menuLive.minimized) { root.confirmClose = true; break }
+        service.closeWindow(token); root.dismiss(); break
       case "hide": root.confirmHide = true; break
-      case "settings": root.switchView("settings"); break
       default: break
     }
   }
@@ -191,6 +192,12 @@ Item {
   function confirmHideNow() {
     if (root.menuLive && service && service.excludeClass) service.excludeClass(root.menuLive.class)
     root.confirmHide = false
+    root.dismiss()
+  }
+
+  function confirmCloseNow() {
+    if (root.menuLive && service) service.closeWindow(root.menuLive.token)
+    root.confirmClose = false
     root.dismiss()
   }
 
@@ -415,7 +422,7 @@ Item {
         }
 
         Repeater {
-          model: root.confirmHide ? [] : root.menuItems
+          model: (root.confirmHide || root.confirmClose) ? [] : root.menuItems
           delegate: Item {
             required property var modelData
             required property int index
@@ -486,6 +493,26 @@ Item {
             PillButton { label: "Cancel"; onActivated: root.confirmHide = false }
           }
         }
+
+        Column {
+          visible: root.confirmClose
+          width: parent.width
+          spacing: Style.space(6)
+          padding: Style.space(6)
+          Text {
+            width: parent.width - Style.space(12)
+            text: "Close this minimized window? It will exit, not just leave the taskbar."
+            wrapMode: Text.WordWrap
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+          Row {
+            spacing: Style.space(6)
+            PillButton { label: "Close"; onActivated: root.confirmCloseNow() }
+            PillButton { label: "Cancel"; onActivated: root.confirmClose = false }
+          }
+        }
       }
     }
 
@@ -534,49 +561,49 @@ Item {
 
         SettingRow {
           label: "OhmTabs"
-          hint: root.ohmtabsOn ? "Turning it off returns minimized windows first" : "Off: no title strips, Minimize refused"
+          hint: root.ohmtabsOn ? "Off returns minimized windows, then drops the title strips" : "Off: no title strips, Minimize refused"
           options: ["On", "Off"]
           current: root.ohmtabsOn ? 0 : 1
           onChosen: function(i) { root.setOhmTabsOn(i === 0) }
         }
         SettingRow {
-          label: "Controls on"
-          hint: "Actions keep the same meaning on either side"
+          label: "Window controls"
+          hint: "Minimize / maximize / close on the title strip"
           options: ["Right", "Left"]
           current: root.settings.buttonsLeft ? 1 : 0
           onChosen: function(i) { if (service) service.saveSettings({ buttonsLeft: i === 1 }) }
         }
         SettingRow {
-          label: "Top bar on hover"
-          hint: "Strip appears only when the pointer is near the top of a window"
+          label: "Title strip on hover"
+          hint: "Show the window title strip only when the pointer is near the top of a window"
           options: ["Off", "On"]
           current: !root.settings.showOnHover ? 0 : 1
           onChosen: function(i) { if (service) service.saveSettings({ showOnHover: i === 1 }) }
         }
         SettingRow {
-          label: "Minimized windows"
-          hint: "Side panel: a Windows-style bar on the left, shown when a window is minimized"
-          options: ["Side panel", "Drawer"]
+          label: "Taskbar"
+          hint: "Icon strip for open and minimized windows. Drawer keeps the list in this overlay instead."
+          options: ["Icon strip", "Drawer only"]
           current: root.settings.sidePanel ? 0 : 1
           onChosen: function(i) { if (service) service.saveSettings({ sidePanel: i === 0 }) }
         }
         SettingRow {
-          label: "Panel position"
-          hint: "Which screen edge the minimized-window strip sits on"
+          label: "Taskbar edge"
+          hint: "Same 46 px icon strip on every edge. Left/right is no longer a wide title column."
           options: ["Bottom", "Left", "Right"]
           current: root.settings.panelPosition === "left" ? 1 : (root.settings.panelPosition === "right" ? 2 : 0)
           onChosen: function(i) { if (service) service.saveSettings({ panelPosition: i === 0 ? "bottom" : (i === 1 ? "left" : "right") }) }
         }
         SettingRow {
-          label: "Panel auto-hide"
-          hint: "Parked off the edge until the pointer reaches it — off by default while the reveal is unreliable"
-          options: ["On", "Off"]
-          current: root.settings.panelAutoHide ? 0 : 1
-          onChosen: function(i) { if (service) service.saveSettings({ panelAutoHide: i === 0 }) }
+          label: "Taskbar auto-hide"
+          hint: "Off (default): strip stays docked and shows running windows. On: parks off the edge until the pointer reaches it."
+          options: ["Off", "On"]
+          current: root.settings.panelAutoHide ? 1 : 0
+          onChosen: function(i) { if (service) service.saveSettings({ panelAutoHide: i === 1 }) }
         }
         SettingRow {
-          label: "Control size"
-          hint: "Standard 34 px strip · Large 46 px strip, applied immediately"
+          label: "Title strip size"
+          hint: "Standard 34 px · Large 46 px, applied to the window chrome immediately"
           options: ["Standard", "Large"]
           current: root.settings.controlSize === "large" ? 1 : 0
           onChosen: function(i) { if (service) service.saveSettings({ controlSize: i === 1 ? "large" : "standard" }) }

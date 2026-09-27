@@ -47,7 +47,10 @@ Item {
   property int selectedIndex: -1
 
   readonly property bool vertical: panelPosition === "left" || panelPosition === "right"
-  readonly property int panelSize: vertical ? 268 : 46
+  // Same thickness on every edge — a Windows-style icon strip, not a 268px
+  // title column. Left/right used to show a title next to each icon and ate
+  // a quarter of the screen.
+  readonly property int panelSize: 46
   // Pixels of the parked surface left on screen so the pointer can find it.
   readonly property int revealSliver: 4
 
@@ -117,9 +120,7 @@ Item {
   readonly property color urgent: Color.urgent
   readonly property int radius: Style.cornerRadius
   readonly property string fontFamily: Style.font.menuFamily
-  // Bottom strip: compact icon tiles so several windows sit next to each
-  // other. Side strip still has room for a title next to the icon.
-  readonly property int buttonLength: vertical ? (root.panelSize - 10) : 40
+  readonly property int buttonLength: 40
 
   // ------------------------------------------------- app-icon resolution
   //
@@ -188,17 +189,52 @@ Item {
   // A right-click on a taskbar button opens the window menu for that window -
   // the same menu the strip shows - instead of restoring it outright. Grouped
   // buttons target their newest member, the one a left-click would restore.
+  function resolveToken(entry) {
+    if (!entry) return ""
+    var tok = String(entry.token || "")
+    if (!tok && entry.members && entry.members.length)
+      tok = String(entry.members[0].token || "")
+    if (tok) return tok
+    if (!service || !service.live) return ""
+    var m = (entry.members && entry.members.length) ? entry.members[0] : entry
+    var cls = String(m.class || "").toLowerCase()
+    var title = String(m.title || m.label || "")
+    var live = service.live
+    for (var k in live) {
+      var w = live[k]
+      if (!w) continue
+      if (String(w.class || "").toLowerCase() === cls && String(w.title || "") === title)
+        return String(w.token || k)
+    }
+    return ""
+  }
+
+  function openBarMenu(item) {
+    if (!service) return
+    var pt = item ? root.pointOnScreen(item) : { x: 0, y: 0 }
+    service.openOverlay({ view: "settings", x: pt.x, y: pt.y })
+    root.selectedIndex = -1
+  }
+
   function openEntryMenu(row, item) {
     if (!service || !row || !item) return false
-    var tok = String(row.token || "")
-    if (!tok && row.members && row.members.length) tok = String(row.members[0].token || "")
+    var tok = root.resolveToken(row)
     if (!tok) return false
     var pt = root.pointOnScreen(item)
     var live = service.liveWindow ? service.liveWindow(tok) : null
     if (!live) {
-      var m = (row.members && row.members.length) ? row.members[0] : null
-      live = { token: tok, class: m ? String(m.class || "") : "", title: m ? String(m.title || "") : "",
-               floating: m ? !!m.floating : false, minimized: true }
+      var m = (row.members && row.members.length) ? row.members[0] : row
+      live = {
+        token: tok,
+        class: m ? String(m.class || "") : "",
+        title: m ? String(m.title || m.label || "") : "",
+        floating: m ? !!m.floating : false,
+        minimized: true,
+        origin: m ? (m.origin || "") : "",
+        maximized: m ? !!m.maximized : false,
+        fullscreen: false,
+        modal: false
+      }
     }
     service.menuWindow = live
     service.menuX = pt.x
@@ -391,9 +427,12 @@ Item {
         id: panelArea
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.NoButton
+        acceptedButtons: Qt.RightButton
         onEntered: { hideDelay.stop(); root.hovered = true }
         onExited: hideDelay.restart()
+        onClicked: function(m) {
+          if (m.button === Qt.RightButton) root.openBarMenu(panelArea)
+        }
       }
 
       Item {
@@ -714,8 +753,8 @@ Item {
 
       Text {
         anchors.verticalCenter: parent.verticalCenter
-        visible: btn.horizontal
-        width: btn.horizontal ? (parent.width - tileBox.width - 6 - 8 - 8) : 0
+        visible: false
+        width: 0
         text: btn.title
         elide: Text.ElideRight
         color: btn.failed ? root.urgent : root.foreground
@@ -858,7 +897,7 @@ Item {
     property bool horizontal: false
     signal activated()
 
-    width: allText.implicitWidth + 34
+    width: all.horizontal ? 36 : (allText.implicitWidth + 34)
     height: 26
     radius: root.radius
     color: allArea.containsMouse ? root.hoverFill : "transparent"
@@ -879,6 +918,7 @@ Item {
         id: allText
         anchors.verticalCenter: parent.verticalCenter
         text: "Restore all"
+        visible: !all.horizontal
         color: root.foreground
         font.family: root.fontFamily
         font.pixelSize: 11
