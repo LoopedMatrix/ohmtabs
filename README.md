@@ -128,7 +128,7 @@ Hovering or clicking a button gives the panel keyboard focus:
 Live OhmTabs 0.1.1 on Omarchy 4 / Hyprland 0.56. The plugin-store card uses [`preview.png`](preview.png).
 
 <p align="center">
-  <img src="docs/screenshots/desktop.png" alt="OhmTabs title strip and 46px icon taskbar on a tiled Brave window" width="100%">
+  <img src="docs/screenshots/desktop.png" alt="OhmTabs title strip and 46px icon taskbar on a blank Brave window" width="100%">
 </p>
 
 <p align="center"><sub>Title strip on the window · 46 px icon taskbar along the bottom (one icon per open or minimized window)</sub></p>
@@ -142,16 +142,16 @@ Live OhmTabs 0.1.1 on Omarchy 4 / Hyprland 0.56. The plugin-store card uses [`pr
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/settings-full.png" alt="OhmTabs settings: taskbar, edge, auto-hide, title strip" width="100%">
+  <img src="docs/screenshots/settings.png" alt="OhmTabs settings: taskbar, edge, auto-hide, title strip" width="70%">
 </p>
 
 <p align="center"><sub>Settings — taskbar vs drawer, edge, auto-hide (default Off), title-strip size, setup check</sub></p>
 
 <p align="center">
-  <img src="docs/screenshots/drawer.png" alt="OhmTabs minimized-window drawer with Restore and Original workspace" width="80%">
+  <img src="docs/screenshots/drawer.png" alt="OhmTabs minimized-window drawer" width="80%">
 </p>
 
-<p align="center"><sub>Bar-widget drawer — restore a minimized window, or jump to its original workspace</sub></p>
+<p align="center"><sub>Bar-widget drawer</sub></p>
 
 ## Configuration
 
