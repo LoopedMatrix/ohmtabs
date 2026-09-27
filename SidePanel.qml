@@ -9,12 +9,11 @@ import qs.Commons
 // that window. Like the bar widget it registers itself as a restore host, so
 // its presence is what lets the service declare restore access.
 //
-// Windows groups a taskbar entry by application, so windows of the same class
-// collapse into ONE button here too. A stacked marker plus a count chip on the
-// tile advertises the group; hovering the button pops a flyout listing each
-// member so a specific window can still be restored. Single-window buttons keep
-// the window title; grouped buttons show the app name and leave the per-window
-// titles to the flyout, the way Windows leaves them to thumbnail previews.
+// One button per window, icons in a row — not a single "Restore all" that
+// replaces the run. Same-class windows used to collapse into one grouped
+// tile; the grouped flyout is still there if a caller builds a multi-member
+// entry, but the default model does not group. With auto-hide off the strip
+// stays mapped and running windows join the run (ToplevelManager.activate).
 //
 // Position is configurable (left / right / bottom) and it can auto-hide. When
 // parked, the surface stays mapped and slides just past its screen edge,
@@ -55,33 +54,50 @@ Item {
   readonly property var rows: (service && service.rows) ? service.rows : []
   readonly property int count: rows.length
 
-  // Windows groups by application: fold rows of the same class into one group,
-  // ordered by their newest member so a group sits where its most recent
-  // window is. Each group carries its members (newest first) and nothing else;
-  // the button derives badge/title/attention from them so there is one source
-  // of truth for how a group reads.
-  readonly property var groups: {
+  // One button per window. `groups` is kept as an alias of `items` so the
+  // leftover grouped-flyout path still compiles; the model itself does not
+  // fold by class (that plus a full-width Restore-all hid every icon).
+  property int toplevelGen: 0
+  readonly property var items: {
+    var gen = root.toplevelGen
     var out = []
-    var byKey = {}
+    var seen = {}
     var list = root.rows
     for (var i = 0; i < list.length; i++) {
       var r = list[i]
-      // Class is the app identity; a window without one falls back to its
-      // title so it still gets a button rather than vanishing into the crowd.
-      var key = String(r.class || r.title || "?")
-      var g = byKey[key]
-      if (!g) {
-        g = { key: key, members: [] }
-        byKey[key] = g
-        out.push(g)
+      var tok = String(r.token || "")
+      var cls = String(r.class || "").toLowerCase()
+      var title = String(r.title || r.label || "")
+      if (tok) seen[tok] = true
+      seen[cls + "\n" + title] = true
+      out.push({ key: tok || ("m" + i), members: [r], kind: "minimized" })
+    }
+    if (!root.panelAutoHide) {
+      var tops = []
+      try { tops = ToplevelManager.toplevels.values } catch (e) { tops = [] }
+      for (var j = 0; j < tops.length; j++) {
+        var t = tops[j]
+        if (!t) continue
+        var app = String(t.appId || "").toLowerCase()
+        var tt = String(t.title || "")
+        if (seen[app + "\n" + tt]) continue
+        if (app === "" && tt === "") continue
+        out.push({
+          key: "live:" + j + ":" + app,
+          members: [{ class: t.appId || "", title: tt, label: tt, token: "", status: "live" }],
+          kind: "open",
+          toplevel: t
+        })
       }
-      g.members.push(r)
     }
     return out
   }
+  readonly property var groups: root.items
 
-  // Nothing to show -> no surface at all, and no stray edge strip either.
-  readonly property bool live: panelEnabled && count > 0
+  // Nothing to show -> no surface at all, unless the strip is docked (auto-hide
+  // off), in which case it stays mapped so running windows have somewhere to
+  // sit and tiled windows keep the reserved edge.
+  readonly property bool live: panelEnabled && (root.items.length > 0 || !panelAutoHide)
   // Auto-hide parks it while the pointer is away and nothing is selected.
   readonly property bool parked: panelAutoHide && !hovered && selectedIndex < 0
 
@@ -101,7 +117,9 @@ Item {
   readonly property color urgent: Color.urgent
   readonly property int radius: Style.cornerRadius
   readonly property string fontFamily: Style.font.menuFamily
-  readonly property int buttonLength: vertical ? root.panelSize : 184
+  // Bottom strip: compact icon tiles so several windows sit next to each
+  // other. Side strip still has room for a title next to the icon.
+  readonly property int buttonLength: vertical ? (root.panelSize - 10) : 40
 
   // ------------------------------------------------- app-icon resolution
   //
@@ -113,8 +131,9 @@ Item {
   //      from the entry id still resolves (org.gnome.Nautilus vs nautilus,
   //      brave-browser, flatpak ids with dots) — the same lookup Omarchy's
   //      own AppLibrary / NotificationCard rely on.
-  //   2. generic executable    — Quickshell.iconPath("application-x-executable", true).
-  //   3. ""                    — the caller keeps the existing letter tile.
+  //   2. letter tile           — the class's own initial, so two unknown apps
+  //      still look different.
+  //   3. generic executable    — last; it identifies nothing.
   // iconPath's `check=true` returns "" for unknown names instead of Qt's
   // missing-texture placeholder.
   readonly property int iconSize: 20        // logical px, inside the 26px tile
@@ -148,7 +167,6 @@ Item {
     var path = ""
     var entry = DesktopEntries.heuristicLookup(key)
     if (entry && entry.icon) path = Quickshell.iconPath(String(entry.icon), true)
-    if (path === "") path = Quickshell.iconPath("application-x-executable", true)
     root.iconCache[key] = path
     return path
   }
@@ -200,8 +218,18 @@ Item {
   // any specific one. This mirrors Windows, where clicking a grouped taskbar
   // button brings up the most recently used window of that app.
   function restoreGroup(group, original) {
-    if (!group || !group.members || group.members.length === 0) return
-    root.restoreRow(group.members[0], original)
+    root.activateItem(group, original)
+  }
+
+  function activateItem(item, original) {
+    if (!item) return
+    if (item.kind === "open" && item.toplevel) {
+      try { item.toplevel.activate() } catch (e) {}
+      root.selectedIndex = -1
+      return
+    }
+    if (!item.members || item.members.length === 0) return
+    root.restoreRow(item.members[0], original)
   }
 
   function restoreAll() {
@@ -256,6 +284,16 @@ Item {
     interval: 260
     repeat: false
     onTriggered: root.hovered = false
+  }
+
+  Connections {
+    target: ToplevelManager
+    function onActiveToplevelChanged() { root.toplevelGen++ }
+  }
+  Connections {
+    target: ToplevelManager.toplevels
+    ignoreUnknownSignals: true
+    function onValuesChanged() { root.toplevelGen++ }
   }
 
   // Last window restored -> drop any selection so nothing lingers, and drop a
@@ -381,7 +419,9 @@ Item {
         visible: root.count > 1
         horizontal: root.vertical
         anchors.right: root.vertical ? undefined : parent.right
+        anchors.verticalCenter: root.vertical ? undefined : parent.verticalCenter
         anchors.bottom: root.vertical ? parent.bottom : undefined
+        anchors.horizontalCenter: root.vertical ? parent.horizontalCenter : undefined
         anchors.rightMargin: root.vertical ? 0 : 6
         anchors.bottomMargin: root.vertical ? 6 : 0
         onActivated: root.restoreAll()
@@ -396,7 +436,7 @@ Item {
         anchors.bottomMargin: (root.vertical && allButton.visible) ? allButton.height + 12 : 5
         spacing: 4
         clip: true
-        model: root.groups
+        model: root.items
         currentIndex: root.selectedIndex
 
         delegate: TaskButton {
@@ -407,7 +447,7 @@ Item {
           horizontal: root.vertical
           length: root.buttonLength
           thickness: root.panelSize - 10
-          onActivated: function(original) { root.restoreGroup(modelData, original) }
+          onActivated: function(original) { root.activateItem(modelData, original) }
           onHovered: root.selectedIndex = index
         }
       }
@@ -674,7 +714,8 @@ Item {
 
       Text {
         anchors.verticalCenter: parent.verticalCenter
-        width: parent.width - tileBox.width - 6 - 8 - 8
+        visible: btn.horizontal
+        width: btn.horizontal ? (parent.width - tileBox.width - 6 - 8 - 8) : 0
         text: btn.title
         elide: Text.ElideRight
         color: btn.failed ? root.urgent : root.foreground
@@ -817,8 +858,8 @@ Item {
     property bool horizontal: false
     signal activated()
 
-    width: all.horizontal ? (allText.implicitWidth + 34) : (all.parent ? all.parent.width - 10 : 0)
-    height: all.horizontal ? (all.parent ? all.parent.height - 10 : 26) : 26
+    width: allText.implicitWidth + 34
+    height: 26
     radius: root.radius
     color: allArea.containsMouse ? root.hoverFill : "transparent"
     border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
