@@ -125,9 +125,34 @@ Hovering or clicking a button gives the panel keyboard focus:
 
 ## Screenshots
 
-Screenshots are being re-captured on a current build — this machine's compositor
-(Hyprland 0.56) has no `wlr-screencopy`, so `grim` cannot capture here and the
-upstream captures that used to sit here were from a different desktop.
+Live OhmTabs 0.1.1 on Omarchy 4 / Hyprland 0.56. The plugin-store card uses [`preview.png`](preview.png).
+
+<p align="center">
+  <img src="docs/screenshots/desktop.png" alt="OhmTabs title strip and 46px icon taskbar on a tiled Brave window" width="100%">
+</p>
+
+<p align="center"><sub>Title strip on the window · 46 px icon taskbar along the bottom (one icon per open or minimized window)</sub></p>
+
+<p align="center">
+  <img src="docs/screenshots/title-strip.png" alt="OhmTabs title strip: menu, title, minimize, maximize, close" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/taskbar.png" alt="OhmTabs icon taskbar with one icon per window" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/settings-full.png" alt="OhmTabs settings: taskbar, edge, auto-hide, title strip" width="100%">
+</p>
+
+<p align="center"><sub>Settings — taskbar vs drawer, edge, auto-hide (default Off), title-strip size, setup check</sub></p>
+
+<p align="center">
+  <img src="docs/screenshots/drawer.png" alt="OhmTabs minimized-window drawer with Restore and Original workspace" width="80%">
+</p>
+
+<p align="center"><sub>Bar-widget drawer — restore a minimized window, or jump to its original workspace</sub></p>
+
 ## Configuration
 
 Settings live in the plugin's `shell.json` entry — edit them in **Settings** (bar widget → right-click → Settings) or directly in the shell config. All of them hot-apply; no shell restart.
