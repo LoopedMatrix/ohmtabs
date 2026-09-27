@@ -89,11 +89,21 @@ Item {
     // The destination is captured when the drawer opens, not when a row is
     // hovered or focus changes later (spec §5.2).
     root.monitorName = service && service.currentMonitorName ? service.currentMonitorName() : ""
+    if (payload.monitor) {
+      var named = root.screenNamed(payload.monitor)
+      if (named) panel.screen = named
+    } else if (payload.x || payload.y) {
+      var at = root.screenAt(Number(payload.x) || 0, Number(payload.y) || 0)
+      if (at) panel.screen = at
+    }
     if (wanted === "menu") {
       var token = String(payload.token || "")
       var live = service && service.liveWindow ? service.liveWindow(token) : null
-      if (!live && service && service.menuWindow && service.menuWindow.token === token) live = service.menuWindow
-      if (!live) { wanted = "drawer" } else {
+      if (!live && service && service.menuWindow && (!token || service.menuWindow.token === token)) live = service.menuWindow
+      if (!live && payload.appId) {
+        live = { token: token, class: String(payload.appId), title: String(payload.appId), minimized: false, floating: false, origin: "", maximized: false, fullscreen: false, modal: false }
+      }
+      if (!live) { wanted = "settings" } else {
         root.menuTarget = live
         root.menuX = Number(payload.x) || 0
         root.menuY = Number(payload.y) || 0
@@ -101,7 +111,7 @@ Item {
         if (s) panel.screen = s
       }
     }
-    if (wanted !== "menu") {
+    if (wanted !== "menu" && !payload.monitor && !(payload.x || payload.y)) {
       var ms = root.screenNamed(root.monitorName)
       if (ms) panel.screen = ms
     }
@@ -163,6 +173,9 @@ Item {
       : (w.fullscreen ? "Leave fullscreen first" : (w.modal ? "Dialogs are minimized with their window" : "")))
     var parkedWhy = "Restore the window first"
     return [
+      { id: "pin", label: service && service.settings && Model.isPinned(service.settings.pinnedApps, w.class) ? "Unpin from dock" : "Pin to dock", enabled: !!w.class, why: w.class ? "" : "No application id" },
+      { id: "launch", label: "Launch", enabled: !!w.class, why: w.class ? "" : "No application id" },
+      { id: "sep0" },
       { id: "minimize", label: "Minimize", enabled: !!minimizeOk, why: minimizeWhy },
       { id: "original", label: "Restore", enabled: parked && !!w.origin, why: parked ? (w.origin ? "" : "No original workspace recorded") : "Only minimized windows can restore" },
       { id: "maximize", label: w.maximized ? "Restore size" : "Maximize", enabled: !w.fullscreen && !parked, why: w.fullscreen ? "Leave fullscreen first" : (parked ? parkedWhy : "") },
@@ -177,6 +190,15 @@ Item {
     if (!item || !item.enabled || !root.menuLive || !service) return
     var token = root.menuLive.token
     switch (item.id) {
+      case "pin":
+        if (service.saveSettings) service.saveSettings({ pinnedApps: Model.togglePinned(service.settings.pinnedApps, root.menuLive.class) })
+        root.dismiss(); break
+      case "launch":
+        try {
+          var desk = String(root.menuLive.class || "")
+          Quickshell.execDetached(["gtk-launch", desk])
+        } catch (e) {}
+        root.dismiss(); break
       case "minimize": service.minimizeToken(token); root.dismiss(); break
       case "original": service.restore(token, "original", ""); root.dismiss(); break
       case "maximize": service.toggleMaximize(token); root.dismiss(); break

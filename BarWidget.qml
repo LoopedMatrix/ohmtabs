@@ -214,5 +214,8 @@ BarWidget {
     pinnedApps: root.settings && root.settings.pinnedApps ? root.settings.pinnedApps : []
     showAppsButton: root.settings ? root.settings.showAppsButton !== false : true
     dockDodge: root.settings ? root.settings.dockDodge === true : false
+    showRunning: root.settings ? root.settings.showRunning !== false : true
+    showWorkspaces: root.settings ? root.settings.showWorkspaces === true : false
+    showClock: root.settings ? root.settings.showClock === true : false
   }
 }

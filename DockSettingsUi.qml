@@ -169,6 +169,24 @@ Item {
       onToggled: ui.save({ showAppsButton: ui.settings.showAppsButton === false })
     }
     DockToggle {
+      title: "Running apps"
+      hint: "Show open windows on the dock."
+      checked: ui.settings.showRunning !== false
+      onToggled: ui.save({ showRunning: ui.settings.showRunning === false })
+    }
+    DockToggle {
+      title: "Workspaces"
+      hint: "Workspace marker on the dock (OhmTabs, not Caelestia)."
+      checked: ui.settings.showWorkspaces === true
+      onToggled: ui.save({ showWorkspaces: !ui.settings.showWorkspaces })
+    }
+    DockToggle {
+      title: "Clock"
+      hint: "Time on the dock."
+      checked: ui.settings.showClock === true
+      onToggled: ui.save({ showClock: !ui.settings.showClock })
+    }
+    DockToggle {
       title: "Hide when windows overlap"
       hint: "Park the dock if a window covers it. Off keeps the reserved strip."
       checked: ui.settings.dockDodge === true

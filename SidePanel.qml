@@ -50,6 +50,10 @@ Item {
   property var pinnedApps: []
   property bool showAppsButton: true
   property bool dockDodge: false
+  property bool showRunning: true
+  property bool showWorkspaces: false
+  property bool showClock: false
+  property string clockText: Qt.formatTime(new Date(), "hh:mm")
   property bool windowsOverlapDock: false
   // A taskbar that is always there must not sit on top of windows: it reserves
   // its own strip the way the Windows taskbar does, and tiled windows end above
@@ -89,6 +93,8 @@ Item {
     }
     if (root.showAppsButton)
       out.push({ key: "apps", kind: "apps", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
+    if (root.showWorkspaces)
+      out.push({ key: "ws", kind: "workspaces", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
 
     var minBy = {}
     var list = root.rows
@@ -130,7 +136,9 @@ Item {
     }
     var pins = root.pinnedApps || []
     for (var p = 0; p < pins.length; p++) pushApp(pins[p], true)
-    for (var app in liveBy) pushApp(app, false)
+    if (root.showRunning) {
+      for (var app in liveBy) pushApp(app, false)
+    }
     for (var mc in minBy) {
       if (seen[mc]) continue
       var mem3 = minBy[mc]
@@ -138,6 +146,8 @@ Item {
         out.push({ key: String(mem3[k].token || ("m" + k)), kind: "minimized", appId: mc, pinned: false, members: [mem3[k]], toplevel: null, liveCount: 0, minCount: 1 })
       }
     }
+    if (root.showClock)
+      out.push({ key: "clock", kind: "clock", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
     return out
   }
   readonly property var groups: root.items
@@ -242,12 +252,22 @@ Item {
   // have no mapToGlobal, so the panel's own anchor geometry is added to the
   // item's position within the surface.
   function pointOnScreen(item) {
-    var p = item.mapToItem(panel.contentItem, item.width / 2, item.height / 2)
     var sc = panel.screen
+    if (!item) {
+      if (!sc) return { x: 0, y: 0 }
+      return { x: sc.x + sc.width / 2, y: sc.y + sc.height - Math.round(root.panelSize / 2) }
+    }
+    var p = item.mapToItem(panel.contentItem, item.width / 2, item.height / 2)
     if (!sc) return { x: p.x, y: p.y }
-    var dx = root.panelPosition === "right" ? (sc.width - root.panelSize) : 0
-    var dy = root.panelPosition === "bottom" ? (sc.height - root.panelSize) : 0
-    return { x: sc.x + p.x + dx, y: sc.y + p.y + dy }
+    var layerH = panel.height > 0 ? panel.height : (root.panelSize + root.magBloom)
+    var layerW = panel.width > 0 ? panel.width : sc.width
+    var layerX = 0
+    var layerY = 0
+    if (root.panelPosition === "bottom") layerY = sc.height - layerH
+    else if (root.panelPosition === "top") layerY = 0
+    else if (root.panelPosition === "right") layerX = sc.width - layerW
+    else if (root.panelPosition === "left") layerX = 0
+    return { x: sc.x + layerX + p.x, y: sc.y + layerY + p.y }
   }
 
   // A right-click on a taskbar button opens the window menu for that window -
@@ -275,24 +295,29 @@ Item {
 
   function openBarMenu(item) {
     if (!service) return
-    var pt = item ? root.pointOnScreen(item) : { x: 0, y: 0 }
-    service.openOverlay({ view: "settings", x: pt.x, y: pt.y })
+    var pt = root.pointOnScreen(item)
+    var name = panel.screen ? String(panel.screen.name) : ""
+    service.openOverlay({ view: "settings", x: pt.x, y: pt.y, monitor: name })
     root.selectedIndex = -1
   }
 
   function openEntryMenu(row, item) {
     if (!row || !item) return false
-    if (row.kind === "apps") { root.openBarMenu(item); return true }
+    if (row.kind === "apps" || row.kind === "clock" || row.kind === "workspaces") {
+      root.openBarMenu(item)
+      return true
+    }
     var tok = root.resolveToken(row)
+    var pt = root.pointOnScreen(item)
+    var name = panel.screen ? String(panel.screen.name) : ""
     if (tok && service) {
-      var pt = root.pointOnScreen(item)
       var live = service.liveWindow ? service.liveWindow(tok) : null
       if (!live) {
         var m = (row.members && row.members.length) ? row.members[0] : row
         live = {
           token: tok,
-          class: m ? String(m.class || "") : "",
-          title: m ? String(m.title || m.label || "") : "",
+          class: m ? String(m.class || row.appId || "") : String(row.appId || ""),
+          title: m ? String(m.title || m.label || "") : String(row.appId || ""),
           floating: m ? !!m.floating : false,
           minimized: true,
           origin: m ? (m.origin || "") : "",
@@ -304,12 +329,26 @@ Item {
       service.menuWindow = live
       service.menuX = pt.x
       service.menuY = pt.y
-      service.openOverlay({ view: "menu", token: tok, x: pt.x, y: pt.y })
+      service.openOverlay({ view: "menu", token: tok, x: pt.x, y: pt.y, monitor: name, appId: row.appId || live.class })
       root.selectedIndex = -1
       return true
     }
+    if (service) {
+      service.menuWindow = {
+        token: "",
+        class: String(row.appId || ""),
+        title: String(row.appId || "App"),
+        floating: false,
+        minimized: false,
+        origin: "",
+        maximized: false,
+        fullscreen: false,
+        modal: false
+      }
+      service.openOverlay({ view: "menu", token: "", x: pt.x, y: pt.y, monitor: name, appId: row.appId || "" })
+    }
     root.menuEntry = row
-    dockItemMenu.popup()
+    try { dockItemMenu.popup(item) } catch (e) { try { dockItemMenu.popup() } catch (e2) {} }
     root.selectedIndex = -1
     return true
   }
@@ -428,6 +467,12 @@ Item {
     interval: 260
     repeat: false
     onTriggered: root.hovered = false
+  }
+  Timer {
+    interval: 15000
+    running: root.showClock
+    repeat: true
+    onTriggered: root.clockText = Qt.formatTime(new Date(), "hh:mm")
   }
 
   Connections {
@@ -564,14 +609,22 @@ Item {
       }
 
       MouseArea {
-        id: panelArea
+        id: hoverCatch
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.RightButton
+        acceptedButtons: Qt.NoButton
         onEntered: { hideDelay.stop(); root.hovered = true }
         onExited: hideDelay.restart()
+        z: 0
+      }
+
+      MouseArea {
+        id: bandMenu
+        anchors.fill: dockBand
+        acceptedButtons: Qt.RightButton
+        z: 1
         onClicked: function(m) {
-          if (m.button === Qt.RightButton) root.openBarMenu(panelArea)
+          if (m.button === Qt.RightButton) root.openBarMenu(dockBand)
         }
       }
 
@@ -750,6 +803,8 @@ Item {
     // button still says something useful before the flyout exists.
     readonly property string title: {
       if (btn.entry && btn.entry.kind === "apps") return "Apps"
+      if (btn.entry && btn.entry.kind === "clock") return root.clockText
+      if (btn.entry && btn.entry.kind === "workspaces") return "WS"
       if (btn.first === null) return "Window"
       if (btn.grouped) {
         var c = String(btn.first.class || "")
@@ -759,6 +814,8 @@ Item {
     }
     readonly property string badge: {
       if (btn.entry && btn.entry.kind === "apps") return "▦"
+      if (btn.entry && btn.entry.kind === "clock") return root.clockText
+      if (btn.entry && btn.entry.kind === "workspaces") return "W"
       var c = btn.first ? String(btn.first.class || btn.first.title || "?") : "?"
       return c.length ? c.charAt(0).toUpperCase() : "?"
     }

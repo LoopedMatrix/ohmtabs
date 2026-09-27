@@ -539,7 +539,10 @@ function normalizeSettings(raw) {
     cornerShape: (r.cornerShape === "square" || r.cornerShape === "rounded") ? r.cornerShape : "pill",
     pinnedApps: normalizePinned(r.pinnedApps),
     showAppsButton: (r.showAppsButton === false || r.showAppsButton === "0" || r.showAppsButton === "off" || r.showAppsButton === "false") ? false : true,
-    dockDodge: (r.dockDodge === true || r.dockDodge === "1" || r.dockDodge === "on" || r.dockDodge === "true") ? true : false
+    dockDodge: (r.dockDodge === true || r.dockDodge === "1" || r.dockDodge === "on" || r.dockDodge === "true") ? true : false,
+    showRunning: (r.showRunning === false || r.showRunning === "0" || r.showRunning === "off" || r.showRunning === "false") ? false : true,
+    showWorkspaces: (r.showWorkspaces === true || r.showWorkspaces === "1" || r.showWorkspaces === "on" || r.showWorkspaces === "true") ? true : false,
+    showClock: (r.showClock === true || r.showClock === "1" || r.showClock === "on" || r.showClock === "true") ? true : false
   }
 }
 
