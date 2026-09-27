@@ -605,14 +605,24 @@ Item {
 
       Rectangle {
         id: dockBand
-        anchors.left: (root.fullLength || root.vertical) ? parent.left : undefined
-        anchors.right: (root.fullLength && !root.vertical) || root.panelPosition === "right" ? parent.right : undefined
-        anchors.horizontalCenter: (!root.fullLength && !root.vertical) ? parent.horizontalCenter : undefined
-        anchors.top: root.vertical ? parent.top : (root.panelPosition === "top" ? parent.top : undefined)
-        anchors.bottom: root.vertical ? parent.bottom : (root.panelPosition === "top" ? undefined : parent.bottom)
-        anchors.verticalCenter: (!root.fullLength && root.vertical) ? parent.verticalCenter : undefined
-        width: root.vertical ? root.panelSize : ((!root.fullLength) ? Math.min(parent.width - 48, Math.max(root.panelSize, list.contentWidth + 28)) : undefined)
-        height: root.vertical ? ((!root.fullLength) ? Math.min(parent.height - 48, Math.max(root.panelSize, list.contentHeight + 28)) : undefined) : root.panelSize
+        width: {
+          if (root.vertical) return root.panelSize
+          if (root.fullLength) return parent.width
+          var n = Math.max(1, root.items.length)
+          var extra = (root.showWorkspaces ? 88 : 0) + (root.showClock ? 56 : 0)
+          return Math.min(parent.width - 48, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
+        }
+        height: {
+          if (!root.vertical) return root.panelSize
+          if (root.fullLength) return parent.height
+          var n = Math.max(1, root.items.length)
+          var extra = (root.showWorkspaces ? 88 : 0) + (root.showClock ? 56 : 0)
+          return Math.min(parent.height - 48, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
+        }
+        x: root.vertical ? (root.panelPosition === "right" ? parent.width - width : 0)
+                         : (root.fullLength ? 0 : Math.round((parent.width - width) / 2))
+        y: root.vertical ? (root.fullLength ? 0 : Math.round((parent.height - height) / 2))
+                         : (root.panelPosition === "top" ? 0 : parent.height - height)
         radius: root.dockRadius
         color: Qt.rgba(root.background.r, root.background.g, root.background.b, root.panelBgOpacity)
         border.color: root.panelBorder ? Qt.rgba(root.dockAccent.r, root.dockAccent.g, root.dockAccent.b, root.panelBorderOpacity) : "transparent"
