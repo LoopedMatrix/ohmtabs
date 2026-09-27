@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Wayland
 import QtQuick
+import QtQuick.Controls
 import qs.Commons
 
 // SidePanel — the Windows-11-style minimized-window taskbar for OhmTabs.
@@ -35,6 +36,9 @@ Item {
   property bool panelEnabled: true
   property string panelPosition: "bottom"    // "left" | "right" | "bottom"
   property bool panelAutoHide: false   // opt-in: the edge reveal is unreliable
+  property int iconPixelSize: 24       // 16–32, from settings.iconSize
+  property bool tintIcons: false       // colorize app icons to theme ink
+  property bool showIconName: false    // hover label above the icon
   // A taskbar that is always there must not sit on top of windows: it reserves
   // its own strip the way the Windows taskbar does, and tiled windows end above
   // it. Auto-hide deliberately overlays instead - reserving space that appears
@@ -137,7 +141,7 @@ Item {
   //   3. generic executable    — last; it identifies nothing.
   // iconPath's `check=true` returns "" for unknown names instead of Qt's
   // missing-texture placeholder.
-  readonly property int iconSize: 20        // logical px, inside the 26px tile
+  readonly property int iconSize: Math.max(16, Math.min(32, root.iconPixelSize))
   readonly property int flyoutIconSize: 16  // per-window flyout row icon
 
   // Monitors here are 1.25x (DP-1) and 1x (DP-2). sourceSize is handed to the
@@ -669,6 +673,9 @@ Item {
         if (m.button === Qt.RightButton) { root.openEntryMenu(btn.entry, btn); return }
         btn.activated(false)
       }
+      ToolTip.visible: root.showIconName && btnArea.containsMouse && btn.title !== ""
+      ToolTip.text: btn.title
+      ToolTip.delay: 350
     }
 
     Row {
@@ -684,25 +691,24 @@ Item {
       Item {
         id: tileBox
         anchors.verticalCenter: parent.verticalCenter
-        width: 26
-        height: 26
+        width: root.iconSize + 6
+        height: root.iconSize + 6
 
         Rectangle {
           id: tile
           anchors.fill: parent
           radius: 7
           color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
-          Image {
+          TintedIcon {
             id: tileIcon
             anchors.centerIn: parent
             width: root.iconSize
             height: root.iconSize
-            sourceSize.width: Math.round(root.iconSize * root.iconDpr)
-            sourceSize.height: Math.round(root.iconSize * root.iconDpr)
-            fillMode: Image.PreserveAspectFit
-            smooth: true
+            sourceOversample: Math.round(root.iconSize * root.iconDpr * 2)
             visible: btn.iconSource !== ""
             source: btn.iconSource
+            tinted: root.tintIcons && btn.iconSource !== ""
+            ink: root.foreground
           }
           Text {
             anchors.centerIn: parent
@@ -821,15 +827,14 @@ Item {
       anchors.leftMargin: 10
       width: 16
       height: 16
-      Image {
+      TintedIcon {
         id: rowIcon
         anchors.fill: parent
-        sourceSize.width: Math.round(root.flyoutIconSize * root.iconDpr)
-        sourceSize.height: Math.round(root.flyoutIconSize * root.iconDpr)
-        fillMode: Image.PreserveAspectFit
-        smooth: true
+        sourceOversample: Math.round(root.flyoutIconSize * root.iconDpr * 2)
         visible: frow.iconSource !== ""
         source: frow.iconSource
+        tinted: root.tintIcons && frow.iconSource !== ""
+        ink: root.foreground
       }
       Rectangle {
         anchors.fill: parent

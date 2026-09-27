@@ -502,7 +502,18 @@ function normalizeSettings(raw) {
     panelAutoHide: (r.panelAutoHide === true || r.panelAutoHide === "1" || r.panelAutoHide === "on" || r.panelAutoHide === "true") ? true : false,
     // On by default: min/max/close on the Omarchy bar for the focused window,
     // not only on the per-window title strip.
-    barWindowControls: (r.barWindowControls === false || r.barWindowControls === "0" || r.barWindowControls === "off" || r.barWindowControls === "false") ? false : true
+    barWindowControls: (r.barWindowControls === false || r.barWindowControls === "0" || r.barWindowControls === "off" || r.barWindowControls === "false") ? false : true,
+    // Taskbar icons (from animated.dock's TintedIcon / iconSize / tintIcons).
+    // Size is clamped so the 46px strip still fits; tint maps artwork to theme ink.
+    iconSize: (function() {
+      var n = parseInt(r.iconSize, 10)
+      if (!(n > 0)) n = 24
+      if (n < 16) n = 16
+      if (n > 32) n = 32
+      return n
+    })(),
+    tintIcons: (r.tintIcons === true || r.tintIcons === "1" || r.tintIcons === "on" || r.tintIcons === "true") ? true : false,
+    showIconName: (r.showIconName === true || r.showIconName === "1" || r.showIconName === "on" || r.showIconName === "true") ? true : false
   }
 }
 

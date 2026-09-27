@@ -201,5 +201,8 @@ BarWidget {
     panelEnabled: root.sidePanelEnabled
     panelPosition: root.settings ? String(root.settings.panelPosition || "bottom") : "bottom"
     panelAutoHide: root.settings ? root.settings.panelAutoHide === true : false
+    iconPixelSize: root.settings && root.settings.iconSize ? Number(root.settings.iconSize) : 24
+    tintIcons: root.settings ? root.settings.tintIcons === true : false
+    showIconName: root.settings ? root.settings.showIconName === true : false
   }
 }

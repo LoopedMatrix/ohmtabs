@@ -609,6 +609,27 @@ Item {
           onChosen: function(i) { if (service) service.saveSettings({ panelAutoHide: i === 1 }) }
         }
         SettingRow {
+          label: "Taskbar icon size"
+          hint: "App icons on the strip. Small 16 · Medium 24 · Large 32 (strip stays 46 px)."
+          options: ["Small", "Medium", "Large"]
+          current: root.settings.iconSize >= 32 ? 2 : (root.settings.iconSize <= 16 ? 0 : 1)
+          onChosen: function(i) { if (service) service.saveSettings({ iconSize: i === 0 ? 16 : (i === 2 ? 32 : 24) }) }
+        }
+        SettingRow {
+          label: "Taskbar icon tint"
+          hint: "Colorize app icons to the theme ink (animated.dock style). Off keeps original artwork."
+          options: ["Off", "On"]
+          current: root.settings.tintIcons ? 1 : 0
+          onChosen: function(i) { if (service) service.saveSettings({ tintIcons: i === 1 }) }
+        }
+        SettingRow {
+          label: "Icon name on hover"
+          hint: "Show the window title when the pointer is on a taskbar icon."
+          options: ["Off", "On"]
+          current: root.settings.showIconName ? 1 : 0
+          onChosen: function(i) { if (service) service.saveSettings({ showIconName: i === 1 }) }
+        }
+        SettingRow {
           label: "Title strip size"
           hint: "Standard 34 px · Large 46 px, applied to the window chrome immediately"
           options: ["Standard", "Large"]

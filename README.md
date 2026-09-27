@@ -169,6 +169,9 @@ Settings live in the plugin's `shell.json` entry — edit them in **Settings** (
 | `sidePanel` | bool | `true` | Windows-style taskbar (`true`) vs the in-bar drawer only (`false`). |
 | `panelPosition` | `"bottom"` \| `"left"` \| `"right"` | `"bottom"` | Screen edge the taskbar sits on. |
 | `panelAutoHide` | bool | `false` | Opt-in. Park the taskbar off the edge until the pointer reaches it. Off (default): the strip stays docked and shows running windows. |
+| `iconSize` | 16–32 | `24` | Taskbar app-icon pixel size (Small / Medium / Large in settings). |
+| `tintIcons` | bool | `false` | Colorize taskbar icons to the theme ink (`TintedIcon`, from animated.dock). |
+| `showIconName` | bool | `false` | Show the window title when hovering a taskbar icon. |
 | `tabGroups` | bool | `false` | Enable window tabs (host/tab creation, `groupCycle`, close-all confirmation). The tab strip itself is drawn natively on the host's title strip. |
 
 Unknown keys are ignored and invalid values fall back to the default; validation lives in [`OhmTabsModel.js`](OhmTabsModel.js) (`normalizeSettings`).
@@ -297,4 +300,4 @@ A rebuilt `.so` is not picked up while it is mapped into the running compositor:
 
 ## License & credits
 
-MIT — see [LICENSE](LICENSE). The native title-strip backend derives from **hyprbars** and is BSD-3-Clause (see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)). OhmTabs is a fork of **grabbar by [Greyforge Labs](https://github.com/GreyforgeLabs/omarchy-grabbar)**; both upstream notices are retained intact, as required for a fork. Fork maintained by [LoopedMatrix](https://github.com/LoopedMatrix).
+MIT — see [LICENSE](LICENSE). The native title-strip backend derives from **hyprbars** and is BSD-3-Clause (see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)). OhmTabs is a fork of **grabbar by [Greyforge Labs](https://github.com/GreyforgeLabs/omarchy-grabbar)**; both upstream notices are retained intact, as required for a fork. Taskbar icon tinting (`TintedIcon.qml`) is adapted from [Davedes83/animated-dock](https://github.com/Davedes83/animated-dock) (MIT). Fork maintained by [LoopedMatrix](https://github.com/LoopedMatrix).
