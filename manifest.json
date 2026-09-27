@@ -6,7 +6,7 @@
   "author": "LoopedMatrix",
   "license": "MIT",
   "homepage": "https://github.com/LoopedMatrix/ohmtabs",
-  "description": "Familiar window controls for Omarchy: minimize, maximize, close, move and resize with the mouse, and a drawer that always brings a minimized window back.",
+  "description": "Windows-style title strips and a 46px icon taskbar for Omarchy: open and minimized windows, Alt+Tab, optional window tabs.",
   "kinds": [
     "service",
     "overlay",
@@ -20,7 +20,7 @@
   },
   "barWidget": {
     "displayName": "OhmTabs",
-    "description": "Minimized windows: a stable place to find them again. Click for the drawer.",
+    "description": "Icon taskbar for open and minimized windows. Click for the drawer, right-click for settings.",
     "category": "System",
     "allowMultiple": false,
     "defaultSection": "right"

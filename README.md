@@ -11,7 +11,7 @@
   <img alt="Hyprland 0.56.2" src="https://img.shields.io/badge/Hyprland-0.56.2-38c8e8?labelColor=0b0f14">
 </p>
 
-**OhmTabs** gives ordinary application windows a Windows/macOS-style title strip — window menu, Minimize, Maximize/Restore, Close, drag-to-move — and **adds two things Omarchy doesn't have out of the box**: a **Windows-style taskbar for minimized windows**, and **browser-style tabs**, where dropping one window onto another turns the target into a tab host.
+**OhmTabs** gives ordinary application windows a Windows/macOS-style title strip — window menu, Minimize, Maximize/Restore, Close, drag-to-move — and **adds two things Omarchy doesn't have out of the box**: a **46 px icon taskbar** (open and minimized windows, one icon each), and **browser-style window tabs**, where dropping one window onto another turns the target into a tab host.
 
 It is a [Quickshell](https://github.com/outfoxxed/quickshell) plugin paired with a native Hyprland plugin that draws the strips and moves the windows.
 
@@ -28,7 +28,7 @@ OhmTabs is a personal fork of [GreyforgeLabs/omarchy-grabbar](https://github.com
 
 | Area | What changed |
 | --- | --- |
-| **Minimized-window taskbar** | A Windows-style taskbar ([`SidePanel.qml`](SidePanel.qml)) replaces the drawer-first UX: bottom/left/right placement, app icon + title + origin workspace, **Restore all**, optional auto-hide with a 4 px reveal sliver, and *no surface at all* when nothing is minimized (`live = panelEnabled && count > 0`). |
+| **Minimized-window taskbar** | A Windows-style **icon strip** ([`SidePanel.qml`](SidePanel.qml)): 46 px on bottom, left, or right; **one icon per window** (open windows join the run when auto-hide is off); real app icons; **right-click an icon** for that window's menu; **right-click empty strip** for settings; compact Restore-all chip. Auto-hide is opt-in. |
 | **Window tabs** | Dropping a window onto another makes the target the **host** and gives its title strip a tab strip (drawn natively), browser-style: smart alt-tab (`ohmtabs alttab`: a group's tabs when the pointer is on its host, the browser's own tab switching in Brave/Chrome, otherwise the normal window cycle), drag a tab out to detach, and a **"close all N window(s)?"** confirmation before a group closes — see [Tab groups](#tab-groups). |
 | **Hot-applied settings** | The plugin's settings entry is watched and applied live — changing `panelPosition` or `panelAutoHide` takes effect with **no shell restart**. |
 | **Scripting / IPC surface** | A complete command surface plus the `bin/ohmtabs` CLI and a stable token format. |
@@ -79,19 +79,19 @@ Every ordinary application window gets a strip above its top edge:
 - **Close** — closes the window.
 - **Drag the strip** — move the window; dragging a tiled window detaches it to floating at 60 %.
 - **Double-click the title** — toggle maximize.
-- **Resize** — drag the strip's edge/corners with `general:resize_on_border = true`.
 
 Controls sit on the right by default; `buttonsLeft` moves them to the left. Hide the strip per app with `excludedClasses`.
 
 ### Minimizing and the taskbar
 
-Minimizing moves a window to the special workspace `special:ohmtabs-minimized`. The taskbar shows one button per minimized window, with the app's real icon, the title, and the workspace it came from:
+Minimizing moves a window to the special workspace `special:ohmtabs-minimized`. The taskbar is a **46 px icon strip** on the bottom, left, or right — one icon per window, not a Restore-all bar.
 
-- **Left-click** a button → restore to the **current** workspace.
-- **Right-click** a button → restore to its **original** workspace.
-- **Restore all** (far end) → restore everything.
-- Default placement is the bottom; `panelPosition` moves it to `left` or `right`, and `panelAutoHide` parks it off-screen behind a 4 px sliver that expands on hover.
-- Empty taskbar → no surface at all (by design).
+- **Left-click** a minimized icon → restore that window to the **current** workspace.
+- **Left-click** an open-window icon → focus it.
+- **Right-click an icon** → that window's menu (Restore, Minimize, Maximize, Move freely, Close, Hide OhmTabs for …). Close on a minimized window asks first.
+- **Right-click empty strip** → OhmTabs settings.
+- **Restore all** (compact chip at the far end, when two or more windows are minimized) → restore everything.
+- Default edge is the bottom. `panelPosition` moves it to `left` or `right` (same 46 px thickness). `panelAutoHide` is **off by default**: the strip stays docked and running windows sit on it. Turn auto-hide on to park it behind a 4 px sliver.
 
 ### Tab groups
 
@@ -141,7 +141,7 @@ Settings live in the plugin's `shell.json` entry — edit them in **Settings** (
 | `excludedClasses` | string[] | `[]` | App classes whose windows get no strip (same as "Hide OhmTabs for this app"). |
 | `sidePanel` | bool | `true` | Windows-style taskbar (`true`) vs the in-bar drawer only (`false`). |
 | `panelPosition` | `"bottom"` \| `"left"` \| `"right"` | `"bottom"` | Screen edge the taskbar sits on. |
-| `panelAutoHide` | bool | `true` | Park the taskbar off the edge until the pointer reaches it. |
+| `panelAutoHide` | bool | `false` | Opt-in. Park the taskbar off the edge until the pointer reaches it. Off (default): the strip stays docked and shows running windows. |
 | `tabGroups` | bool | `false` | Enable window tabs (host/tab creation, `groupCycle`, close-all confirmation). The tab strip itself is drawn natively on the host's title strip. |
 
 Unknown keys are ignored and invalid values fall back to the default; validation lives in [`OhmTabsModel.js`](OhmTabsModel.js) (`normalizeSettings`).
@@ -244,7 +244,7 @@ A rebuilt `.so` is not picked up while it is mapped into the running compositor:
 ## Known issues
 
 1. **`m_showOnHover` flag reuse (native).** `m_showOnHover` is used both as the mode flag and as the revealed-state flag, which makes hover-reveal behaviour hard to reason about. Inherited from upstream.
-2. **Taskbar auto-hide reveal is unreliable.** When `panelAutoHide` is on, the panel can reveal when the pointer merely rests near its edge (e.g. with no other windows open), and buttons sometimes do not take clicks. Until this is fixed, set `panelAutoHide: false` — the panel then stays visible whenever something is minimized. Fix in progress.
+2. **Taskbar auto-hide reveal is unreliable.** When `panelAutoHide` is on, the panel can reveal when the pointer merely rests near its edge, and buttons sometimes do not take clicks. Leave it **off** (the default) — the strip stays docked and shows running windows.
 3. **Tab-strip separation and feel.** Tab groups work, but the host's tab strip is visually flat (selected vs. unselected tabs are close in tone) and switching is not as snappy as it should be. Work in progress.
 
 ## Roadmap
