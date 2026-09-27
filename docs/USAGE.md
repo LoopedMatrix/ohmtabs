@@ -47,10 +47,9 @@ Unknown keys are ignored; invalid values fall back to the default. Values are va
 When `tabGroups: true` is set on the bar's layout entry:
 
 - **Dropping a window onto another** makes the target the *host* and turns the dragged window into a tab in the host's group. The host's native title strip gains the tab strip (drawn natively). The shell keeps the group state and the window list; the visual strip is the backend's.
-- **Alt-tab is smart, and it is one key for three jobs.** `ohmtabs alttab next|prev` decides, every press, in this order:
+- **Alt-tab is smart.** `ohmtabs alttab next|prev` decides, every press, in this order:
   1. **A tab group** — if the focused window is in a tab group, or the pointer is on a host window (on its client box or on the tab strip above it), the group's tabs cycle. This is the `groupCycle` IPC call, and it works whether the pointer is inside the window or the window is simply focused.
-  2. **A browser** — if the focused window's class matches the browser list, the helper sends the browser its own `Ctrl+PageDown` / `Ctrl+PageUp`, the keystroke every Chromium- and Firefox-family browser uses for next/previous tab. Brave and Chrome switch tabs without an extension or a second process.
-  3. **Anything else** — the normal window cycle: Omarchy's own `hl.dsp.window.cycle_next()` followed by `bring_to_top()`, which is exactly what the stock `ALT + TAB` bindings did (both of them), so plain-desktop behaviour is unchanged.
+  2. **Anything else** — the **macOS dock** app-switcher HUD (`macos.dock altTabNext`) when that plugin is enabled; otherwise Omarchy's `cycle_next` + `bring_to_top`. Browser tabs stay on `Ctrl+PageDown` / `Ctrl+PageUp` inside the browser.
 
   The decision tree is a pure function with its own unit tests (`tests/unit/test_alttab.py`), and `ohmtabs alttab --decide` prints the decision it would take without doing anything - the way to see why a press went where it went.
 

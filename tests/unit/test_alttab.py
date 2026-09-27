@@ -139,24 +139,21 @@ check(
     "window",
 )
 
-# --- 3. the browser branch --------------------------------------------------
+# --- 3. browsers do not steal Alt+Tab (Ctrl+PageDown still works in-app) ----
 
 for cls in ("brave-browser", "Brave", "google-chrome", "Chromium", "firefox", "zen"):
     check(
-        f"{cls} -> browser tab switch",
+        f"{cls} focused -> window switcher, not browser tabs",
         mod.decide(base_ctx(focus={"class": cls, "token": None}), "next")["action"],
-        "browser",
+        "window",
     )
 
+browser_box = {"x": 100, "y": 100, "w": 800, "h": 600}
+browser_focus = {"class": "brave-browser", "token": None, "box": browser_box}
 check(
-    "browser next key is Page_Down",
-    mod.decide(base_ctx(focus={"class": "brave-browser", "token": None}), "next")["keys"],
-    "Next",
-)
-check(
-    "browser prev key is Page_Up",
-    mod.decide(base_ctx(focus={"class": "brave-browser", "token": None}), "prev")["keys"],
-    "Prior",
+    "pointer on focused browser still -> window switcher",
+    mod.decide(base_ctx(focus=browser_focus, pointer={"x": 400, "y": 300}), "next")["action"],
+    "window",
 )
 check(
     "a browser is not a browser when it is grouped and focused",
@@ -206,7 +203,7 @@ except TypeError as exc:  # pragma: no cover
 # --- 7. the helper's own CLI surface ---------------------------------------
 
 text = HELPER.read_text()
-for token in ("def decide(", "def execute(", "--decide", "groupCycle", "cycle_next", "Next", "Prior"):
+for token in ("def decide(", "def execute(", "--decide", "groupCycle", "cycle_next", "macos.dock", "Next", "Prior"):
     check(f"helper defines {token}", token in text, True)
 check("helper is importable without a session", mod.PLUGIN_ID, "tech.loopedmatrix.ohmtabs")
 

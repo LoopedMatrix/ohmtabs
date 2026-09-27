@@ -5,15 +5,10 @@ Alt-tab is a habit, so it has to do the obvious thing wherever the user is:
 
   1. the pointer sits on a tab group's host window (or a tab group is focused)
      and that group holds two or more tabs   -> cycle the group's tabs
-  2. the focused window is a browser          -> switch that browser's TAB
-                                                 (Ctrl+PageDown / Ctrl+PageUp,
-                                                 which Brave, Chrome, Chromium,
-                                                 Edge, Firefox and friends all
-                                                 use as next/previous tab)
-  3. anything else                            -> the compositor's window cycle,
-     which is exactly what Omarchy's own ALT+TAB did before this helper existed
-     (cycle the window list, then raise the focused window - Omarchy bound both
-     to ALT+TAB, so both are preserved).
+  2. the pointer is ON a focused browser      -> switch that browser's TAB
+                                                 (Ctrl+PageDown / Ctrl+PageUp)
+  3. anything else                            -> the macOS dock app-switcher
+     HUD when macos.dock is enabled, otherwise the compositor's window cycle.
 
 Nothing here needs a privilege, a daemon or a browser extension: case 2 asks the
 focused browser to switch its own tab, the same keystroke the browser's own
@@ -258,23 +253,34 @@ def decide(ctx, direction):
             "reason": "a tab group is focused or the pointer is on its host",
         }
 
-    if is_browser(focus.get("class"), ctx.get("browserClasses") or DEFAULT_BROWSER_CLASSES):
-        return {
-            "action": "browser",
-            "direction": step,
-            "class": focus.get("class"),
-            "keys": BROWSER_KEYS[step],
-            "reason": "the focused window is a browser: switch its own tab",
-        }
-
+    # Browser tabs stay on Ctrl+PageDown inside the browser. Alt+Tab always
+    # opens the window switcher (macos.dock HUD when installed) unless a
+    # OhmTabs tab group is in play.
     return {
         "action": "window",
         "direction": step,
-        "reason": "no tab group, no browser: the compositor's window cycle",
+        "reason": "no tab group: app switcher / window cycle",
     }
 
 
 # ------------------------------------------------------------------- execution
+
+
+
+def focus_box(focus_window):
+    """Client box of hyprctl activewindow, or None."""
+    if not focus_window:
+        return None
+    at = focus_window.get("at") or focus_window.get("box")
+    size = focus_window.get("size")
+    try:
+        if isinstance(at, (list, tuple)) and len(at) >= 2 and isinstance(size, (list, tuple)) and len(size) >= 2:
+            return {"x": int(at[0]), "y": int(at[1]), "w": int(size[0]), "h": int(size[1])}
+        if isinstance(at, dict) and "x" in at:
+            return {"x": int(at["x"]), "y": int(at["y"]), "w": int(at.get("w") or at.get("width") or 0), "h": int(at.get("h") or at.get("height") or 0)}
+    except (TypeError, ValueError):
+        return None
+    return None
 
 
 def collect_context():
@@ -309,6 +315,7 @@ def collect_context():
             "title": focus_window.get("title") or "",
             "address": address,
             "token": token,
+            "box": focus_box(focus_window),
         },
     }
 
@@ -369,6 +376,11 @@ def execute(decision):
             rc, _, _ = run([wtype, "-M", "ctrl", "-k", key], timeout=3)
             if rc == 0:
                 return True, "ctrl+" + key
+
+    method = "altTabNext" if step == "next" else "altTabPrev"
+    rc, out, err = run(["omarchy-shell", "-q", "macos.dock", method], timeout=4)
+    if rc == 0:
+        return True, "macos.dock"
 
     lua = "hl.dsp.window.cycle_next()" if step == "next" else "hl.dsp.window.cycle_next({ next = false })"
     moved = hypr_dispatch(lua)
