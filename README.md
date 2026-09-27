@@ -18,7 +18,7 @@
 - a **macOS-style Alt+Tab HUD**
 - optional **window tabs** (drop one window onto another)
 
-The store card is [`preview.png`](preview.png). Gallery frames below are **diagrams**, not a live desktop.
+The store card is [`preview.png`](preview.png). Title strip, dock, and desktop crops are **live grim** of a blank Brave window — no bookmarks, no pages, no Omarchy stats bar. Alt+Tab / settings / hover stay as diagrams so window titles never leak.
 
 <p align="center">
   <img src="preview.png" alt="OhmTabs: title strip, Alt+Tab cards, pill taskbar" width="100%">
@@ -48,7 +48,7 @@ Full walkthrough: **[docs/USAGE.md](docs/USAGE.md)**.
 <p align="center">
   <img src="docs/screenshots/desktop.png" alt="Title strip and centered pill taskbar" width="100%">
 </p>
-<p align="center"><sub>Title strip + compact pill dock. Diagram — not a live desktop.</sub></p>
+<p align="center"><sub>Live glass title strip + pill dock on a blank Brave window.</sub></p>
 
 <p align="center">
   <img src="docs/screenshots/title-strip.png" alt="OhmTabs title strip" width="100%">
