@@ -129,6 +129,7 @@ BarWidget {
     textColor: String(Color.bar.text),
     hoverColor: String(Qt.rgba(Color.bar.text.r, Color.bar.text.g, Color.bar.text.b, 0.18)),
     closeHoverColor: String(Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.85)),
+    accentColor: String(Color.accent),
     textFont: String((bar && bar.fontFamily) || Style.font.family || "")
   })
   onThemeValuesChanged: pushTheme()

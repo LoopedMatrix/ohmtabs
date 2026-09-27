@@ -48,7 +48,7 @@ struct SGlobalState {
     // They take precedence over the config values above while set, so the
     // strip follows the desktop theme without edits to hyprland.lua.
     struct {
-        std::optional<uint64_t>  barColor, inactiveBarColor, textColor, hoverColor, closeHoverColor, snapGlowColor;
+        std::optional<uint64_t>  barColor, inactiveBarColor, textColor, hoverColor, closeHoverColor, snapGlowColor, accentColor;
         std::optional<std::string> textFont;
         std::optional<bool>      buttonsLeft, showOnHover;
         std::optional<int>       barHeight, buttonSize;

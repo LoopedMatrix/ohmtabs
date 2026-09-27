@@ -48,6 +48,7 @@ struct SButtonSlot {
 struct STabBox {
     int         index      = -1; // index into the host group's tab list
     CBox        box;             // segment bounds (logical px, strip-relative)
+    CBox        iconBox;         // Chrome-style app icon on the tab
     CBox        closeBox;        // close affordance within the segment
     bool        active     = false;
     std::string token;

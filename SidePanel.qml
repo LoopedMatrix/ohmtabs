@@ -78,6 +78,18 @@ Item {
   readonly property int panelSize: Math.max(48, root.iconSize + root.dockPad * 2)
   readonly property int dockRadius: cornerShape === "square" ? 0 : (cornerShape === "pill" ? Math.round(root.panelSize / 2) : Math.max(root.radius, 14))
   readonly property color dockAccent: Color.accent
+  readonly property var notifService: (root.shell && typeof root.shell.serviceFor === "function") ? root.shell.serviceFor("omarchy.notifications") : null
+
+  function appHasNotification(appId) {
+    var m = root.notifService && root.notifService.popupModel ? root.notifService.popupModel : null
+    if (!m || !appId) return false
+    try {
+      for (var i = 0; i < m.count; i++) {
+        if (Model.notifMatchesApp(m.get(i), appId)) return true
+      }
+    } catch (e) {}
+    return false
+  }
   readonly property int buttonLength: root.iconSize + 16
   // Pixels of the parked surface left on screen so the pointer can find it.
   readonly property int revealSliver: 4
@@ -1146,17 +1158,18 @@ Item {
       }
     }
 
-    // Focused-window indicator: a short rounded bar that lengthens and
-    // brightens when this button is selected, like the running-app marker
-    // under a Windows taskbar icon. Selection (hover or keyboard) is the
-    // closest thing to focus a minimized-only list has.
+    // Notification badge only — no always-on running dots.
     Rectangle {
       id: indicator
       radius: 4
       width: 8
       height: 8
-      visible: btn.entry && btn.entry.kind !== "minimized"
-      color: Qt.rgba(root.dockAccent.r, root.dockAccent.g, root.dockAccent.b, btn.selected ? 1 : 0.75)
+      visible: {
+        if (!btn.entry || btn.entry.kind === "apps" || btn.entry.kind === "clock" || btn.entry.kind === "notifs" || btn.entry.kind === "dashboard" || btn.entry.kind === "workspaces")
+          return false
+        return root.appHasNotification(btn.entry.appId)
+      }
+      color: root.urgent
 
       anchors.horizontalCenter: btn.horizontal ? parent.horizontalCenter : undefined
       anchors.bottom: btn.horizontal ? parent.bottom : undefined
@@ -1164,8 +1177,6 @@ Item {
       anchors.verticalCenter: btn.horizontal ? undefined : parent.verticalCenter
       anchors.left: btn.horizontal ? undefined : parent.left
       anchors.leftMargin: btn.horizontal ? undefined : 0
-
-      Behavior on color { ColorAnimation { duration: 110 } }
     }
   }
 

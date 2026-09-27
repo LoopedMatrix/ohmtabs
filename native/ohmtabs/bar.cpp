@@ -31,6 +31,7 @@
 
 #include <cairo/cairo.h>
 
+#include <cctype>
 #include <climits>
 #include <cmath>
 #include <format>
@@ -295,6 +296,8 @@ std::vector<STabBox> COhmTabsDeco::layoutTabs(double barW, double barH) {
         tb.active = (i == (size_t)G->active);
         tb.token  = G->tabs[i];
         tb.box    = CBox{x, y, segW, (double)SIZE};
+        const double IS = std::max(12.0, SIZE * 0.62);
+        tb.iconBox      = CBox{x + 6.0, y + (SIZE - IS) / 2.0, IS, IS};
         const double CS = std::max(12.0, SIZE * 0.5);
         tb.closeBox     = CBox{x + segW - CS - 6, y + (SIZE - CS) / 2.0, CS, CS};
         m_tabBoxes.push_back(tb);
@@ -876,6 +879,37 @@ void COhmTabsDeco::renderTabs(float a, const CBox& titleBarBox, float SCALE, int
         if (!focused)
             xc.a *= 0.75;
 
+        auto              w     = g_pBackend->resolve(tb.token);
+        const std::string title = w ? w->m_title : tb.token;
+
+        // Chrome-style app glyph on the tab (class initial until a theme icon is available).
+        CBox ib = tb.iconBox;
+        ib.translate(Vector2D{titleBarBox.x / SCALE, titleBarBox.y / SCALE}).scale(SCALE).round();
+        if (ib.w > 2 && ib.h > 2) {
+            auto ic = xc;
+            ic.a *= tb.active ? 0.28 : 0.14;
+            g_pHyprOpenGL->renderRect(ib, ic, {.round = (int)std::round(ib.w / 2.0), .roundingPower = 2.F});
+            std::string letter = "?";
+            if (w) {
+                std::string cls = w->m_class.empty() ? w->m_initialClass : w->m_class;
+                const auto  dot = cls.rfind('.');
+                if (dot != std::string::npos && dot + 1 < cls.size())
+                    cls = cls.substr(dot + 1);
+                for (unsigned char ch : cls) {
+                    if (std::isalpha(ch)) {
+                        letter = std::string(1, static_cast<char>(std::toupper(ch)));
+                        break;
+                    }
+                }
+            }
+            auto ltex = g_pHyprRenderer->renderText(letter, xc, std::round(ib.h * 0.52), true, FONT, (int)std::round(ib.w));
+            if (ltex && ltex->m_texID != 0) {
+                CBox lp = {ib.x + (ib.w - ltex->m_size.x) / 2.0, ib.y + (ib.h - ltex->m_size.y) / 2.0, (double)ltex->m_size.x, (double)ltex->m_size.y};
+                lp.round();
+                g_pHyprOpenGL->renderTexture(ltex, lp, {.a = a});
+            }
+        }
+
         // Close affordance: a small x on the right edge of the segment.
         CBox cb = tb.closeBox;
         cb.translate(Vector2D{titleBarBox.x / SCALE, titleBarBox.y / SCALE}).scale(SCALE).round();
@@ -886,13 +920,11 @@ void COhmTabsDeco::renderTabs(float a, const CBox& titleBarBox, float SCALE, int
             g_pHyprOpenGL->renderTexture(xtex, pos, {.a = a});
         }
 
-        // Tab title, truncated to the segment minus the close affordance.
-        auto              w     = g_pBackend->resolve(tb.token);
-        const std::string title = w ? w->m_title : tb.token;
-        const int         maxW  = std::max<int>(8, (int)std::round((tb.closeBox.x - tb.box.x - PAD) * SCALE));
-        auto              ttex  = g_pHyprRenderer->renderText(title, xc, std::round(SIZE * SCALE), false, FONT, maxW);
+        // Tab title, truncated to the segment minus icon and close.
+        const int maxW = std::max<int>(8, (int)std::round((tb.closeBox.x - (tb.iconBox.x + tb.iconBox.w) - PAD) * SCALE));
+        auto      ttex = g_pHyprRenderer->renderText(title, xc, std::round(SIZE * SCALE), false, FONT, maxW);
         if (ttex && ttex->m_texID != 0) {
-            CBox pos = {b.x + PAD * SCALE, b.y + (b.h - ttex->m_size.y) / 2.0, (double)ttex->m_size.x, (double)ttex->m_size.y};
+            CBox pos = {ib.x + ib.w + PAD * SCALE, b.y + (b.h - ttex->m_size.y) / 2.0, (double)ttex->m_size.x, (double)ttex->m_size.y};
             pos.round();
             g_pHyprOpenGL->renderTexture(ttex, pos, {.a = a});
         }
@@ -1000,7 +1032,29 @@ void COhmTabsDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
     }
 
-    g_pHyprOpenGL->renderRect(titleBarBox, color, {.round = (int)scaledRounding, .roundingPower = PWINDOW->roundingPower()});
+    const float SCALE = pMonitor->m_scale;
+    CBox        pill  = {DECOBOX.x - pMonitor->m_position.x, DECOBOX.y - pMonitor->m_position.y, DECOBOX.w, DECOBOX.h};
+    pill.translate(PWINDOW->m_floatingOffset).scale(SCALE).round();
+    const double insetX = 5.0 * SCALE;
+    const double insetY = 2.5 * SCALE;
+    pill.x += insetX;
+    pill.y += insetY;
+    pill.w -= 2.0 * insetX;
+    pill.h -= 2.0 * insetY;
+    int rad = (int)std::round(std::min(pill.h, pill.w) * 0.5);
+    if (rad < 4)
+        rad = 4;
+    CHyprColor accent = g_pGlobalState->shell.accentColor ? CHyprColor{*g_pGlobalState->shell.accentColor} :
+                                                            colorOf(g_pGlobalState->shell.textColor, g_pGlobalState->config.textColor);
+    accent.a *= a * 0.92;
+    if (pill.w > 8 && pill.h > 6) {
+        CBox rim = pill;
+        rim.expand(std::max(1.0, 1.15 * SCALE));
+        g_pHyprOpenGL->renderRect(rim, accent, {.round = rad + (int)std::round(SCALE), .roundingPower = 2.F});
+        g_pHyprOpenGL->renderRect(pill, color, {.round = rad, .roundingPower = 2.F});
+    } else {
+        g_pHyprOpenGL->renderRect(titleBarBox, color, {.round = (int)scaledRounding, .roundingPower = PWINDOW->roundingPower()});
+    }
 
     if (ROUNDING) {
         glClearStencil(0);
@@ -1012,7 +1066,6 @@ void COhmTabsDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
 
     // buttons (logical layout, scaled at draw time)
     const auto  SLOTS      = layoutButtons(DECOBOX.w, DECOBOX.h);
-    const float SCALE      = pMonitor->m_scale;
     const bool  MAXIMIZED  = g_pBackend->isMaximized(PWINDOW);
     const bool  MINENABLED = g_pBackend->minimizeEnabled();
     const auto  TEXTCOL    = colorOf(g_pGlobalState->shell.textColor, g_pGlobalState->config.textColor);

@@ -880,6 +880,18 @@ function parseWpctlVolume(text) {
   return { percent: pct, muted: muted }
 }
 
+function notifMatchesApp(notif, appId) {
+  var want = dockAppId(appId)
+  if (!want) return false
+  var n = notif && typeof notif === "object" ? notif : {}
+  var keys = [n.app, n.appName, n.appIcon, n.desktopEntry, n.app_id]
+  for (var i = 0; i < keys.length; i++) {
+    var got = dockAppId(keys[i])
+    if (got && got === want) return true
+  }
+  return false
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PLUGIN_ID: PLUGIN_ID, PROTOCOL: PROTOCOL, JOURNAL_SCHEMA: JOURNAL_SCHEMA, JOURNAL_MAX_BYTES: JOURNAL_MAX_BYTES,
@@ -894,7 +906,7 @@ if (typeof module !== "undefined" && module.exports) {
     restoreDestination: restoreDestination, clampBox: clampBox, originLabel: originLabel, rowsWithOrdinals: rowsWithOrdinals,
  statusSummary: statusSummary, normalizeSettings: normalizeSettings, readOwnEntry: readOwnEntry,
  sanitizeAppId: sanitizeAppId, dockAppId: dockAppId, normalizePinned: normalizePinned, togglePinned: togglePinned, isPinned: isPinned,
- parseWpctlVolume: parseWpctlVolume, parseBrightness: parseBrightness,
+ parseWpctlVolume: parseWpctlVolume, parseBrightness: parseBrightness, notifMatchesApp: notifMatchesApp,
     TAB_CYCLE_FALLTHROUGH: TAB_CYCLE_FALLTHROUGH,
     createGroup: createGroup, removeGroup: removeGroup, addMember: addMember, removeMember: removeMember,
     moveMember: moveMember, getActiveMember: getActiveMember, setActiveMember: setActiveMember,

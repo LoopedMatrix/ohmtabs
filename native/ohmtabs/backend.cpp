@@ -1573,6 +1573,7 @@ void COhmTabsBackend::applyTheme(const Fields& f) {
     set("hoverColor", t.hoverColor);
     set("closeHoverColor", t.closeHoverColor);
     set("snapGlowColor", t.snapGlowColor);
+    set("accentColor", t.accentColor);
     if (const auto FONT = field(f, "textFont"); !FONT.empty())
         t.textFont = FONT == "reset" ? std::optional<std::string>{} : std::optional<std::string>{FONT.substr(0, 64)};
     g_pGlobalState->glyphCache.clear();

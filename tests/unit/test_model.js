@@ -448,4 +448,13 @@ test("normalizeSettings empty object includes pinnedApps, showAppsButton, dockDo
   assert.strictEqual(s.dockDodge, false)
 })
 
+test("notifMatchesApp ties Omarchy popup rows to a dock app id", () => {
+  assert.strictEqual(M.notifMatchesApp({ app: "Firefox" }, "firefox"), true)
+  assert.strictEqual(M.notifMatchesApp({ appName: "com.nousresearch.hermes" }, "hermes"), true)
+  assert.strictEqual(M.notifMatchesApp({ appIcon: "brave-browser" }, "brave-browser"), true)
+  assert.strictEqual(M.notifMatchesApp({ app: "Slack" }, "firefox"), false)
+  assert.strictEqual(M.notifMatchesApp({}, "firefox"), false)
+  assert.strictEqual(M.notifMatchesApp(null, "firefox"), false)
+})
+
 console.log("test_model: " + passed + " passed")
