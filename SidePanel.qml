@@ -54,6 +54,7 @@ Item {
   property bool showRunning: true
   property bool showWorkspaces: false
   property bool showClock: false
+  property bool showStatus: false
   property bool showActiveWindow: true
   property int workspaceCount: 5
   property bool showNotifs: false
@@ -631,14 +632,14 @@ Item {
           if (root.vertical) return root.panelSize
           if (root.fullLength) return parent.width
           var n = Math.max(1, root.items.length)
-          var extra = (root.showWorkspaces ? (root.workspaceCount * 14 + 12) : 0) + (root.showClock ? 56 : 0) + (root.showActiveWindow ? 120 : 0)
+          var extra = (root.showWorkspaces ? (root.workspaceCount * 14 + 12) : 0) + (root.showClock ? 56 : 0) + (root.showActiveWindow ? 120 : 0) + (root.showStatus ? 78 : 0)
           return Math.min(parent.width - 48, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
         }
         height: {
           if (!root.vertical) return root.panelSize
           if (root.fullLength) return parent.height
           var n = Math.max(1, root.items.length)
-          var extra = (root.showWorkspaces ? (root.workspaceCount * 14 + 12) : 0) + (root.showClock ? 56 : 0) + (root.showActiveWindow ? 120 : 0)
+          var extra = (root.showWorkspaces ? (root.workspaceCount * 14 + 12) : 0) + (root.showClock ? 56 : 0) + (root.showActiveWindow ? 120 : 0) + (root.showStatus ? 78 : 0)
           return Math.min(parent.height - 48, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
         }
         x: root.vertical ? (root.panelPosition === "right" ? parent.width - width : 0)
@@ -757,11 +758,25 @@ Item {
             height: parent.height
           }
         }
-        footer: DockClock {
-          visible: root.showClock
-          ink: root.foreground
-          width: root.showClock ? implicitWidth : 0
-          height: root.vertical ? (root.showClock ? implicitHeight : 0) : (root.panelSize - 16)
+        footer: Row {
+          spacing: 8
+          height: root.vertical ? implicitHeight : (root.panelSize - 16)
+          width: (root.showStatus ? stChip.implicitWidth : 0) + (root.showStatus && root.showClock ? 8 : 0) + (root.showClock ? clkChip.implicitWidth : 0)
+          DockStatus {
+            id: stChip
+            visible: root.showStatus
+            ink: root.foreground
+            accent: root.dockAccent
+            width: root.showStatus ? implicitWidth : 0
+            height: parent.height
+          }
+          DockClock {
+            id: clkChip
+            visible: root.showClock
+            ink: root.foreground
+            width: root.showClock ? implicitWidth : 0
+            height: parent.height
+          }
         }
 
         delegate: TaskButton {

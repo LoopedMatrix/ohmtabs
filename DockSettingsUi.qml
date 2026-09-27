@@ -193,6 +193,12 @@ Item {
       onToggled: ui.save({ showClock: !ui.settings.showClock })
     }
     DockToggle {
+      title: "Status chips"
+      hint: "Mute, Wi-Fi panel, Bluetooth panel."
+      checked: ui.settings.showStatus === true
+      onToggled: ui.save({ showStatus: !ui.settings.showStatus })
+    }
+    DockToggle {
       title: "Notifications"
       hint: "Bell on the dock. Opens OhmTabs drawer (uses Omarchy history)."
       checked: ui.settings.showNotifs === true

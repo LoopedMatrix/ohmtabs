@@ -546,6 +546,7 @@ function normalizeSettings(raw) {
     showNotifs: (r.showNotifs === true || r.showNotifs === "1" || r.showNotifs === "on" || r.showNotifs === "true") ? true : false,
     showDashboard: (r.showDashboard === true || r.showDashboard === "1" || r.showDashboard === "on" || r.showDashboard === "true") ? true : false,
     showOsd: (r.showOsd === true || r.showOsd === "1" || r.showOsd === "on" || r.showOsd === "true") ? true : false,
+    showStatus: (r.showStatus === true || r.showStatus === "1" || r.showStatus === "on" || r.showStatus === "true") ? true : false,
     showActiveWindow: (r.showActiveWindow === false || r.showActiveWindow === "0" || r.showActiveWindow === "off" || r.showActiveWindow === "false") ? false : true,
     workspaceCount: (function() {
       var n = parseInt(r.workspaceCount, 10)
