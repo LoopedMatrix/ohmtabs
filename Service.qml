@@ -1057,5 +1057,12 @@ Item {
     function groupCycle(hostToken: string, direction: string, pointerInside: string): string { return root.groupCycle(hostToken, direction, Model.flag(pointerInside)) }
     function groupClose(token: string): string { return root.groupClose(token, false) }
     function groupCloseForce(token: string): string { return root.groupClose(token, true) }
+    function altTabNext(): string { return altTab.step("next") }
+    function altTabPrev(): string { return altTab.step("prev") }
+    function altTabCancel(): string { altTab.cancel(); return "ok" }
+  }
+
+  AltTabOverlay {
+    id: altTab
   }
 }

@@ -378,6 +378,9 @@ def execute(decision):
                 return True, "ctrl+" + key
 
     method = "altTabNext" if step == "next" else "altTabPrev"
+    rc, out, err = run(["omarchy-shell", "-q", PLUGIN_ID, method], timeout=4)
+    if rc == 0:
+        return True, "ohmtabs-hud"
     rc, out, err = run(["omarchy-shell", "-q", "macos.dock", method], timeout=4)
     if rc == 0:
         return True, "macos.dock"

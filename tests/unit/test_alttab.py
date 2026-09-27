@@ -203,7 +203,7 @@ except TypeError as exc:  # pragma: no cover
 # --- 7. the helper's own CLI surface ---------------------------------------
 
 text = HELPER.read_text()
-for token in ("def decide(", "def execute(", "--decide", "groupCycle", "cycle_next", "macos.dock", "Next", "Prior"):
+for token in ("def decide(", "def execute(", "--decide", "groupCycle", "cycle_next", "ohmtabs-hud", "macos.dock", "Next", "Prior"):
     check(f"helper defines {token}", token in text, True)
 check("helper is importable without a session", mod.PLUGIN_ID, "tech.loopedmatrix.ohmtabs")
 

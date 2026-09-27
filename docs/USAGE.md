@@ -49,7 +49,7 @@ When `tabGroups: true` is set on the bar's layout entry:
 - **Dropping a window onto another** makes the target the *host* and turns the dragged window into a tab in the host's group. The host's native title strip gains the tab strip (drawn natively). The shell keeps the group state and the window list; the visual strip is the backend's.
 - **Alt-tab is smart.** `ohmtabs alttab next|prev` decides, every press, in this order:
   1. **A tab group** — if the focused window is in a tab group, or the pointer is on a host window (on its client box or on the tab strip above it), the group's tabs cycle. This is the `groupCycle` IPC call, and it works whether the pointer is inside the window or the window is simply focused.
-  2. **Anything else** — the **macOS dock** app-switcher HUD (`macos.dock altTabNext`) when that plugin is enabled; otherwise Omarchy's `cycle_next` + `bring_to_top`. Browser tabs stay on `Ctrl+PageDown` / `Ctrl+PageUp` inside the browser.
+  2. **Anything else** — OhmTabs' **macOS-style window switcher** HUD (`altTabNext`). Release Alt to switch, Escape to cancel. If the overlay cannot open, it falls back to `macos.dock` then Omarchy's `cycle_next`. Browser tabs stay on `Ctrl+PageDown` / `Ctrl+PageUp` inside the browser.
 
   The decision tree is a pure function with its own unit tests (`tests/unit/test_alttab.py`), and `ohmtabs alttab --decide` prints the decision it would take without doing anything - the way to see why a press went where it went.
 

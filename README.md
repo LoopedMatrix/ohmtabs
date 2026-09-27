@@ -101,7 +101,7 @@ Tab grouping is opt-in: set `tabGroups: true` on the plugin's settings entry.
 
 - **Drop a window onto another** — the target becomes the **host**, its title strip gains a tab strip, and the dropped window becomes a tab. Tab titles come from the windows themselves.
 - **Click a tab** to switch to it; **drag a tab out** to detach it back into a normal window. A group that drops to one window dissolves.
-- **Alt-tab** opens the **macOS dock app switcher** (pretty HUD) unless a tab group is focused or the pointer is on its host. Browser tabs stay on `Ctrl+PageDown` / `Ctrl+PageUp` inside the browser.
+- **Alt-tab** opens a **macOS-style window switcher** HUD unless a tab group is focused or the pointer is on its host. Browser tabs stay on `Ctrl+PageDown` / `Ctrl+PageUp` inside the browser.
 - **Closing a group** with more than one window asks first — *"are you sure you want to close all N windows?"* — listing the tab titles, with **Cancel** and **Close all**. Cancel/Escape dismisses it with no action, and it does not steal focus from the rest of the shell.
 
 ### The bar drawer
