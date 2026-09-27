@@ -176,9 +176,15 @@ Item {
     }
     DockToggle {
       title: "Workspaces"
-      hint: "Workspace marker on the dock (OhmTabs, not Caelestia)."
+      hint: "Pips for workspaces 1–N. Click or scroll to switch."
       checked: ui.settings.showWorkspaces === true
       onToggled: ui.save({ showWorkspaces: !ui.settings.showWorkspaces })
+    }
+    DockToggle {
+      title: "Active window"
+      hint: "Show the focused window title on the dock."
+      checked: ui.settings.showActiveWindow !== false
+      onToggled: ui.save({ showActiveWindow: ui.settings.showActiveWindow === false })
     }
     DockToggle {
       title: "Clock"

@@ -54,6 +54,8 @@ Item {
   property bool showRunning: true
   property bool showWorkspaces: false
   property bool showClock: false
+  property bool showActiveWindow: true
+  property int workspaceCount: 5
   property bool showNotifs: false
   property bool showDashboard: false
   property string clockText: Qt.formatTime(new Date(), "hh:mm")
@@ -609,14 +611,14 @@ Item {
           if (root.vertical) return root.panelSize
           if (root.fullLength) return parent.width
           var n = Math.max(1, root.items.length)
-          var extra = (root.showWorkspaces ? 88 : 0) + (root.showClock ? 56 : 0)
+          var extra = (root.showWorkspaces ? (root.workspaceCount * 14 + 12) : 0) + (root.showClock ? 56 : 0) + (root.showActiveWindow ? 120 : 0)
           return Math.min(parent.width - 48, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
         }
         height: {
           if (!root.vertical) return root.panelSize
           if (root.fullLength) return parent.height
           var n = Math.max(1, root.items.length)
-          var extra = (root.showWorkspaces ? 88 : 0) + (root.showClock ? 56 : 0)
+          var extra = (root.showWorkspaces ? (root.workspaceCount * 14 + 12) : 0) + (root.showClock ? 56 : 0) + (root.showActiveWindow ? 120 : 0)
           return Math.min(parent.height - 48, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
         }
         x: root.vertical ? (root.panelPosition === "right" ? parent.width - width : 0)
@@ -707,13 +709,33 @@ Item {
         z: 2
         model: root.items
         currentIndex: root.selectedIndex
-        header: DockWorkspaces {
-          bar: root.bar
-          visible: root.showWorkspaces
-          ink: root.foreground
-          accent: root.dockAccent
-          width: root.showWorkspaces ? implicitWidth : 0
-          height: root.vertical ? (root.showWorkspaces ? implicitHeight : 0) : (root.panelSize - 16)
+        header: Row {
+          spacing: 10
+          height: root.vertical ? (root.showWorkspaces || root.showActiveWindow ? implicitHeight : 0) : (root.panelSize - 16)
+          width: {
+            var w = 0
+            if (root.showWorkspaces) w += wsPips.implicitWidth
+            if (root.showWorkspaces && root.showActiveWindow) w += 10
+            if (root.showActiveWindow) w += awChip.implicitWidth
+            return w
+          }
+          DockWorkspaces {
+            id: wsPips
+            bar: root.bar
+            visible: root.showWorkspaces
+            shown: root.workspaceCount
+            ink: root.foreground
+            accent: root.dockAccent
+            width: root.showWorkspaces ? implicitWidth : 0
+            height: parent.height
+          }
+          DockActiveWindow {
+            id: awChip
+            visible: root.showActiveWindow
+            ink: root.foreground
+            width: root.showActiveWindow ? implicitWidth : 0
+            height: parent.height
+          }
         }
         footer: DockClock {
           visible: root.showClock

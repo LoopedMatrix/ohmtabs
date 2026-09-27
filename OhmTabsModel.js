@@ -545,7 +545,14 @@ function normalizeSettings(raw) {
     showClock: (r.showClock === true || r.showClock === "1" || r.showClock === "on" || r.showClock === "true") ? true : false,
     showNotifs: (r.showNotifs === true || r.showNotifs === "1" || r.showNotifs === "on" || r.showNotifs === "true") ? true : false,
     showDashboard: (r.showDashboard === true || r.showDashboard === "1" || r.showDashboard === "on" || r.showDashboard === "true") ? true : false,
-    showOsd: (r.showOsd === true || r.showOsd === "1" || r.showOsd === "on" || r.showOsd === "true") ? true : false
+    showOsd: (r.showOsd === true || r.showOsd === "1" || r.showOsd === "on" || r.showOsd === "true") ? true : false,
+    showActiveWindow: (r.showActiveWindow === false || r.showActiveWindow === "0" || r.showActiveWindow === "off" || r.showActiveWindow === "false") ? false : true,
+    workspaceCount: (function() {
+      var n = parseInt(r.workspaceCount, 10)
+      if (!(n >= 1)) n = 5
+      if (n > 10) n = 10
+      return n
+    })()
   }
 }
 

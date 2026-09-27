@@ -218,6 +218,8 @@ BarWidget {
     showRunning: root.settings ? root.settings.showRunning !== false : true
     showWorkspaces: root.settings ? root.settings.showWorkspaces === true : false
     showClock: root.settings ? root.settings.showClock === true : false
+    showActiveWindow: root.settings ? root.settings.showActiveWindow !== false : true
+    workspaceCount: root.settings && root.settings.workspaceCount ? Number(root.settings.workspaceCount) : 5
     showNotifs: root.settings ? root.settings.showNotifs === true : false
     showDashboard: root.settings ? root.settings.showDashboard === true : false
   }
