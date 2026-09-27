@@ -294,7 +294,7 @@ Item {
   }
 
   function openBarMenu(item) {
-    if (!service) return
+    if (!service || root.suppressBandMenu) return
     var pt = root.pointOnScreen(item)
     var name = panel.screen ? String(panel.screen.name) : ""
     service.openOverlay({ view: "settings", x: pt.x, y: pt.y, monitor: name })
@@ -307,6 +307,9 @@ Item {
       root.openBarMenu(item)
       return true
     }
+    root.suppressBandMenu = true
+    if (openEntryMenuClear.running) openEntryMenuClear.restart()
+    else openEntryMenuClear.start()
     var tok = root.resolveToken(row)
     var pt = root.pointOnScreen(item)
     var name = panel.screen ? String(panel.screen.name) : ""
@@ -347,8 +350,6 @@ Item {
       }
       service.openOverlay({ view: "menu", token: "", x: pt.x, y: pt.y, monitor: name, appId: row.appId || "" })
     }
-    root.menuEntry = row
-    try { dockItemMenu.popup(item) } catch (e) { try { dockItemMenu.popup() } catch (e2) {} }
     root.selectedIndex = -1
     return true
   }
@@ -413,6 +414,7 @@ Item {
     service.saveSettings({ pinnedApps: Model.togglePinned(root.pinnedApps, appId) })
   }
 
+  property bool suppressBandMenu: false
   property var menuEntry: null
 
   function restoreAll() {
@@ -467,6 +469,12 @@ Item {
     interval: 260
     repeat: false
     onTriggered: root.hovered = false
+  }
+  Timer {
+    id: openEntryMenuClear
+    interval: 250
+    repeat: false
+    onTriggered: root.suppressBandMenu = false
   }
   Timer {
     interval: 15000
@@ -863,7 +871,7 @@ Item {
       onEntered: { btn.hovered(); if (btn.grouped) root.flyoutOpen(btn.entry, btn) }
       onExited: { if (btn.grouped) root.flyoutMaybeClose() }
       onClicked: function(m) {
-        if (m.button === Qt.RightButton) { root.openEntryMenu(btn.entry, btn); return }
+        if (m.button === Qt.RightButton) { m.accepted = true; root.openEntryMenu(btn.entry, btn); return }
         btn.activated(false)
       }
       ToolTip.visible: root.showIconName && btnArea.containsMouse && btn.title !== ""
@@ -1121,20 +1129,6 @@ Item {
       anchors.fill: parent
       hoverEnabled: true
       onClicked: function(m) { m.accepted = true; all.activated() }
-    }
-  }
-
-  Menu {
-    id: dockItemMenu
-    MenuItem {
-      text: (root.menuEntry && root.menuEntry.pinned) ? "Unpin from dock" : "Pin to dock"
-      enabled: !!(root.menuEntry && root.menuEntry.appId)
-      onTriggered: root.togglePinned(root.menuEntry.appId)
-    }
-    MenuItem {
-      text: "Launch"
-      enabled: !!(root.menuEntry && root.menuEntry.appId)
-      onTriggered: root.launchApp(root.menuEntry.appId)
     }
   }
 }
