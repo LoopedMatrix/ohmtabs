@@ -36,9 +36,11 @@ Item {
   property bool panelEnabled: true
   property string panelPosition: "bottom"    // "left" | "right" | "bottom"
   property bool panelAutoHide: false   // opt-in: the edge reveal is unreliable
-  property int iconPixelSize: 24       // 16–32, from settings.iconSize
+  property int iconPixelSize: 32       // 16–40, from settings.iconSize
   property bool tintIcons: false       // colorize app icons to theme ink
   property bool showIconName: false    // hover label above the icon
+  property bool magnify: true          // animated.dock-style hover zoom
+  property real iconZoom: 0.48         // extra scale on hover (0–1)
   // A taskbar that is always there must not sit on top of windows: it reserves
   // its own strip the way the Windows taskbar does, and tiled windows end above
   // it. Auto-hide deliberately overlays instead - reserving space that appears
@@ -141,7 +143,8 @@ Item {
   //   3. generic executable    — last; it identifies nothing.
   // iconPath's `check=true` returns "" for unknown names instead of Qt's
   // missing-texture placeholder.
-  readonly property int iconSize: Math.max(16, Math.min(32, root.iconPixelSize))
+  readonly property int iconSize: Math.max(16, Math.min(40, root.iconPixelSize))
+  readonly property int magBloom: root.magnify ? Math.round(root.iconSize * root.iconZoom) + 10 : 0
   readonly property int flyoutIconSize: 16  // per-window flyout row icon
 
   // Monitors here are 1.25x (DP-1) and 1x (DP-2). sourceSize is handed to the
@@ -417,15 +420,26 @@ Item {
     Behavior on margins.left { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
     Behavior on margins.right { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
-    implicitWidth: root.vertical ? root.panelSize : 0
-    implicitHeight: root.vertical ? 0 : root.panelSize
+    implicitWidth: root.vertical ? (root.panelSize + root.magBloom) : 0
+    implicitHeight: root.vertical ? 0 : (root.panelSize + root.magBloom)
 
     Rectangle {
       id: surface
       anchors.fill: parent
-      color: root.background
-      border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.14)
-      border.width: 1
+      color: "transparent"
+
+      Rectangle {
+        id: dockBand
+        anchors.left: parent.left
+        anchors.right: root.vertical ? undefined : parent.right
+        anchors.top: root.vertical ? parent.top : undefined
+        anchors.bottom: parent.bottom
+        width: root.vertical ? root.panelSize : undefined
+        height: root.vertical ? undefined : root.panelSize
+        color: root.background
+        border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.14)
+        border.width: 1
+      }
 
       MouseArea {
         id: panelArea
@@ -462,9 +476,9 @@ Item {
         visible: root.count > 1
         horizontal: root.vertical
         anchors.right: root.vertical ? undefined : parent.right
-        anchors.verticalCenter: root.vertical ? undefined : parent.verticalCenter
+        anchors.verticalCenter: root.vertical ? undefined : dockBand.verticalCenter
         anchors.bottom: root.vertical ? parent.bottom : undefined
-        anchors.horizontalCenter: root.vertical ? parent.horizontalCenter : undefined
+        anchors.horizontalCenter: root.vertical ? dockBand.horizontalCenter : undefined
         anchors.rightMargin: root.vertical ? 0 : 6
         anchors.bottomMargin: root.vertical ? 6 : 0
         onActivated: root.restoreAll()
@@ -473,12 +487,18 @@ Item {
       ListView {
         id: list
         orientation: root.vertical ? ListView.Vertical : ListView.Horizontal
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: root.vertical ? undefined : parent.right
+        anchors.bottom: parent.bottom
+        anchors.top: root.vertical ? parent.top : undefined
+        width: root.vertical ? root.panelSize : undefined
+        height: root.vertical ? undefined : root.panelSize
         anchors.margins: 5
         anchors.rightMargin: (!root.vertical && allButton.visible) ? allButton.width + 12 : 5
         anchors.bottomMargin: (root.vertical && allButton.visible) ? allButton.height + 12 : 5
         spacing: 4
-        clip: true
+        clip: false
+        z: 2
         model: root.items
         currentIndex: root.selectedIndex
 
@@ -698,7 +718,12 @@ Item {
           id: tile
           anchors.fill: parent
           radius: 7
-          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
+          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, btn.iconSource !== "" ? 0 : 0.16)
+          scale: (root.magnify && btnArea.containsMouse) ? (1 + root.iconZoom) : 1
+          transformOrigin: root.vertical
+            ? (root.panelPosition === "left" ? Item.Left : Item.Right)
+            : Item.Bottom
+          Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
           TintedIcon {
             id: tileIcon
             anchors.centerIn: parent

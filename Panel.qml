@@ -610,10 +610,24 @@ Item {
         }
         SettingRow {
           label: "Taskbar icon size"
-          hint: "App icons on the strip. Small 16 · Medium 24 · Large 32 (strip stays 46 px)."
+          hint: "App icons on the strip. Small 16 · Medium 32 · Large 40."
           options: ["Small", "Medium", "Large"]
-          current: root.settings.iconSize >= 32 ? 2 : (root.settings.iconSize <= 16 ? 0 : 1)
-          onChosen: function(i) { if (service) service.saveSettings({ iconSize: i === 0 ? 16 : (i === 2 ? 32 : 24) }) }
+          current: root.settings.iconSize >= 40 ? 2 : (root.settings.iconSize <= 16 ? 0 : 1)
+          onChosen: function(i) { if (service) service.saveSettings({ iconSize: i === 0 ? 16 : (i === 2 ? 40 : 32) }) }
+        }
+        SettingRow {
+          label: "Icon magnify"
+          hint: "animated.dock-style hover zoom on the bottom strip. Off keeps icons flat."
+          options: ["On", "Off"]
+          current: root.settings.magnify === false ? 1 : 0
+          onChosen: function(i) { if (service) service.saveSettings({ magnify: i === 0 }) }
+        }
+        SettingRow {
+          label: "Magnify amount"
+          hint: "How far icons grow under the pointer (20% / 48% / 80%)."
+          options: ["Low", "Medium", "High"]
+          current: root.settings.iconZoom >= 0.7 ? 2 : (root.settings.iconZoom <= 0.25 ? 0 : 1)
+          onChosen: function(i) { if (service) service.saveSettings({ iconZoom: i === 0 ? 0.2 : (i === 2 ? 0.8 : 0.48) }) }
         }
         SettingRow {
           label: "Taskbar icon tint"

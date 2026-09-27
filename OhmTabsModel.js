@@ -507,13 +507,20 @@ function normalizeSettings(raw) {
     // Size is clamped so the 46px strip still fits; tint maps artwork to theme ink.
     iconSize: (function() {
       var n = parseInt(r.iconSize, 10)
-      if (!(n > 0)) n = 24
+      if (!(n > 0)) n = 32
       if (n < 16) n = 16
-      if (n > 32) n = 32
+      if (n > 40) n = 40
       return n
     })(),
     tintIcons: (r.tintIcons === true || r.tintIcons === "1" || r.tintIcons === "on" || r.tintIcons === "true") ? true : false,
-    showIconName: (r.showIconName === true || r.showIconName === "1" || r.showIconName === "on" || r.showIconName === "true") ? true : false
+    showIconName: (r.showIconName === true || r.showIconName === "1" || r.showIconName === "on" || r.showIconName === "true") ? true : false,
+    magnify: (r.magnify === false || r.magnify === "0" || r.magnify === "off" || r.magnify === "false") ? false : true,
+    iconZoom: (function() {
+      var z = parseFloat(r.iconZoom)
+      if (!(z >= 0)) z = 0.48
+      if (z > 1) z = 1
+      return z
+    })()
   }
 }
 
