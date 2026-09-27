@@ -565,6 +565,15 @@ function sanitizeAppId(id) {
   return s
 }
 
+function dockAppId(id) {
+  var n = sanitizeAppId(id).toLowerCase()
+  if (!n) return ""
+  if (n === "com.nousresearch.hermes" || n === "hermes-desktop") return "hermes"
+  var i = n.lastIndexOf(".")
+  if (i >= 0 && i < n.length - 1) n = n.slice(i + 1)
+  return n
+}
+
 function normalizePinned(list) {
   var src = []
   if (list && typeof list === "object" && typeof list.length === "number") {
@@ -574,8 +583,9 @@ function normalizePinned(list) {
   var seen = {}
   for (var j = 0; j < src.length; j++) {
     var id = sanitizeAppId(src[j])
-    if (!id || seen[id.toLowerCase()]) continue
-    seen[id.toLowerCase()] = true
+    var key = dockAppId(id)
+    if (!key || seen[key]) continue
+    seen[key] = true
     out.push(id)
     if (out.length >= 24) break
   }
@@ -585,12 +595,12 @@ function normalizePinned(list) {
 function togglePinned(pinnedIds, appId) {
   var id = sanitizeAppId(appId)
   if (!id) return normalizePinned(pinnedIds)
+  var want = dockAppId(id)
   var arr = normalizePinned(pinnedIds)
-  var key = id.toLowerCase()
   var next = []
   var found = false
   for (var i = 0; i < arr.length; i++) {
-    if (arr[i].toLowerCase() === key) { found = true; continue }
+    if (dockAppId(arr[i]) === want) { found = true; continue }
     next.push(arr[i])
   }
   if (!found) next.push(id)
@@ -598,11 +608,11 @@ function togglePinned(pinnedIds, appId) {
 }
 
 function isPinned(pinnedIds, appId) {
-  var id = sanitizeAppId(appId).toLowerCase()
-  if (!id) return false
+  var want = dockAppId(appId)
+  if (!want) return false
   var arr = normalizePinned(pinnedIds)
   for (var i = 0; i < arr.length; i++) {
-    if (arr[i].toLowerCase() === id) return true
+    if (dockAppId(arr[i]) === want) return true
   }
   return false
 }
@@ -883,7 +893,7 @@ if (typeof module !== "undefined" && module.exports) {
     toJournal: toJournal, parseJournal: parseJournal, reconcile: reconcile,
     restoreDestination: restoreDestination, clampBox: clampBox, originLabel: originLabel, rowsWithOrdinals: rowsWithOrdinals,
  statusSummary: statusSummary, normalizeSettings: normalizeSettings, readOwnEntry: readOwnEntry,
- sanitizeAppId: sanitizeAppId, normalizePinned: normalizePinned, togglePinned: togglePinned, isPinned: isPinned,
+ sanitizeAppId: sanitizeAppId, dockAppId: dockAppId, normalizePinned: normalizePinned, togglePinned: togglePinned, isPinned: isPinned,
  parseWpctlVolume: parseWpctlVolume, parseBrightness: parseBrightness,
     TAB_CYCLE_FALLTHROUGH: TAB_CYCLE_FALLTHROUGH,
     createGroup: createGroup, removeGroup: removeGroup, addMember: addMember, removeMember: removeMember,

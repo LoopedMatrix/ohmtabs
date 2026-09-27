@@ -382,6 +382,15 @@ test("group operations never mutate the input state", () => {
   assert.strictEqual(JSON.stringify(s.groups), before)
 })
 
+test("dockAppId folds reverse-DNS and Hermes aliases into one dock identity", () => {
+  assert.strictEqual(M.dockAppId("com.nousresearch.hermes"), "hermes")
+  assert.strictEqual(M.dockAppId("hermes-desktop"), "hermes")
+  assert.strictEqual(M.dockAppId("hermes"), "hermes")
+  assert.strictEqual(M.dockAppId("org.mozilla.firefox"), "firefox")
+  assert.strictEqual(M.dockAppId("firefox.desktop"), "firefox")
+  assert.strictEqual(M.dockAppId(""), "")
+})
+
 test("pin-to-dock helpers: sanitizeAppId strips .desktop, drops illegal chars, caps length 80", () => {
   assert.strictEqual(M.sanitizeAppId("firefox.desktop"), "firefox")
   assert.strictEqual(M.sanitizeAppId("org.gnome.Firefox.desktop"), "org.gnome.Firefox")
@@ -426,7 +435,10 @@ test("isPinned true/false", () => {
   assert.strictEqual(M.isPinned([], "firefox"), false)
   assert.strictEqual(M.isPinned(null, "firefox"), false)
   assert.strictEqual(M.isPinned(["firefox"], ""), false)
-  assert.strictEqual(M.isPinned(["firefox"], null), false)
+  assert.strictEqual(M.isPinned(["com.nousresearch.hermes"], "hermes"), true)
+  assert.strictEqual(M.isPinned(["hermes"], "com.nousresearch.hermes"), true)
+  assert.deepStrictEqual(M.togglePinned(["com.nousresearch.hermes"], "hermes"), [])
+  assert.deepStrictEqual(M.normalizePinned(["com.nousresearch.hermes", "hermes", "hermes-desktop"]), ["com.nousresearch.hermes"])
 })
 
 test("normalizeSettings empty object includes pinnedApps, showAppsButton, dockDodge defaults", () => {

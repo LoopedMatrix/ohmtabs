@@ -95,7 +95,7 @@ Item {
     var out = []
     var seen = {}
     function norm(c) {
-      return Model.sanitizeAppId(c).toLowerCase()
+      return Model.dockAppId(c)
     }
     if (root.showAppsButton)
       out.push({ key: "apps", kind: "apps", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
