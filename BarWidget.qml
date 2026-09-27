@@ -121,15 +121,32 @@ BarWidget {
     return bar.shell.updateEntryInline(moduleName, entry) === true
   }
 
-  // Omarchy palette → strip colors. Focused strip uses the bar surface; the
-  // unfocused one steps toward the background so the active window reads.
+  function hexArgb(c, a) {
+    function h(n) {
+      var v = Math.round(Math.max(0, Math.min(1, Number(n))) * 255)
+      var s = v.toString(16)
+      return s.length < 2 ? ("0" + s) : s
+    }
+    if (!c) return ""
+    var alpha = (a === undefined || a === null || isNaN(a)) ? c.a : a
+    return "#" + h(alpha) + h(c.r) + h(c.g) + h(c.b)
+  }
+
+  readonly property real stripGlass: {
+    var n = root.settings && root.settings.panelBgOpacity !== undefined ? Number(root.settings.panelBgOpacity) : 0.78
+    if (!(n >= 0.15)) n = 0.78
+    if (n > 1) n = 1
+    return n
+  }
+
+  // Omarchy palette → strip colors. Same glass opacity as the dock pill.
   readonly property var themeValues: ({
-    barColor: String(Color.bar.background),
-    inactiveBarColor: String(Qt.tint(Color.bar.background, Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 0.45))),
-    textColor: String(Color.bar.text),
-    hoverColor: String(Qt.rgba(Color.bar.text.r, Color.bar.text.g, Color.bar.text.b, 0.18)),
-    closeHoverColor: String(Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.85)),
-    accentColor: String(Color.accent),
+    barColor: root.hexArgb(Color.bar.background, root.stripGlass),
+    inactiveBarColor: root.hexArgb(Color.bar.background, Math.max(0.15, root.stripGlass * 0.62)),
+    textColor: root.hexArgb(Color.bar.text, 1),
+    hoverColor: root.hexArgb(Color.bar.text, 0.18),
+    closeHoverColor: root.hexArgb(Color.urgent, 0.85),
+    accentColor: root.hexArgb(Color.accent, root.settings && root.settings.panelBorderOpacity !== undefined ? Number(root.settings.panelBorderOpacity) : 0.95),
     textFont: String((bar && bar.fontFamily) || Style.font.family || "")
   })
   onThemeValuesChanged: pushTheme()
