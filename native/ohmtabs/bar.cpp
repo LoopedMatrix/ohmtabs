@@ -1044,13 +1044,13 @@ void COhmTabsDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
     int rad = (int)std::round(std::min(pill.h, pill.w) * 0.5);
     if (rad < 4)
         rad = 4;
-    CHyprColor accent = g_pGlobalState->shell.accentColor ? CHyprColor{*g_pGlobalState->shell.accentColor} :
-                                                            colorOf(g_pGlobalState->shell.textColor, g_pGlobalState->config.textColor);
-    accent.a *= a * 0.92;
+    // Glass like the dock: translucent fill, faint edge — no accent/red rim.
+    CHyprColor rimc = color;
+    rimc.a = std::min(1.0, std::max(0.12, color.a + 0.18));
     if (pill.w > 8 && pill.h > 6) {
         CBox rim = pill;
-        rim.expand(std::max(1.0, 1.15 * SCALE));
-        g_pHyprOpenGL->renderRect(rim, accent, {.round = rad + (int)std::round(SCALE), .roundingPower = 2.F});
+        rim.expand(std::max(1.0, 1.0 * SCALE));
+        g_pHyprOpenGL->renderRect(rim, rimc, {.round = rad + (int)std::round(SCALE), .roundingPower = 2.F});
         g_pHyprOpenGL->renderRect(pill, color, {.round = rad, .roundingPower = 2.F});
     } else {
         g_pHyprOpenGL->renderRect(titleBarBox, color, {.round = (int)scaledRounding, .roundingPower = PWINDOW->roundingPower()});
