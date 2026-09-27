@@ -1044,16 +1044,25 @@ void COhmTabsDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
     int rad = (int)std::round(std::min(pill.h, pill.w) * 0.5);
     if (rad < 4)
         rad = 4;
-    // Glass like the dock: translucent fill, faint edge — no accent/red rim.
-    CHyprColor rimc = color;
-    rimc.a = std::min(1.0, std::max(0.12, color.a + 0.18));
+    // Dock recipe: dark glass FILL + accent RING. Never draw accent under a
+    // translucent fill — it reads as a solid red bar. Inner fill stays opaque
+    // so only the ~2px outline is Color.accent.
+    CHyprColor glass = color;
+    glass.a = a; // opaque RGB from the theme; window alpha only
+    if (glass.r > glass.g + 0.18 && glass.r > glass.b + 0.18) {
+        glass.r = 0.055;
+        glass.g = 0.035;
+        glass.b = 0.114;
+    }
+    CHyprColor rimc = g_pGlobalState->shell.accentColor ? CHyprColor{*g_pGlobalState->shell.accentColor} :
+                                                          colorOf(g_pGlobalState->shell.textColor, g_pGlobalState->config.textColor);
+    rimc.a *= a * 0.95;
+    g_pHyprOpenGL->renderRect(titleBarBox, glass, {.round = (int)scaledRounding, .roundingPower = PWINDOW->roundingPower()});
     if (pill.w > 8 && pill.h > 6) {
         CBox rim = pill;
-        rim.expand(std::max(1.0, 1.0 * SCALE));
-        g_pHyprOpenGL->renderRect(rim, rimc, {.round = rad + (int)std::round(SCALE), .roundingPower = 2.F});
-        g_pHyprOpenGL->renderRect(pill, color, {.round = rad, .roundingPower = 2.F});
-    } else {
-        g_pHyprOpenGL->renderRect(titleBarBox, color, {.round = (int)scaledRounding, .roundingPower = PWINDOW->roundingPower()});
+        rim.expand(std::max(1.5, 2.0 * SCALE));
+        g_pHyprOpenGL->renderRect(rim, rimc, {.round = rad + (int)std::round(2.0 * SCALE), .roundingPower = 2.F});
+        g_pHyprOpenGL->renderRect(pill, glass, {.round = rad, .roundingPower = 2.F});
     }
 
     if (ROUNDING) {

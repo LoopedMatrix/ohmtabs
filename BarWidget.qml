@@ -132,21 +132,26 @@ BarWidget {
     return "#" + h(alpha) + h(c.r) + h(c.g) + h(c.b)
   }
 
-  readonly property real stripGlass: {
-    var n = root.settings && root.settings.panelBgOpacity !== undefined ? Number(root.settings.panelBgOpacity) : 0.78
-    if (!(n >= 0.15)) n = 0.78
-    if (n > 1) n = 1
-    return n
+  // 6-digit RGB only. Native owns fill alpha so an accent ring cannot bleed
+  // through a translucent interior (that was the solid-red strip).
+  function hexRgb(c) {
+    function h(n) {
+      var v = Math.round(Math.max(0, Math.min(1, Number(n))) * 255)
+      var s = v.toString(16)
+      return s.length < 2 ? ("0" + s) : s
+    }
+    if (!c) return ""
+    return "#" + h(c.r) + h(c.g) + h(c.b)
   }
 
-  // Omarchy palette → strip colors. Same glass opacity as the dock pill.
+  // Omarchy palette → strip colors. Fill is the dark canvas; accent is the rim.
   readonly property var themeValues: ({
-    barColor: root.hexArgb(Color.bar.background, root.stripGlass),
-    inactiveBarColor: root.hexArgb(Color.bar.background, Math.max(0.15, root.stripGlass * 0.62)),
+    barColor: root.hexRgb(Color.background),
+    inactiveBarColor: root.hexRgb(Color.background),
     textColor: root.hexArgb(Color.bar.text, 1),
     hoverColor: root.hexArgb(Color.bar.text, 0.18),
     closeHoverColor: root.hexArgb(Color.urgent, 0.85),
-    accentColor: root.hexArgb(Color.accent, root.settings && root.settings.panelBorderOpacity !== undefined ? Number(root.settings.panelBorderOpacity) : 0.95),
+    accentColor: root.hexRgb(Color.accent),
     textFont: String((bar && bar.fontFamily) || Style.font.family || "")
   })
   onThemeValuesChanged: pushTheme()
