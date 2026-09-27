@@ -36,6 +36,8 @@
 #include <climits>
 #include <cmath>
 #include <format>
+#include <fstream>
+#include <unistd.h>
 
 using namespace Render::GL;
 
@@ -131,19 +133,100 @@ static std::string classKey(std::string n) {
     return n;
 }
 
+static std::vector<std::string> iconNamesFor(const std::string& cls) {
+    const auto k = classKey(cls);
+    std::vector<std::string> n;
+    auto add = [&](const std::string& s) {
+        if (s.empty())
+            return;
+        for (const auto& e : n)
+            if (e == s)
+                return;
+        n.push_back(s);
+    };
+    if (k == "hermes")
+        add("hermes-desktop");
+    if (k == "brave" || k == "brave-browser") {
+        add("brave-desktop");
+        add("brave-browser");
+        add("brave");
+    }
+    add(k);
+    add(cls);
+    return n;
+}
+
+static bool readableFile(const std::string& p) {
+    return !p.empty() && p[0] == '/' && access(p.c_str(), R_OK) == 0;
+}
+
+static std::string iconFromDesktop(const std::string& name) {
+    const std::string paths[] = {"/usr/share/applications/" + name + ".desktop",
+                                 std::string(getenv("HOME") ? getenv("HOME") : "") + "/.local/share/applications/" + name + ".desktop"};
+    for (const auto& dp : paths) {
+        std::ifstream in(dp);
+        if (!in)
+            continue;
+        std::string line;
+        while (std::getline(in, line)) {
+            if (line.rfind("Icon=", 0) != 0)
+                continue;
+            auto v = line.substr(5);
+            while (!v.empty() && (v.back() == '\r' || v.back() == ' '))
+                v.pop_back();
+            if (v.empty())
+                break;
+            if (v[0] == '/')
+                return readableFile(v) ? v : "";
+            return v; // theme name, search below
+        }
+    }
+    return "";
+}
+
+static std::string findIconFile(const std::string& cls) {
+    const auto names = iconNamesFor(cls);
+    for (const auto& n : names) {
+        if (auto it = g_pGlobalState->shell.iconPaths.find(n); it != g_pGlobalState->shell.iconPaths.end() && readableFile(it->second))
+            return it->second;
+    }
+    const char* sizes[] = {"48x48", "32x32", "64x64", "128x128", "24x24", "256x256", "scalable"};
+    const char* exts[]  = {".png", ".svg"};
+    auto searchName = [&](const std::string& n) -> std::string {
+        const std::string pix = "/usr/share/pixmaps/" + n + ".png";
+        if (readableFile(pix))
+            return pix;
+        for (auto sz : sizes) {
+            for (auto ext : exts) {
+                const std::string p = std::string("/usr/share/icons/hicolor/") + sz + "/apps/" + n + ext;
+                if (readableFile(p))
+                    return p;
+            }
+        }
+        return "";
+    };
+    for (const auto& n : names) {
+        if (auto p = searchName(n); !p.empty())
+            return p;
+        const auto desk = iconFromDesktop(n);
+        if (desk.empty())
+            continue;
+        if (desk[0] == '/')
+            return desk;
+        if (auto p = searchName(desk); !p.empty())
+            return p;
+    }
+    return "";
+}
+
 static SP<Render::ITexture> appIconTex(const std::string& cls, int px) {
     px = std::max(px, 12);
     const auto key = classKey(cls) + "@" + std::to_string(px);
     auto&      slot = g_pGlobalState->iconCache[key];
     if (slot && slot->m_texID != 0)
         return slot;
-    std::string path;
-    const auto  k = classKey(cls);
-    if (auto it = g_pGlobalState->shell.iconPaths.find(k); it != g_pGlobalState->shell.iconPaths.end())
-        path = it->second;
-    else if (auto it2 = g_pGlobalState->shell.iconPaths.find(cls); it2 != g_pGlobalState->shell.iconPaths.end())
-        path = it2->second;
-    if (path.empty() || path[0] != '/')
+    const auto path = findIconFile(cls);
+    if (path.empty())
         return nullptr;
     Hyprgraphics::CImage img(path, Vector2D{px, px});
     if (!img.success())
@@ -281,35 +364,37 @@ std::string COhmTabsDeco::getDisplayName() {
 std::vector<SButtonSlot> COhmTabsDeco::layoutButtons(double barW, double barH) {
     const int  SIZE = buttonSizeValue();
     const int  PAD  = std::clamp<int>(g_pGlobalState->config.padding->value(), 0, 32);
+    // Keep glyphs out of the pill's rounded caps (and past the 3px float inset).
+    const int  END  = std::max(PAD + 6, (int)std::lround(barH * 0.42));
     const bool LEFT = buttonsLeftValue();
     const double y  = std::floor((barH - SIZE) / 2.0);
 
     std::vector<SButtonSlot> slots;
 
     // Narrow window: keep only the window-menu target (spec §3.3).
-    const bool NARROW = barW < PAD * 2 + SIZE * 4 + 24;
+    const bool NARROW = barW < END * 2 + SIZE * 4 + 24;
 
     if (!LEFT) {
         if (!NARROW) {
-            double x = barW - PAD - SIZE * 3;
+            double x = barW - END - SIZE * 3;
             for (auto b : {BTN_MINIMIZE, BTN_MAXIMIZE, BTN_CLOSE}) {
                 slots.push_back({b, CBox{x, y, (double)SIZE, (double)SIZE}});
                 x += SIZE;
             }
         }
-        slots.push_back({BTN_MENU, CBox{(double)PAD, y, (double)SIZE, (double)SIZE}});
+        slots.push_back({BTN_MENU, CBox{(double)END, y, (double)SIZE, (double)SIZE}});
     } else {
         if (!NARROW) {
-            double x = PAD;
+            double x = END;
             for (auto b : {BTN_CLOSE, BTN_MINIMIZE, BTN_MAXIMIZE}) {
                 slots.push_back({b, CBox{x, y, (double)SIZE, (double)SIZE}});
                 x += SIZE;
             }
         }
-        slots.push_back({BTN_MENU, CBox{barW - PAD - SIZE, y, (double)SIZE, (double)SIZE}});
+        slots.push_back({BTN_MENU, CBox{barW - END - SIZE, y, (double)SIZE, (double)SIZE}});
     }
 
-    if (NARROW && barW < PAD * 2 + SIZE)
+    if (NARROW && barW < END * 2 + SIZE)
         slots.clear();
 
     return slots;
@@ -1131,8 +1216,8 @@ void COhmTabsDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
     // Float the pill inside the deco band like the dock floats off the screen
     // edge — a gap under the strip so the accent is a ring, not a red underline
     // on the window.
-    const double insetX = 8.0 * SCALE;
-    const double insetY = 4.0 * SCALE;
+    const double insetX = 3.0 * SCALE;
+    const double insetY = 3.0 * SCALE;
     pill.x += insetX;
     pill.y += insetY;
     pill.w -= 2.0 * insetX;
