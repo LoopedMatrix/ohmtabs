@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import qs.Commons
 
 // macOS-style window switcher HUD. Hyprland consumes ALT+TAB (ohmtabs alttab
@@ -120,6 +121,18 @@ PanelWindow {
     }
   }
 
+  screen: {
+    try {
+      var m = Hyprland.focusedMonitor
+      if (m) {
+        var screens = Quickshell.screens
+        for (var i = 0; i < screens.length; i++) {
+          if (String(screens[i].name) === String(m.name)) return screens[i]
+        }
+      }
+    } catch (e) {}
+    return Quickshell.screens.length ? Quickshell.screens[0] : null
+  }
   visible: root.active
   color: "transparent"
   exclusionMode: ExclusionMode.Ignore
