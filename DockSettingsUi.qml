@@ -240,8 +240,8 @@ Item {
     DockToggle {
       title: "Omarchy bar controls"
       hint: "− □ × on the OhmTabs bar widget for the focused window."
-      checked: ui.settings.barWindowControls !== false
-      onToggled: ui.save({ barWindowControls: ui.settings.barWindowControls === false })
+      checked: ui.settings.barWindowControls === true
+      onToggled: ui.save({ barWindowControls: !ui.settings.barWindowControls })
     }
 
     Row {

@@ -33,7 +33,7 @@ BarWidget {
   readonly property string glyph: String.fromCodePoint(0xF05B2)   // nf-md-window_restore: a window stack
   property bool pulse: false
 
-  readonly property bool barWindowControls: settings ? settings.barWindowControls !== false : true
+  readonly property bool barWindowControls: settings ? settings.barWindowControls === true : false
   readonly property var focusedToplevel: {
     try { return ToplevelManager.activeToplevel } catch (e) { return null }
   }

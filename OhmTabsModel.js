@@ -500,9 +500,9 @@ function normalizeSettings(raw) {
     // Auto-hide is opt-in: the reveal is unreliable (see README "Known issues"),
     // so the panel stays visible unless the user explicitly asks for hiding.
     panelAutoHide: (r.panelAutoHide === true || r.panelAutoHide === "1" || r.panelAutoHide === "on" || r.panelAutoHide === "true") ? true : false,
-    // On by default: min/max/close on the Omarchy bar for the focused window,
-    // not only on the per-window title strip.
-    barWindowControls: (r.barWindowControls === false || r.barWindowControls === "0" || r.barWindowControls === "off" || r.barWindowControls === "false") ? false : true,
+    // Off by default: the Omarchy bar already has window chrome; − □ × on
+    // this widget duplicated it. Opt-in from OhmTabs settings.
+    barWindowControls: (r.barWindowControls === true || r.barWindowControls === "1" || r.barWindowControls === "on" || r.barWindowControls === "true") ? true : false,
     // Taskbar icons (from animated.dock's TintedIcon / iconSize / tintIcons).
     // Size is clamped so the 46px strip still fits; tint maps artwork to theme ink.
     iconSize: (function() {
