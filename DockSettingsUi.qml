@@ -187,6 +187,24 @@ Item {
       onToggled: ui.save({ showClock: !ui.settings.showClock })
     }
     DockToggle {
+      title: "Notifications"
+      hint: "Drawer overlay (OhmTabs). Off until built out."
+      checked: ui.settings.showNotifs === true
+      onToggled: ui.save({ showNotifs: !ui.settings.showNotifs })
+    }
+    DockToggle {
+      title: "Dashboard"
+      hint: "Overview overlay (OhmTabs). Off until built out."
+      checked: ui.settings.showDashboard === true
+      onToggled: ui.save({ showDashboard: !ui.settings.showDashboard })
+    }
+    DockToggle {
+      title: "OSD"
+      hint: "Volume/brightness overlay (OhmTabs). Off until built out."
+      checked: ui.settings.showOsd === true
+      onToggled: ui.save({ showOsd: !ui.settings.showOsd })
+    }
+    DockToggle {
       title: "Hide when windows overlap"
       hint: "Park the dock if a window covers it. Off keeps the reserved strip."
       checked: ui.settings.dockDodge === true

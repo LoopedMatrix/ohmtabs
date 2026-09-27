@@ -31,6 +31,7 @@ Item {
 
   property var shell: null
   property var service: null
+  property var bar: null
   property string serviceName: "tech.loopedmatrix.ohmtabs"
 
   // ---- settings (from this plugin's shell.json entry) ----
@@ -93,8 +94,6 @@ Item {
     }
     if (root.showAppsButton)
       out.push({ key: "apps", kind: "apps", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
-    if (root.showWorkspaces)
-      out.push({ key: "ws", kind: "workspaces", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
 
     var minBy = {}
     var list = root.rows
@@ -677,6 +676,14 @@ Item {
         z: 2
         model: root.items
         currentIndex: root.selectedIndex
+        header: DockWorkspaces {
+          bar: root.bar
+          visible: root.showWorkspaces
+          ink: root.foreground
+          accent: root.dockAccent
+          width: root.showWorkspaces ? implicitWidth : 0
+          height: root.vertical ? (root.showWorkspaces ? implicitHeight : 0) : (root.panelSize - 16)
+        }
 
         delegate: TaskButton {
           required property var modelData

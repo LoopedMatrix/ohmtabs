@@ -542,7 +542,10 @@ function normalizeSettings(raw) {
     dockDodge: (r.dockDodge === true || r.dockDodge === "1" || r.dockDodge === "on" || r.dockDodge === "true") ? true : false,
     showRunning: (r.showRunning === false || r.showRunning === "0" || r.showRunning === "off" || r.showRunning === "false") ? false : true,
     showWorkspaces: (r.showWorkspaces === true || r.showWorkspaces === "1" || r.showWorkspaces === "on" || r.showWorkspaces === "true") ? true : false,
-    showClock: (r.showClock === true || r.showClock === "1" || r.showClock === "on" || r.showClock === "true") ? true : false
+    showClock: (r.showClock === true || r.showClock === "1" || r.showClock === "on" || r.showClock === "true") ? true : false,
+    showNotifs: (r.showNotifs === true || r.showNotifs === "1" || r.showNotifs === "on" || r.showNotifs === "true") ? true : false,
+    showDashboard: (r.showDashboard === true || r.showDashboard === "1" || r.showDashboard === "on" || r.showDashboard === "true") ? true : false,
+    showOsd: (r.showOsd === true || r.showOsd === "1" || r.showOsd === "on" || r.showOsd === "true") ? true : false
   }
 }
 

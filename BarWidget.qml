@@ -198,6 +198,7 @@ BarWidget {
     id: sidePanel
     shell: root.bar ? root.bar.shell : null
     service: root.service
+    bar: root.bar
     panelEnabled: root.sidePanelEnabled
     panelPosition: root.settings ? String(root.settings.panelPosition || "bottom") : "bottom"
     panelAutoHide: root.settings ? root.settings.panelAutoHide === true : false
