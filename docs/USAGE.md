@@ -17,7 +17,7 @@ Optional extras (all **off** unless you turn them on): workspace pips, focused-w
 
 ## Title strip
 
-Every managed window gets a strip above its top edge.
+Every managed window gets a **glass pill** strip above its top edge (same fill and accent outline as the dock). Tabbed windows (drop one onto another) show that app’s icon on each tab.
 
 | Control | Action |
 | --- | --- |

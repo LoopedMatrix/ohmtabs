@@ -13,8 +13,8 @@
 
 **OhmTabs** is a [Quickshell](https://github.com/outfoxxed/quickshell) + Hyprland plugin for [Omarchy](https://omarchy.org/). It adds the window chrome Omarchy does not ship:
 
-- a **Windows-style title strip** on each app (− □ ×, drag, double-click maximize)
-- a **glassy pill taskbar** for open, minimized, and pinned apps
+- a **glass pill title strip** on each app (− □ ×, drag, double-click maximize; matches the dock)
+- a **glassy pill taskbar** for open, minimized, and pinned apps (one icon per window)
 - a **macOS-style Alt+Tab HUD**
 - optional **window tabs** (drop one window onto another)
 
