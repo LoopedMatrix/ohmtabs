@@ -10,8 +10,8 @@ endif
 
 CXXFLAGS ?= -O2
 CXXFLAGS += -shared -fPIC -std=c++2b -Wno-c++11-narrowing -Wall -Wno-unused-parameter
-INCLUDES = `pkg-config --cflags pixman-1 libdrm hyprland libinput libudev wayland-server xkbcommon`
-LIBS =
+INCLUDES = `pkg-config --cflags pixman-1 libdrm hyprland libinput libudev wayland-server xkbcommon hyprgraphics cairo`
+LIBS = `pkg-config --libs hyprgraphics cairo`
 
 SRC = main.cpp backend.cpp bar.cpp pass.cpp snapfx.cpp tabs.cpp
 TARGET = ohmtabs.so

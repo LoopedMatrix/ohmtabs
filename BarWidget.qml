@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Widgets
+import Quickshell.Hyprland
 import qs.Commons
 import qs.Ui
 import "OhmTabsModel.js" as Model
@@ -144,15 +145,76 @@ BarWidget {
     return "#" + h(c.r) + h(c.g) + h(c.b)
   }
 
-  // Omarchy palette → strip colors. Fill is the dark canvas; accent is the rim.
+  readonly property real stripGlass: {
+    var n = root.settings && root.settings.panelBgOpacity !== undefined ? Number(root.settings.panelBgOpacity) : 0.78
+    if (!(n >= 0.15)) n = 0.78
+    if (n > 1) n = 1
+    return n
+  }
+
+  function resolveStripIcon(cls) {
+    var key = String(cls || "")
+    if (!key) return ""
+    var names = [key]
+    var parts = key.split(".")
+    if (parts.length > 1) names.push(parts[parts.length - 1])
+    var lower = key.toLowerCase()
+    if (lower.indexOf("hermes") >= 0) {
+      names.push("hermes")
+      names.push("hermes-desktop")
+    }
+    var path = ""
+    for (var i = 0; i < names.length && !path; i++) {
+      var entry = null
+      try { entry = DesktopEntries.heuristicLookup(names[i]) } catch (e) { entry = null }
+      if (entry && entry.icon)
+        path = Quickshell.iconPath(String(entry.icon), true)
+      if (!path)
+        path = Quickshell.iconPath(names[i], true)
+    }
+    if (path && path.charAt(0) !== "/") path = ""
+    return path
+  }
+
+  readonly property string stripIconMap: {
+    var seen = {}
+    var parts = []
+    function addCls(c) {
+      var id = Model.dockAppId(c)
+      if (!id || seen[id]) return
+      var p = root.resolveStripIcon(c)
+      if (!p) p = root.resolveStripIcon(id)
+      if (!p) return
+      seen[id] = true
+      parts.push(id + ":" + p)
+    }
+    try {
+      var hts = Hyprland.toplevels.values
+      for (var h = 0; h < hts.length; h++) {
+        var ht = hts[h]
+        if (!ht) continue
+        addCls(ht.class || (ht.lastIpcObject ? ht.lastIpcObject.class : "") || "")
+      }
+    } catch (e1) {}
+    try {
+      var tops = ToplevelManager.toplevels.values
+      for (var j = 0; j < tops.length; j++) {
+        if (tops[j]) addCls(tops[j].appId)
+      }
+    } catch (e2) {}
+    return parts.join("|")
+  }
+
+  // Omarchy palette → strip. Glass fill like the dock; accent is the outline.
   readonly property var themeValues: ({
-    barColor: root.hexRgb(Color.background),
-    inactiveBarColor: root.hexRgb(Color.background),
+    barColor: root.hexArgb(Color.background, root.stripGlass),
+    inactiveBarColor: root.hexArgb(Color.background, Math.max(0.15, root.stripGlass * 0.62)),
     textColor: root.hexArgb(Color.bar.text, 1),
     hoverColor: root.hexArgb(Color.bar.text, 0.18),
     closeHoverColor: root.hexArgb(Color.urgent, 0.85),
     accentColor: root.hexRgb(Color.accent),
-    textFont: String((bar && bar.fontFamily) || Style.font.family || "")
+    textFont: String((bar && bar.fontFamily) || Style.font.family || ""),
+    iconMap: root.stripIconMap
   })
   onThemeValuesChanged: pushTheme()
   function pushTheme() { if (service && service.setTheme) service.setTheme(themeValues) }

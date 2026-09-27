@@ -1576,6 +1576,27 @@ void COhmTabsBackend::applyTheme(const Fields& f) {
     set("accentColor", t.accentColor);
     if (const auto FONT = field(f, "textFont"); !FONT.empty())
         t.textFont = FONT == "reset" ? std::optional<std::string>{} : std::optional<std::string>{FONT.substr(0, 64)};
+    if (const auto MAP = field(f, "iconMap"); !MAP.empty()) {
+        t.iconPaths.clear();
+        g_pGlobalState->iconCache.clear();
+        if (MAP != "reset") {
+            size_t start = 0;
+            while (start < MAP.size()) {
+                const auto BAR = MAP.find('|', start);
+                const auto PIECE = MAP.substr(start, (BAR == std::string::npos ? MAP.size() : BAR) - start);
+                const auto COL = PIECE.find(':');
+                if (COL != std::string::npos && COL > 0 && COL + 1 < PIECE.size()) {
+                    auto k = PIECE.substr(0, COL);
+                    auto p = PIECE.substr(COL + 1);
+                    if (k.size() <= 80 && p.size() <= 512 && p[0] == '/')
+                        t.iconPaths[k] = p;
+                }
+                if (BAR == std::string::npos)
+                    break;
+                start = BAR + 1;
+            }
+        }
+    }
     g_pGlobalState->glyphCache.clear();
     for (auto& b : g_pGlobalState->bars)
         if (b)

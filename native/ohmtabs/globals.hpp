@@ -53,6 +53,7 @@ struct SGlobalState {
         std::optional<bool>      buttonsLeft, showOnHover;
         std::optional<int>       barHeight, buttonSize;
         std::vector<std::string> excludedClasses; // exact window class matches, from Settings
+        std::map<std::string, std::string> iconPaths; // dockAppId / class → theme icon file
     } shell;
 
     // "Top bar on hover" mode: bars start hidden and reveal when the pointer
@@ -60,6 +61,8 @@ struct SGlobalState {
 
     // glyph textures shared by every bar, keyed by glyph + scaled size + color
     std::map<std::string, SP<Render::ITexture>> glyphCache;
+    // app icons for Chrome-style tabs, keyed by class@px
+    std::map<std::string, SP<Render::ITexture>> iconCache;
 };
 
 inline UP<SGlobalState>     g_pGlobalState;

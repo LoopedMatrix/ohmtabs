@@ -465,7 +465,7 @@ Item {
 
   function setTheme(values) {
     var next = {}
-    var keys = ["barColor", "inactiveBarColor", "textColor", "hoverColor", "closeHoverColor", "accentColor", "textFont"]
+    var keys = ["barColor", "inactiveBarColor", "textColor", "hoverColor", "closeHoverColor", "accentColor", "textFont", "iconMap"]
     for (var i = 0; i < keys.length; i++) {
       var v = values ? values[keys[i]] : undefined
       if (v !== undefined && v !== null && String(v) !== "") next[keys[i]] = String(v)

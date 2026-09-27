@@ -30,6 +30,7 @@
 #include "pass.hpp"
 
 #include <cairo/cairo.h>
+#include <hyprgraphics/image/Image.hpp>
 
 #include <cctype>
 #include <climits>
@@ -70,6 +71,88 @@ namespace {
     int tabMinWidthValue() {
         return std::clamp<int>(g_pGlobalState->config.tabMinWidth->value(), 48, 640);
     }
+}
+
+static void cairoRoundRect(cairo_t* cr, double x, double y, double w, double h, double r) {
+    if (r > w * 0.5)
+        r = w * 0.5;
+    if (r > h * 0.5)
+        r = h * 0.5;
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x + w - r, y + r, r, -M_PI / 2.0, 0);
+    cairo_arc(cr, x + w - r, y + h - r, r, 0, M_PI / 2.0);
+    cairo_arc(cr, x + r, y + h - r, r, M_PI / 2.0, M_PI);
+    cairo_arc(cr, x + r, y + r, r, M_PI, 3.0 * M_PI / 2.0);
+    cairo_close_path(cr);
+}
+
+// Dock-matching pill: glass fill + 2px accent stroke. Stroke sits on the
+// outline so it cannot bleed through a translucent interior.
+static SP<Render::ITexture> dockPillTex(int w, int h, const CHyprColor& fill, const CHyprColor& rim, double stroke) {
+    if (w < 8 || h < 6)
+        return nullptr;
+    const auto key = std::to_string(w) + "x" + std::to_string(h) + "@" + std::to_string((int)(fill.r * 255)) +
+                     "," + std::to_string((int)(fill.g * 255)) + "," + std::to_string((int)(fill.b * 255)) + "," +
+                     std::to_string((int)(fill.a * 255)) + "/" + std::to_string((int)(rim.r * 255)) + "," +
+                     std::to_string((int)(rim.g * 255)) + "," + std::to_string((int)(rim.b * 255)) + "," +
+                     std::to_string((int)(rim.a * 255)) + "s" + std::to_string((int)stroke);
+    auto& slot = g_pGlobalState->glyphCache["pill:" + key];
+    if (slot && slot->m_texID != 0)
+        return slot;
+    auto* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+    auto* cr      = cairo_create(surface);
+    cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);
+    cairo_paint(cr);
+    cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+    const double sw = std::max(1.0, stroke);
+    const double in = sw * 0.5 + 0.5;
+    cairoRoundRect(cr, in, in, w - 2.0 * in, h - 2.0 * in, (h - 2.0 * in) * 0.5);
+    cairo_set_source_rgba(cr, fill.r, fill.g, fill.b, fill.a);
+    cairo_fill_preserve(cr);
+    cairo_set_line_width(cr, sw);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+    cairo_set_source_rgba(cr, rim.r, rim.g, rim.b, rim.a);
+    cairo_stroke(cr);
+    cairo_surface_flush(surface);
+    slot = g_pHyprRenderer->createTexture(surface);
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+    return slot;
+}
+
+static std::string classKey(std::string n) {
+    for (auto& c : n)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (n == "com.nousresearch.hermes" || n == "hermes-desktop")
+        return "hermes";
+    const auto d = n.rfind('.');
+    if (d != std::string::npos && d + 1 < n.size())
+        n = n.substr(d + 1);
+    return n;
+}
+
+static SP<Render::ITexture> appIconTex(const std::string& cls, int px) {
+    px = std::max(px, 12);
+    const auto key = classKey(cls) + "@" + std::to_string(px);
+    auto&      slot = g_pGlobalState->iconCache[key];
+    if (slot && slot->m_texID != 0)
+        return slot;
+    std::string path;
+    const auto  k = classKey(cls);
+    if (auto it = g_pGlobalState->shell.iconPaths.find(k); it != g_pGlobalState->shell.iconPaths.end())
+        path = it->second;
+    else if (auto it2 = g_pGlobalState->shell.iconPaths.find(cls); it2 != g_pGlobalState->shell.iconPaths.end())
+        path = it2->second;
+    if (path.empty() || path[0] != '/')
+        return nullptr;
+    Hyprgraphics::CImage img(path, Vector2D{px, px});
+    if (!img.success())
+        return nullptr;
+    auto surf = img.cairoSurface();
+    if (!surf || !surf->cairo())
+        return nullptr;
+    slot = g_pHyprRenderer->createTexture(surf->cairo());
+    return slot;
 }
 
 // Control glyphs are drawn as paths (spec §3.3): no icon font is needed and
@@ -886,27 +969,37 @@ void COhmTabsDeco::renderTabs(float a, const CBox& titleBarBox, float SCALE, int
         CBox ib = tb.iconBox;
         ib.translate(Vector2D{titleBarBox.x / SCALE, titleBarBox.y / SCALE}).scale(SCALE).round();
         if (ib.w > 2 && ib.h > 2) {
-            auto ic = xc;
-            ic.a *= tb.active ? 0.28 : 0.14;
-            g_pHyprOpenGL->renderRect(ib, ic, {.round = (int)std::round(ib.w / 2.0), .roundingPower = 2.F});
-            std::string letter = "?";
+            bool drew = false;
             if (w) {
-                std::string cls = w->m_class.empty() ? w->m_initialClass : w->m_class;
-                const auto  dot = cls.rfind('.');
-                if (dot != std::string::npos && dot + 1 < cls.size())
-                    cls = cls.substr(dot + 1);
-                for (unsigned char ch : cls) {
-                    if (std::isalpha(ch)) {
-                        letter = std::string(1, static_cast<char>(std::toupper(ch)));
-                        break;
-                    }
+                const std::string cls = w->m_class.empty() ? w->m_initialClass : w->m_class;
+                if (auto itex = appIconTex(cls, (int)std::round(ib.h))) {
+                    g_pHyprOpenGL->renderTexture(itex, ib, {.a = a});
+                    drew = true;
                 }
             }
-            auto ltex = g_pHyprRenderer->renderText(letter, xc, std::round(ib.h * 0.52), true, FONT, (int)std::round(ib.w));
-            if (ltex && ltex->m_texID != 0) {
-                CBox lp = {ib.x + (ib.w - ltex->m_size.x) / 2.0, ib.y + (ib.h - ltex->m_size.y) / 2.0, (double)ltex->m_size.x, (double)ltex->m_size.y};
-                lp.round();
-                g_pHyprOpenGL->renderTexture(ltex, lp, {.a = a});
+            if (!drew) {
+                auto ic = xc;
+                ic.a *= tb.active ? 0.28 : 0.14;
+                g_pHyprOpenGL->renderRect(ib, ic, {.round = (int)std::round(ib.w / 2.0), .roundingPower = 2.F});
+                std::string letter = "?";
+                if (w) {
+                    std::string cls = w->m_class.empty() ? w->m_initialClass : w->m_class;
+                    const auto  dot = cls.rfind('.');
+                    if (dot != std::string::npos && dot + 1 < cls.size())
+                        cls = cls.substr(dot + 1);
+                    for (unsigned char ch : cls) {
+                        if (std::isalpha(ch)) {
+                            letter = std::string(1, static_cast<char>(std::toupper(ch)));
+                            break;
+                        }
+                    }
+                }
+                auto ltex = g_pHyprRenderer->renderText(letter, xc, std::round(ib.h * 0.52), true, FONT, (int)std::round(ib.w));
+                if (ltex && ltex->m_texID != 0) {
+                    CBox lp = {ib.x + (ib.w - ltex->m_size.x) / 2.0, ib.y + (ib.h - ltex->m_size.y) / 2.0, (double)ltex->m_size.x, (double)ltex->m_size.y};
+                    lp.round();
+                    g_pHyprOpenGL->renderTexture(ltex, lp, {.a = a});
+                }
             }
         }
 
@@ -1035,20 +1128,16 @@ void COhmTabsDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
     const float SCALE = pMonitor->m_scale;
     CBox        pill  = {DECOBOX.x - pMonitor->m_position.x, DECOBOX.y - pMonitor->m_position.y, DECOBOX.w, DECOBOX.h};
     pill.translate(PWINDOW->m_floatingOffset).scale(SCALE).round();
-    const double insetX = 5.0 * SCALE;
-    const double insetY = 2.5 * SCALE;
+    // Float the pill inside the deco band like the dock floats off the screen
+    // edge — a gap under the strip so the accent is a ring, not a red underline
+    // on the window.
+    const double insetX = 8.0 * SCALE;
+    const double insetY = 4.0 * SCALE;
     pill.x += insetX;
     pill.y += insetY;
     pill.w -= 2.0 * insetX;
     pill.h -= 2.0 * insetY;
-    int rad = (int)std::round(std::min(pill.h, pill.w) * 0.5);
-    if (rad < 4)
-        rad = 4;
-    // Dock recipe: dark glass FILL + accent RING. Never draw accent under a
-    // translucent fill — it reads as a solid red bar. Inner fill stays opaque
-    // so only the ~2px outline is Color.accent.
     CHyprColor glass = color;
-    glass.a = a; // opaque RGB from the theme; window alpha only
     if (glass.r > glass.g + 0.18 && glass.r > glass.b + 0.18) {
         glass.r = 0.055;
         glass.g = 0.035;
@@ -1056,13 +1145,13 @@ void COhmTabsDeco::renderPass(PHLMONITOR pMonitor, const float& a) {
     }
     CHyprColor rimc = g_pGlobalState->shell.accentColor ? CHyprColor{*g_pGlobalState->shell.accentColor} :
                                                           colorOf(g_pGlobalState->shell.textColor, g_pGlobalState->config.textColor);
-    rimc.a *= a * 0.95;
-    g_pHyprOpenGL->renderRect(titleBarBox, glass, {.round = (int)scaledRounding, .roundingPower = PWINDOW->roundingPower()});
+    rimc.a *= a * 0.85;
     if (pill.w > 8 && pill.h > 6) {
-        CBox rim = pill;
-        rim.expand(std::max(1.5, 2.0 * SCALE));
-        g_pHyprOpenGL->renderRect(rim, rimc, {.round = rad + (int)std::round(2.0 * SCALE), .roundingPower = 2.F});
-        g_pHyprOpenGL->renderRect(pill, glass, {.round = rad, .roundingPower = 2.F});
+        if (auto tex = dockPillTex((int)pill.w, (int)pill.h, glass, rimc, std::max(2.0, 2.0 * SCALE))) {
+            g_pHyprOpenGL->renderTexture(tex, pill, {.a = a});
+        } else {
+            g_pHyprOpenGL->renderRect(pill, glass, {.round = (int)std::round(pill.h * 0.5), .roundingPower = 2.F});
+        }
     }
 
     if (ROUNDING) {
