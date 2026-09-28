@@ -14,7 +14,7 @@ operator decides when the plugin is first loaded (`hyprctl reload`, or the next
 login). `disable` removes the line and the marker. `retry` clears a recorded
 failed start so the next evaluation declares the plugin again.
 """
-import argparse, json, os, re, sys, time
+import argparse, json, os, re, sys, tempfile, time
 
 BEGIN = "-- BEGIN tech.loopedmatrix.ohmtabs autoload"
 END = "-- END tech.loopedmatrix.ohmtabs autoload"
@@ -111,6 +111,68 @@ def retry(state_dir):
             pass
 
 
+def _atomic_backup(content_bytes, base_path):
+    """Write an exclusive, collision-safe backup next to *base_path*.
+
+    Uses ``mkstemp`` so the file is created exclusively (no symlink
+    following) and a unique name is guaranteed.  Returns the absolute
+    path of the written backup.
+    """
+    backup_dir = os.path.dirname(base_path)
+    target_name = os.path.basename(base_path)
+    fd, path = tempfile.mkstemp(
+        prefix="ohmtabs-" + target_name + "-",
+        suffix=".bak",
+        dir=backup_dir,
+    )
+    try:
+        os.write(fd, content_bytes)
+        os.close(fd)
+        os.chmod(path, 0o644)
+        return path
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+        raise
+
+
+def _atomic_replace(content_bytes, target_path, mode=0o644):
+    """Write *content_bytes* to a brand-new temp file in the same directory
+    as *target_path*, then ``os.replace`` it onto *target_path*.
+
+    The temp file is created exclusively via ``mkstemp``, so an existing
+    symlink at the predictable ``.tmp`` path is never followed or truncated.
+    If anything fails before the replace, the temp file is cleaned up.
+    """
+    target_dir = os.path.dirname(target_path) or "."
+    fd, tmp = tempfile.mkstemp(
+        prefix="ohmtabs-" + os.path.basename(target_path) + "-",
+        suffix=".tmp",
+        dir=target_dir,
+    )
+    try:
+        os.write(fd, content_bytes)
+        os.close(fd)
+        os.chmod(tmp, mode)
+        os.replace(tmp, target_path)
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def enable(state_dir, hypr_config):
     try:
         with open(hypr_config) as f:
@@ -120,17 +182,11 @@ def enable(state_dir, hypr_config):
     if BEGIN in text:
         arm(state_dir)
         return "already-installed"
-    backup = "%s.bak.%s" % (hypr_config, time.strftime("%Y%m%d-%H%M%S"))
-    with open(backup, "w") as f:
-        f.write(text)
+    backup = _atomic_backup(text.encode("utf-8"), hypr_config)
     if not text.endswith("\n"):
         text += "\n"
     text += "\n" + HOOK
-    tmp = hypr_config + ".ohmtabs.tmp"
-    with open(tmp, "w") as f:
-        f.write(text)
-    os.chmod(tmp, 0o644)
-    os.replace(tmp, hypr_config)
+    _atomic_replace(text.encode("utf-8"), hypr_config)
     arm(state_dir)
     return "installed (backup: %s)" % backup
 
@@ -145,14 +201,8 @@ def disable(state_dir, hypr_config):
     if BEGIN not in text:
         return "not-installed"
     new = re.sub(r"\n?" + re.escape(BEGIN) + r".*?" + re.escape(END) + r"\n", "", text, count=1, flags=re.S)
-    backup = "%s.bak.%s" % (hypr_config, time.strftime("%Y%m%d-%H%M%S"))
-    with open(backup, "w") as f:
-        f.write(text)
-    tmp = hypr_config + ".ohmtabs.tmp"
-    with open(tmp, "w") as f:
-        f.write(new)
-    os.chmod(tmp, 0o644)
-    os.replace(tmp, hypr_config)
+    backup = _atomic_backup(text.encode("utf-8"), hypr_config)
+    _atomic_replace(new.encode("utf-8"), hypr_config)
     return "removed (backup: %s)" % backup
 
 
