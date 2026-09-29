@@ -126,7 +126,15 @@ def _atomic_backup(content_bytes, base_path):
         dir=backup_dir,
     )
     try:
-        os.write(fd, content_bytes)
+        written = 0
+        total = len(content_bytes)
+        while written < total:
+            n = os.write(fd, content_bytes[written:])
+            if n <= 0:
+                raise OSError("short write: wrote %d of %d bytes" % (written, total))
+            written += n
+        if written != total:
+            raise OSError("incomplete write: %d of %d bytes" % (written, total))
         os.close(fd)
         os.chmod(path, 0o644)
         return path
@@ -157,7 +165,15 @@ def _atomic_replace(content_bytes, target_path, mode=0o644):
         dir=target_dir,
     )
     try:
-        os.write(fd, content_bytes)
+        written = 0
+        total = len(content_bytes)
+        while written < total:
+            n = os.write(fd, content_bytes[written:])
+            if n <= 0:
+                raise OSError("short write: wrote %d of %d bytes" % (written, total))
+            written += n
+        if written != total:
+            raise OSError("incomplete write: %d of %d bytes" % (written, total))
         os.close(fd)
         os.chmod(tmp, mode)
         os.replace(tmp, target_path)
