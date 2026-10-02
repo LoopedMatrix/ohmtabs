@@ -35,9 +35,13 @@
 #include <cctype>
 #include <climits>
 #include <cmath>
+#include <filesystem>
 #include <format>
 #include <fstream>
+#include <string>
+#include <system_error>
 #include <unistd.h>
+#include <vector>
 
 using namespace Render::GL;
 
@@ -160,6 +164,80 @@ static bool readableFile(const std::string& p) {
     return !p.empty() && p[0] == '/' && access(p.c_str(), R_OK) == 0;
 }
 
+// Scan the XDG application dirs for the .desktop entry whose id (or
+// StartupWMClass) normalizes to the same dock id as `cls`, and return its Icon=.
+// The class-derived name in iconNamesFor() misses this case entirely: Claude's
+// window class and entry id are both com.anthropic.Claude while its Icon= is
+// claude-desktop, and the dock id is the short "claude" — none of which
+// iconNamesFor() can produce, so the tab fell back to a letter tile.
+static std::string iconFromEntryScan(const std::string& cls) {
+    const auto want = classKey(cls);
+    if (want.empty())
+        return "";
+    std::vector<std::string> dirs;
+    if (const char* home = getenv("HOME"))
+        dirs.push_back(std::string(home) + "/.local/share/applications");
+    const char* xdg = getenv("XDG_DATA_DIRS");
+    const std::string dataDirs = xdg && *xdg ? xdg : "/usr/local/share:/usr/share";
+    size_t pos = 0;
+    while (pos <= dataDirs.size()) {
+        const auto sep  = dataDirs.find(':', pos);
+        const auto part = dataDirs.substr(pos, sep == std::string::npos ? std::string::npos : sep - pos);
+        if (!part.empty())
+            dirs.push_back(part + "/applications");
+        if (sep == std::string::npos)
+            break;
+        pos = sep + 1;
+    }
+    std::string byId;
+    std::string byClass;
+    for (const auto& dir : dirs) {
+        std::error_code ec;
+        for (const auto& de : std::filesystem::directory_iterator(dir, ec)) {
+            if (ec)
+                break;
+            const auto p = de.path();
+            if (p.extension() != ".desktop" || !de.is_regular_file())
+                continue;
+            const auto id = p.stem().string();
+            const bool idHit    = classKey(id) == want;
+            std::ifstream in(p);
+            if (!in)
+                continue;
+            std::string icon;
+            std::string sc;
+            bool        hidden = false;
+            std::string line;
+            bool        inMain = false;
+            while (std::getline(in, line)) {
+                if (!line.empty() && line[0] == '[') {
+                    inMain = line.rfind("[Desktop Entry]", 0) == 0;
+                    continue;
+                }
+                if (!inMain)
+                    continue;
+                if (line.rfind("Icon=", 0) == 0 && icon.empty())
+                    icon = line.substr(5);
+                else if (line.rfind("StartupWMClass=", 0) == 0 && sc.empty())
+                    sc = line.substr(15);
+                else if (line.rfind("NoDisplay=true", 0) == 0)
+                    hidden = true;
+            }
+            if (hidden || icon.empty())
+                continue;
+            if (!byId.empty() && !byClass.empty())
+                break;
+            // An id match wins outright; StartupWMClass is only a fallback,
+            // since several entries can share one class.
+            if (idHit && byId.empty())
+                byId = icon;
+            else if (!idHit && !sc.empty() && classKey(sc) == want && byClass.empty())
+                byClass = icon;
+        }
+    }
+    return !byId.empty() ? byId : byClass;
+}
+
 static std::string iconFromDesktop(const std::string& name) {
     const std::string paths[] = {"/usr/share/applications/" + name + ".desktop",
                                  std::string(getenv("HOME") ? getenv("HOME") : "") + "/.local/share/applications/" + name + ".desktop"};
@@ -205,6 +283,15 @@ static std::string findIconFile(const std::string& cls) {
         }
         return "";
     };
+    // The owning entry's Icon= name first: it is the app's canonical icon and
+    // the class-derived names above cannot produce it (Claude's is
+    // claude-desktop while every name above says "claude").
+    if (const auto ownerIcon = iconFromEntryScan(cls); !ownerIcon.empty()) {
+        if (ownerIcon[0] == '/')
+            return readableFile(ownerIcon) ? ownerIcon : "";
+        if (auto p = searchName(ownerIcon); !p.empty())
+            return p;
+    }
     for (const auto& n : names) {
         if (auto p = searchName(n); !p.empty())
             return p;
@@ -633,13 +720,12 @@ void COhmTabsDeco::handleDownEvent(Event::SCallbackInfo& info) {
     if (PWINDOW->m_isFloating)
         Desktop::windowState()->raise(PWINDOW);
 
-    info.cancelled  = true;
-    m_cancelledDown = true;
-
     const auto TOKEN = g_pBackend->tokenFor(PWINDOW);
     const auto BTN   = buttonAt(COORDS);
 
     if (BTN != BTN_NONE) {
+        info.cancelled      = true;
+        m_cancelledDown     = true;
         m_pressedButton     = BTN;
         m_pressToken        = TOKEN;
         m_lastPressWasTitle = false;
@@ -652,6 +738,8 @@ void COhmTabsDeco::handleDownEvent(Event::SCallbackInfo& info) {
     // that window, and dragging a non-active segment tears it out of the group.
     if (const int TAB = tabAt(COORDS); TAB >= 0) {
         const auto& TB      = m_tabBoxes[TAB];
+        info.cancelled      = true;
+        m_cancelledDown     = true;
         m_pressedTab        = TAB;
         m_pressedTabClose   = TB.closeBox.containsPoint(COORDS);
         m_pressToken        = TB.token;
@@ -665,28 +753,9 @@ void COhmTabsDeco::handleDownEvent(Event::SCallbackInfo& info) {
         return;
     }
 
-    // Title region: double-click toggles Maximize / Restore size, otherwise a
-    // drag may start once the pointer travels past the threshold.
-    const auto NOW = Time::steadyNow();
-    const bool DOUBLE =
-        m_lastPressWasTitle && std::chrono::duration_cast<std::chrono::milliseconds>(NOW - m_lastTitlePress).count() < 400;
-
-    m_lastTitlePress    = NOW;
-    m_lastPressWasTitle = true;
-    m_pressedButton     = BTN_NONE;
-    m_pressToken        = TOKEN;
-
-    if (DOUBLE) {
-        m_lastPressWasTitle = false;
-        m_dragPending       = false;
-        std::string err;
-        g_pBackend->setMaximized(TOKEN, std::nullopt, err);
-        return;
-    }
-
-    m_pressPos    = g_pInputManager->getMouseCoordsInternal();
-    m_pressOffset = COORDS;
-    m_dragPending = true;
+    // Empty strip area: let the click pass through to the window below so that
+    // context menus and other popups overlapping the strip remain clickable.
+    // Window dragging is still available via Super+drag or by dragging tabs.
 }
 
 void COhmTabsDeco::handleUpEvent(Event::SCallbackInfo& info) {

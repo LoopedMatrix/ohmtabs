@@ -163,6 +163,18 @@ BarWidget {
       names.push("hermes")
       names.push("hermes-desktop")
     }
+    // The entry that owns this dock id can be named quite differently from it
+    // (pin "claude" -> com.anthropic.Claude, Icon=claude-desktop). Resolve the
+    // owner and try its Icon= first — the native half only gets a real file path
+    // out of this map, so a name that resolves nowhere means no tab icon.
+    var entries = []
+    try { entries = DesktopEntries.applications ? (DesktopEntries.applications.values || []) : [] } catch (e0) { entries = [] }
+    var ownerId = Model.desktopEntryIdFor(key, entries)
+    if (ownerId) {
+      var owner = null
+      try { owner = DesktopEntries.byId(ownerId) } catch (e1) { owner = null }
+      if (owner && owner.icon) names.unshift(String(owner.icon))
+    }
     var path = ""
     for (var i = 0; i < names.length && !path; i++) {
       var entry = null

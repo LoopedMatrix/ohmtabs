@@ -253,6 +253,21 @@ Item {
       add("hermes")
       add("hermes-desktop")
     }
+    // The entry that owns this dock id can be named quite differently from it
+    // (pin "claude" -> com.anthropic.Claude, whose Icon= is claude-desktop), and
+    // neither the id nor its last dotted segment is a theme icon name. Resolve
+    // the owner entry and try ITS Icon= before falling back to a letter tile.
+    var entries = []
+    try { entries = DesktopEntries.applications ? (DesktopEntries.applications.values || []) : [] } catch (e0) { entries = [] }
+    var ownerId = Model.desktopEntryIdFor(key, entries)
+    if (ownerId) {
+      var owner = null
+      try { owner = DesktopEntries.byId(ownerId) } catch (e1) { owner = null }
+      if (owner && owner.icon) add(String(owner.icon))
+      var osc = owner ? String(owner.startupClass || "") : ""
+      if (osc) add(osc)
+      add(ownerId)
+    }
     var path = ""
     for (var i = 0; i < names.length && !path; i++) {
       var entry = null
@@ -262,7 +277,11 @@ Item {
       if (!path)
         path = Quickshell.iconPath(names[i], true)
     }
-    root.iconCache[key] = path || ""
+    // Do not cache a miss while the entry scan is still empty: a pinned app with
+    // no window is drawn at startup, before the scan lands, and a cached "" would
+    // pin its letter tile for the rest of the session. An empty scan leaves the
+    // cache untouched so the binding re-resolves when the entries arrive.
+    if (path || entries.length > 0) root.iconCache[key] = path || ""
     return path
   }
 
@@ -440,20 +459,20 @@ Item {
     try {
       if (typeof DesktopEntries !== "undefined" && DesktopEntries) {
         var entry = DesktopEntries.heuristicLookup(id) || DesktopEntries.byId(id)
-        if (entry && entry.id) desk = String(entry.id)
-        else {
-          // Fallback: search for a desktop entry whose dockAppId matches
-          var values = DesktopEntries.values || []
-          for (var i = 0; i < values.length; i++) {
-            var e = values[i]
-            if (e && e.id && Model.dockAppId(e.id) === id) {
-              desk = String(e.id)
-              break
-            }
-          }
+        if (entry && entry.id) {
+          desk = String(entry.id)
+        } else {
+          // A pin is stored under the normalized dock id ("claude"), which need
+          // not match the entry's own id (com.anthropic.Claude). Resolve it
+          // against the entry list; `gtk-launch claude` fails with exit 2.
+          var values = DesktopEntries.applications ? (DesktopEntries.applications.values || []) : []
+          var found = Model.desktopEntryIdFor(id, values)
+          if (found) desk = found
         }
       }
     } catch (e) {}
+    // Keep the .desktop suffix: ids like org.telegram.desktop only resolve with
+    // it (same reason Omarchy's own AppLibrary.launch keeps it).
     try { Quickshell.execDetached(["gtk-launch", desk]) } catch (e2) {}
   }
 

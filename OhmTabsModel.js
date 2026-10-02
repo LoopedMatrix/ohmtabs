@@ -574,6 +574,37 @@ function dockAppId(id) {
   return n
 }
 
+// The .desktop entry that owns a dock id. `dockAppId` normalizes a window class
+// to the id a pin is stored under, but the entry's own id can be named quite
+// differently from that id: Claude's window class and entry id are both
+// com.anthropic.Claude while the pin and the dock tile are the short "claude",
+// so neither byId("claude") nor heuristicLookup("claude") matches (that lookup
+// only tries the exact id and StartupWMClass). Icon and launch resolution both
+// missed, and the tile fell back to a letter. Scan the entries for one whose id
+// OR StartupWMClass normalizes to the same dock id, preferring an id match
+// (a StartupWMClass can be shared by several entries). NoDisplay entries are
+// skipped — they are hidden helpers, not apps.
+function desktopEntryIdFor(appId, entries) {
+  var want = dockAppId(appId)
+  if (!want) return ""
+  var list = entries && typeof entries.length === "number" ? entries : []
+  var byId = ""
+  var byClass = ""
+  for (var i = 0; i < list.length; i++) {
+    var e = list[i]
+    if (!e || e.noDisplay) continue
+    var id = String(e.id || "")
+    if (!id) continue
+    if (!byId && dockAppId(id) === want) byId = id
+    if (!byClass) {
+      var sc = String(e.startupWMClass || "")
+      if (sc && dockAppId(sc) === want) byClass = id
+    }
+    if (byId && byClass) break
+  }
+  return byId || byClass
+}
+
 function normalizePinned(list) {
   var src = []
   if (list && typeof list === "object" && typeof list.length === "number") {
@@ -1023,6 +1054,7 @@ if (typeof module !== "undefined" && module.exports) {
     restoreDestination: restoreDestination, clampBox: clampBox, originLabel: originLabel, rowsWithOrdinals: rowsWithOrdinals,
  statusSummary: statusSummary, normalizeSettings: normalizeSettings, readOwnEntry: readOwnEntry,
  sanitizeAppId: sanitizeAppId, dockAppId: dockAppId, normalizePinned: normalizePinned, togglePinned: togglePinned, isPinned: isPinned,
+ desktopEntryIdFor: desktopEntryIdFor,
  normalizeAddress: normalizeAddress, isParkedWorkspace: isParkedWorkspace, buildDockItems: buildDockItems,
  parseWpctlVolume: parseWpctlVolume, parseBrightness: parseBrightness, notifMatchesApp: notifMatchesApp,
     TAB_CYCLE_FALLTHROUGH: TAB_CYCLE_FALLTHROUGH,

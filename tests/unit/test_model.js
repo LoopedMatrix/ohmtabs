@@ -402,6 +402,27 @@ test("pin-to-dock helpers: sanitizeAppId strips .desktop, drops illegal chars, c
   assert.strictEqual(M.sanitizeAppId(undefined), "")
 })
 
+test("desktopEntryIdFor resolves dock id to owning entry id", () => {
+  // Claude: dock id "claude", entry id "com.anthropic.claude", StartupWMClass "com.anthropic.claude"
+  const entries = [
+    { id: "com.anthropic.claude", startupWMClass: "com.anthropic.claude", icon: "claude-desktop" },
+    { id: "org.mozilla.firefox", startupWMClass: "firefox", icon: "firefox" },
+    { id: "org.gnome.Nautilus", startupWMClass: "org.gnome.Nautilus", icon: "org.gnome.Nautilus" },
+  ]
+  assert.strictEqual(M.desktopEntryIdFor("claude", entries), "com.anthropic.claude")
+  assert.strictEqual(M.desktopEntryIdFor("firefox", entries), "org.mozilla.firefox")
+  assert.strictEqual(M.desktopEntryIdFor("org.gnome.Nautilus", entries), "org.gnome.Nautilus")
+  assert.strictEqual(M.desktopEntryIdFor("nonexistent", entries), "")
+  assert.strictEqual(M.desktopEntryIdFor("", entries), "")
+  assert.strictEqual(M.desktopEntryIdFor("claude", []), "")
+  assert.strictEqual(M.desktopEntryIdFor("claude", null), "")
+  // StartupWMClass fallback when id doesn't match
+  const entries2 = [
+    { id: "some.other.app", startupWMClass: "claude", icon: "claude" },
+  ]
+  assert.strictEqual(M.desktopEntryIdFor("claude", entries2), "some.other.app")
+})
+
 test("normalizePinned dedups case-insensitively, drops junk, caps at 24", () => {
   assert.deepStrictEqual(M.normalizePinned([]), [])
   assert.deepStrictEqual(M.normalizePinned(null), [])

@@ -62,7 +62,25 @@ PanelWindow {
     var entry = null
     try { entry = DesktopEntries.heuristicLookup(key) } catch (e) {}
     if (entry && entry.icon) return Quickshell.iconPath(String(entry.icon), true)
-    return Quickshell.iconPath(key, true)
+    // A dock id need not match the entry's own id (pin "claude" ->
+    // com.anthropic.Claude, Icon=claude-desktop), and heuristicLookup only tries
+    // the exact id and StartupWMClass, so resolve the owner entry's icon too.
+    var names = [key]
+    var parts = key.split(".")
+    if (parts.length > 1) names.push(parts[parts.length - 1])
+    var entries = []
+    try { entries = DesktopEntries.applications ? (DesktopEntries.applications.values || []) : [] } catch (e1) { entries = [] }
+    var ownerId = Model.desktopEntryIdFor(key, entries)
+    if (ownerId) {
+      var owner = null
+      try { owner = DesktopEntries.byId(ownerId) } catch (e2) { owner = null }
+      if (owner && owner.icon) names.unshift(String(owner.icon))
+    }
+    for (var i = 0; i < names.length; i++) {
+      var p = Quickshell.iconPath(names[i], true)
+      if (p) return p
+    }
+    return ""
   }
 
   function step(direction) {
