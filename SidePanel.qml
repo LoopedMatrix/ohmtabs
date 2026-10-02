@@ -104,53 +104,50 @@ Item {
   // Apps button + one tile per window + pinned stubs with no window.
   // Same-class windows stay separate so two Brave windows are two icons.
   // A pin only adds a stub when that app has no live or minimized window.
+  // Which button gets drawn is decided by Model.buildDockItems (unit-tested);
+  // this block only reads the compositor, which the model cannot do. The
+  // workspace NAME has to come from the HyprlandToplevel: the WaylandToplevel
+  // the dock activates has no workspace at all, so a window OhmTabs parked on
+  // its holding workspace used to be drawn as a live icon as well as its
+  // minimized row — the same window twice on the taskbar.
   readonly property var items: {
     var gen = root.toplevelGen
-    var out = []
-    function norm(c) {
-      return Model.dockAppId(c)
-    }
-    if (root.showAppsButton)
-      out.push({ key: "apps", kind: "apps", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
-
-    var minList = []
-    var list = root.rows
-    for (var i = 0; i < list.length; i++) {
-      var r = list[i]
-      var cls = norm(r.class)
-      if (!cls) cls = "__min" + i
-      minList.push({ id: cls, row: r })
-    }
-    var lives = []
-    function isParked(t) {
+    var live = []
+    function wsNameOf(ht) {
       try {
-        var n = t.workspace ? (t.workspace.name || t.workspace) : ""
-        if (String(n).indexOf("ohmtabs-minimized") >= 0) return true
-      } catch (e8) {}
-      try {
-        var w = t.lastIpcObject && t.lastIpcObject.workspace
-        var nn = w && (w.name || w)
-        if (String(nn).indexOf("ohmtabs-minimized") >= 0) return true
-      } catch (e9) {}
-      return false
+        var ws = ht && ht.workspace ? ht.workspace : null
+        if (!ws) return ""
+        var n = ws.name !== undefined && ws.name !== null ? ws.name : ws
+        return String(n === undefined || n === null ? "" : n)
+      } catch (e0) { return "" }
     }
-    function addLive(id, t) {
+    function titleOf(t, ht) {
+      try { if (t && t.title) return String(t.title) } catch (e4) {}
+      try { if (ht && ht.lastIpcObject && ht.lastIpcObject.title) return String(ht.lastIpcObject.title) } catch (e5) {}
+      return ""
+    }
+    function addLive(id, t, ht) {
       if (!id || !t) return
-      if (id === "electron" || id === "chromium") return
-      if (isParked(t)) return
-      lives.push({ id: id, t: t })
+      var key = ""
+      try { if (ht && ht.address) key = String(ht.address) } catch (e6) {}
+      if (!key) { try { if (t.address) key = String(t.address) } catch (e7) {} }
+      if (!key) key = "live:" + id + ":" + live.length
+      var addr = ""
+      try { if (ht && ht.address) addr = String(ht.address) } catch (e8) {}
+      if (!addr) { try { if (t.address) addr = String(t.address) } catch (e9) {} }
+      live.push({ id: id, toplevel: t, key: key, address: addr, workspace: wsNameOf(ht), title: titleOf(t, ht) })
     }
     try {
       var hts = Hyprland.toplevels.values
       for (var h = 0; h < hts.length; h++) {
         var ht = hts[h]
         if (!ht) continue
-        var cls2 = norm(ht.class || (ht.lastIpcObject ? ht.lastIpcObject.class : "") || "")
+        var cls2 = Model.dockAppId(ht.class || (ht.lastIpcObject ? ht.lastIpcObject.class : "") || "")
         var way = null
         try { way = ht.wayland } catch (e1) { way = null }
-        var app = way ? norm(way.appId) : ""
+        var app = way ? Model.dockAppId(way.appId) : ""
         var hid = (cls2 && cls2 !== "electron" && cls2 !== "chromium") ? cls2 : app
-        addLive(hid, way || ht)
+        addLive(hid, way || ht, ht)
       }
     } catch (e2) {
       var tops = []
@@ -158,75 +155,18 @@ Item {
       for (var j = 0; j < tops.length; j++) {
         var t = tops[j]
         if (!t) continue
-        addLive(norm(t.appId), t)
+        addLive(Model.dockAppId(t.appId), t, null)
       }
     }
-    var covered = {}
-    function titleOf(t, fallback) {
-      try { if (t && t.title) return String(t.title) } catch (e4) {}
-      try { if (t && t.lastIpcObject && t.lastIpcObject.title) return String(t.lastIpcObject.title) } catch (e5) {}
-      return fallback
-    }
-    function liveKey(t, idx, id) {
-      try { if (t && t.address) return String(t.address) } catch (e6) {}
-      try {
-        if (t && t.lastIpcObject && t.lastIpcObject.address) return String(t.lastIpcObject.address)
-      } catch (e7) {}
-      return "live:" + id + ":" + idx
-    }
-    var pins = root.pinnedApps || []
-    if (root.showRunning) {
-      for (var li = 0; li < lives.length; li++) {
-        var L = lives[li]
-        covered[L.id] = true
-        var ttl = titleOf(L.t, L.id)
-        out.push({
-          key: liveKey(L.t, li, L.id),
-          kind: "app",
-          appId: L.id,
-          pinned: Model.isPinned(pins, L.id),
-          members: [{ class: L.id, title: ttl, label: ttl, token: "", status: "live" }],
-          toplevel: L.t,
-          liveCount: 1,
-          minCount: 0
-        })
-      }
-    }
-    for (var mi = 0; mi < minList.length; mi++) {
-      var M = minList[mi]
-      covered[M.id] = true
-      var row = M.row
-      out.push({
-        key: String(row.token || ("m" + mi)),
-        kind: "minimized",
-        appId: M.id,
-        pinned: Model.isPinned(pins, M.id),
-        members: [row],
-        toplevel: null,
-        liveCount: 0,
-        minCount: 1
-      })
-    }
-    for (var p = 0; p < pins.length; p++) {
-      var pid = norm(pins[p])
-      if (!pid || covered[pid]) continue
-      covered[pid] = true
-      out.push({
-        key: "pin:" + pid,
-        kind: "app",
-        appId: pid,
-        pinned: true,
-        members: [{ class: pid, title: pid, label: pid, token: "", status: "pinned" }],
-        toplevel: null,
-        liveCount: 0,
-        minCount: 0
-      })
-    }
-    if (root.showNotifs)
-      out.push({ key: "notifs", kind: "notifs", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
-    if (root.showDashboard)
-      out.push({ key: "dash", kind: "dashboard", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
-    return out
+    return Model.buildDockItems({
+      showAppsButton: root.showAppsButton,
+      showRunning: root.showRunning,
+      showNotifs: root.showNotifs,
+      showDashboard: root.showDashboard,
+      pinnedApps: root.pinnedApps,
+      rows: root.rows,
+      live: live
+    })
   }
   readonly property var groups: root.items
 

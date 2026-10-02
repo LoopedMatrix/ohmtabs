@@ -617,6 +617,123 @@ function isPinned(pinnedIds, appId) {
   return false
 }
 
+// --------------------------------------------------------------- dock items
+
+// Hyprland reports window addresses as "0x5ba374a2efb0"; Quickshell's
+// HyprlandToplevel.address drops the prefix ("5ba374a2efb0"). Compare the
+// address itself, never the spelling, so a row and its toplevel still match.
+function normalizeAddress(value) {
+  var s = String(value === undefined || value === null ? "" : value).trim().toLowerCase()
+  if (s.slice(0, 2) === "0x") s = s.slice(2)
+  s = s.replace(/^0+/, "")
+  return s
+}
+
+// A window OhmTabs parked on its holding workspace is not an open window: its
+// button is its minimized row. The workspace name is the only fact that says
+// so, and only the HyprlandToplevel carries it (the WaylandToplevel the dock
+// activates has no workspace property at all, and the toplevel's
+// lastIpcObject.workspace keeps the OLD workspace after a park).
+function isParkedWorkspace(workspaceName) {
+  var n = String(workspaceName === undefined || workspaceName === null ? "" : workspaceName)
+  if (!n) return false
+  if (n === OWNED_WORKSPACE) return true
+  return n.indexOf("ohmtabs-minimized") >= 0
+}
+
+// The dock's button list: one button per window, in order — apps button, live
+// windows, minimized rows, pinned stubs with no window, notifs, dashboard.
+//
+// `input.live` is the shell's snapshot of the compositor's toplevels as plain
+// facts ({ id, title, key, address, workspace, toplevel }) because only QML can
+// reach Hyprland; everything that decides what is drawn lives here, where it
+// is unit-tested. `input.rows` are the minimized entries.
+//
+// A live toplevel is dropped when it is parked, and — belt and braces — when
+// its address is one a minimized row already claims. Either check alone keeps
+// the minimized window off the dock a second time; the address check also
+// covers a compositor that reports no workspace for the holding workspace.
+function buildDockItems(input) {
+  var o = input && typeof input === "object" ? input : {}
+  var pins = normalizePinned(o.pinnedApps)
+  var rows = o.rows && typeof o.rows.length === "number" ? o.rows : []
+  var live = o.live && typeof o.live.length === "number" ? o.live : []
+  var out = []
+
+  if (o.showAppsButton)
+    out.push({ key: "apps", kind: "apps", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
+
+  var parkedAddress = {}
+  for (var a = 0; a < rows.length; a++) {
+    var addr = normalizeAddress(rows[a] && rows[a].address)
+    if (addr) parkedAddress[addr] = true
+  }
+
+  var covered = {}
+  if (o.showRunning !== false) {
+    for (var i = 0; i < live.length; i++) {
+      var L = live[i]
+      if (!L) continue
+      var id = dockAppId(L.id)
+      if (!id || id === "electron" || id === "chromium") continue
+      if (isParkedWorkspace(L.workspace)) continue
+      var la = normalizeAddress(L.address)
+      if (la && parkedAddress[la]) continue
+      covered[id] = true
+      var ttl = sanitizeLabel(L.title, LABEL_MAX) || id
+      out.push({
+        key: L.key ? String(L.key) : ("live:" + id + ":" + i),
+        kind: "app",
+        appId: id,
+        pinned: isPinned(pins, id),
+        members: [{ class: id, title: ttl, label: ttl, token: "", status: "live" }],
+        toplevel: L.toplevel || null,
+        liveCount: 1,
+        minCount: 0
+      })
+    }
+  }
+
+  for (var m = 0; m < rows.length; m++) {
+    var row = rows[m]
+    var mid = dockAppId(row && row.class)
+    if (!mid) mid = "__min" + m
+    covered[mid] = true
+    out.push({
+      key: String((row && row.token) || ("m" + m)),
+      kind: "minimized",
+      appId: mid,
+      pinned: isPinned(pins, mid),
+      members: [row],
+      toplevel: null,
+      liveCount: 0,
+      minCount: 1
+    })
+  }
+
+  for (var p = 0; p < pins.length; p++) {
+    var pid = dockAppId(pins[p])
+    if (!pid || covered[pid]) continue
+    covered[pid] = true
+    out.push({
+      key: "pin:" + pid,
+      kind: "app",
+      appId: pid,
+      pinned: true,
+      members: [{ class: pid, title: pid, label: pid, token: "", status: "pinned" }],
+      toplevel: null,
+      liveCount: 0,
+      minCount: 0
+    })
+  }
+
+  if (o.showNotifs)
+    out.push({ key: "notifs", kind: "notifs", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
+  if (o.showDashboard)
+    out.push({ key: "dash", kind: "dashboard", members: [], appId: "", pinned: false, liveCount: 0, minCount: 0, toplevel: null })
+  return out
+}
+
 // Find this plugin's entry in a shell.json document and return its settings
 // (everything but `id`), or null when the entry is absent.
 function readOwnEntry(raw, pluginId) {
@@ -906,6 +1023,7 @@ if (typeof module !== "undefined" && module.exports) {
     restoreDestination: restoreDestination, clampBox: clampBox, originLabel: originLabel, rowsWithOrdinals: rowsWithOrdinals,
  statusSummary: statusSummary, normalizeSettings: normalizeSettings, readOwnEntry: readOwnEntry,
  sanitizeAppId: sanitizeAppId, dockAppId: dockAppId, normalizePinned: normalizePinned, togglePinned: togglePinned, isPinned: isPinned,
+ normalizeAddress: normalizeAddress, isParkedWorkspace: isParkedWorkspace, buildDockItems: buildDockItems,
  parseWpctlVolume: parseWpctlVolume, parseBrightness: parseBrightness, notifMatchesApp: notifMatchesApp,
     TAB_CYCLE_FALLTHROUGH: TAB_CYCLE_FALLTHROUGH,
     createGroup: createGroup, removeGroup: removeGroup, addMember: addMember, removeMember: removeMember,

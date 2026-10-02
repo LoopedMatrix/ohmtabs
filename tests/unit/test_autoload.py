@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory() as td:
     r = al.enable(state, cfg); assert r.startswith("installed"), r
     text = open(cfg).read(); assert text.count(al.BEGIN) == 1 and "pcall(dofile" in text and text.startswith(original), text
     assert os.path.exists(os.path.join(state, "autoload", "enabled"))
-    assert any(f.startswith("hyprland.lua.bak.") for f in os.listdir(td))
+    assert any(f.startswith("ohmtabs-hyprland.lua-") and f.endswith(".bak") for f in os.listdir(td))
     # the installed line must not depend on plugin state (the 2026-09-15 defect)
     assert "get_loaded_plugins" not in text and "if not loaded" not in text
     assert al.enable(state, cfg) == "already-installed" and open(cfg).read().count(al.BEGIN) == 1

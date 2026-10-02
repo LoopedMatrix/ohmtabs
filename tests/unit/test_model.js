@@ -457,4 +457,113 @@ test("notifMatchesApp ties Omarchy popup rows to a dock app id", () => {
   assert.strictEqual(M.notifMatchesApp(null, "firefox"), false)
 })
 
+// ------------------------------------------------------------- dock items
+
+function liveFact(extra) {
+  return Object.assign({ id: "mpv", title: "ohmtabs-probe-window", key: "5ba374a2efb0", address: "5ba374a2efb0", workspace: "1", toplevel: {} }, extra || {})
+}
+
+function minRow(extra) {
+  return Object.assign({ token: "g1790898843-6", status: "minimized", class: "mpv", origin: "1", address: "0x5ba374a2efb0" }, extra || {})
+}
+
+test("normalizeAddress matches Hyprland and Quickshell spellings of one window", () => {
+  assert.strictEqual(M.normalizeAddress("0x5ba374a2efb0"), M.normalizeAddress("5BA374A2EFB0"))
+  assert.strictEqual(M.normalizeAddress("0x000abc"), "abc")
+  assert.strictEqual(M.normalizeAddress(""), "")
+  assert.strictEqual(M.normalizeAddress(null), "")
+  assert.strictEqual(M.normalizeAddress(undefined), "")
+})
+
+test("isParkedWorkspace only claims the holding workspace", () => {
+  assert.strictEqual(M.isParkedWorkspace("special:ohmtabs-minimized"), true)
+  assert.strictEqual(M.isParkedWorkspace("special:ohmtabs-minimized-2"), true)
+  assert.strictEqual(M.isParkedWorkspace("1"), false)
+  assert.strictEqual(M.isParkedWorkspace("special:scratchpad"), false)
+  assert.strictEqual(M.isParkedWorkspace(""), false)
+  assert.strictEqual(M.isParkedWorkspace(undefined), false)
+  assert.strictEqual(M.isParkedWorkspace(null), false)
+})
+
+test("dock items: a parked window is one button — its minimized row", () => {
+  // The bug: the dock's parked check was handed the WaylandToplevel, which has
+  // no workspace, so the parked window stayed a live icon AND its row drew.
+  const items = M.buildDockItems({
+    showAppsButton: false, showRunning: true,
+    rows: [minRow()],
+    live: [liveFact({ workspace: "special:ohmtabs-minimized" })]
+  })
+  assert.strictEqual(items.length, 1, "one window, one button")
+  assert.strictEqual(items[0].kind, "minimized")
+  assert.strictEqual(items[0].appId, "mpv")
+  assert.strictEqual(items[0].liveCount, 0)
+})
+
+test("dock items: a parked window whose toplevel reports no workspace is still one button", () => {
+  const items = M.buildDockItems({
+    showAppsButton: false, showRunning: true,
+    rows: [minRow()],
+    live: [liveFact({ workspace: "" })]
+  })
+  assert.strictEqual(items.length, 1)
+  assert.strictEqual(items[0].kind, "minimized")
+})
+
+test("dock items: an open window keeps its live icon and its address key", () => {
+  const items = M.buildDockItems({ showAppsButton: false, showRunning: true, rows: [], live: [liveFact()] })
+  assert.strictEqual(items.length, 1)
+  assert.strictEqual(items[0].kind, "app")
+  assert.strictEqual(items[0].key, "5ba374a2efb0")
+  assert.strictEqual(items[0].liveCount, 1)
+  assert.strictEqual(items[0].members[0].title, "ohmtabs-probe-window")
+})
+
+test("dock items: same-class windows stay separate buttons", () => {
+  const items = M.buildDockItems({
+    showAppsButton: false, showRunning: true, rows: [],
+    live: [liveFact({ key: "aaa", address: "aaa", title: "one" }), liveFact({ key: "bbb", address: "bbb", title: "two" })]
+  })
+  assert.strictEqual(items.length, 2, "two Brave windows are two icons")
+  assert.deepStrictEqual(items.map(i => i.appId), ["mpv", "mpv"])
+  assert.deepStrictEqual(items.map(i => i.key), ["aaa", "bbb"])
+})
+
+test("dock items: a pin only stubs when the app has no live or minimized window", () => {
+  const pins = ["mpv", "hermes"]
+  const withLive = M.buildDockItems({ showAppsButton: false, showRunning: true, pinnedApps: pins, rows: [], live: [liveFact()] })
+  assert.deepStrictEqual(withLive.map(i => i.key), ["5ba374a2efb0", "pin:hermes"], "no stub for the live app")
+  assert.strictEqual(withLive[1].pinned, true)
+  assert.strictEqual(withLive[0].pinned, true, "a pinned app with a window is still marked pinned")
+
+  const withRow = M.buildDockItems({ showAppsButton: false, showRunning: true, pinnedApps: pins, rows: [minRow()], live: [liveFact({ workspace: "special:ohmtabs-minimized" })] })
+  assert.deepStrictEqual(withRow.map(i => i.key), ["g1790898843-6", "pin:hermes"], "no stub for the minimized app")
+})
+
+test("dock items: apps button, notifs and dashboard follow their flags", () => {
+  const off = M.buildDockItems({ showAppsButton: false, showRunning: true, rows: [], live: [] })
+  assert.deepStrictEqual(off, [])
+  const on = M.buildDockItems({ showAppsButton: true, showNotifs: true, showDashboard: true, rows: [], live: [] })
+  assert.deepStrictEqual(on.map(i => i.key), ["apps", "notifs", "dash"])
+})
+
+test("dock items: showRunning false hides live windows but keeps minimized rows", () => {
+  const items = M.buildDockItems({ showAppsButton: false, showRunning: false, rows: [minRow()], live: [liveFact()] })
+  assert.deepStrictEqual(items.map(i => i.key), ["g1790898843-6"])
+})
+
+test("dock items: electron/chromium shells are not dock apps; a missing class still gets a row", () => {
+  const items = M.buildDockItems({
+    showAppsButton: false, showRunning: true, rows: [{ token: "g1-1", class: "" }],
+    live: [liveFact({ id: "electron" }), liveFact({ id: "chromium", key: "ccc", address: "ccc" })]
+  })
+  assert.strictEqual(items.length, 1)
+  assert.strictEqual(items[0].kind, "minimized")
+  assert.strictEqual(items[0].appId, "__min0")
+})
+
+test("dock items: tolerate missing/odd input", () => {
+  assert.deepStrictEqual(M.buildDockItems(), [])
+  assert.deepStrictEqual(M.buildDockItems({ showRunning: true, rows: [null], live: [null] }), [{ key: "m0", kind: "minimized", appId: "__min0", pinned: false, members: [null], toplevel: null, liveCount: 0, minCount: 1 }])
+})
+
 console.log("test_model: " + passed + " passed")

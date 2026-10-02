@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Taskbar: one tile per window when a window is minimized
+
+- Minimizing a window no longer adds a second taskbar icon for it. The dock's
+  parked-window filter read the Wayland toplevel's `workspace` and `address`,
+  both of which are `undefined` in the live shell (only `HyprlandToplevel`
+  resolves them), so a window parked on `special:ohmtabs-minimized` was never
+  filtered out: it stayed in the strip as a live tile *and* picked up a
+  minimized tile from the service rows.
+- The decision is now a pure function, `OhmTabsModel.buildDockItems`, which
+  `SidePanel.qml` feeds the `HyprlandToplevel` workspace fact and the service
+  rows; it parks by workspace name and de-duplicates by window address
+  (Hyprland's `0x`-prefixed address vs Quickshell's bare hex), with unit
+  coverage in `tests/unit/test_model.js`.
+- `tests/unit/test_autoload.py` asserted the pre-rename backup filename
+  (`hyprland.lua.bak.*`); the helper writes `ohmtabs-hyprland.lua-*.bak`.
+
 ### Alt-tab: tab groups, browser tabs, then the window cycle
 
 - New `ohmtabs alttab next|prev` (helper `helpers/ohmtabs_alttab.py`), one key
