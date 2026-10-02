@@ -441,6 +441,17 @@ Item {
       if (typeof DesktopEntries !== "undefined" && DesktopEntries) {
         var entry = DesktopEntries.heuristicLookup(id) || DesktopEntries.byId(id)
         if (entry && entry.id) desk = String(entry.id)
+        else {
+          // Fallback: search for a desktop entry whose dockAppId matches
+          var values = DesktopEntries.values || []
+          for (var i = 0; i < values.length; i++) {
+            var e = values[i]
+            if (e && e.id && Model.dockAppId(e.id) === id) {
+              desk = String(e.id)
+              break
+            }
+          }
+        }
       }
     } catch (e) {}
     try { Quickshell.execDetached(["gtk-launch", desk]) } catch (e2) {}
