@@ -632,6 +632,7 @@ Item {
   }
 
   function openSettings() { root.openOverlay({ view: "settings" }) }
+  function openSuperMenu() { root.openOverlay({ view: "supermenu" }) }
 
   // --------------------------------------------------------- tab groups
 
@@ -1040,6 +1041,7 @@ Item {
     function openSettings(): string { root.openSettings(); return "ok" }
     function openNotifs(): string { root.openOverlay({ view: "notifs" }); return "ok" }
     function openDashboard(): string { root.openOverlay({ view: "dashboard" }); return "ok" }
+    function openSuperMenu(): string { root.openSuperMenu(); return "ok" }
     function reconcile(): string {
       root.journalConsumed = false
       root.snapshotDone = false

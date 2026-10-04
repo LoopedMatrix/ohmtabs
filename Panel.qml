@@ -14,6 +14,7 @@ import "OhmTabsModel.js" as Model
 //              strip's menu button or a right-click on the strip.
 //   settings — the short settings panel (spec §9) with Restore all, Check
 //              setup and the OhmTabs on/off switch.
+//   supermenu — Windows-style start page: All Apps, Pinned, Recommended.
 //
 // The host calls open(payloadJson) / close(); `opened` reports the state.
 Item {
@@ -82,7 +83,7 @@ Item {
     var payload = {}
     try { payload = JSON.parse(String(payloadJson || "{}")) || {} } catch (e) {}
     var wanted = String(payload.view || "drawer")
-    if (wanted !== "menu" && wanted !== "settings" && wanted !== "notifs" && wanted !== "dashboard") wanted = "drawer"
+    if (wanted !== "menu" && wanted !== "settings" && wanted !== "notifs" && wanted !== "dashboard" && wanted !== "supermenu") wanted = "drawer"
     root.confirmHide = false
     root.confirmClose = false
     root.selectedIndex = 0
@@ -255,7 +256,7 @@ Item {
     MouseArea {
       anchors.fill: parent
       onClicked: root.dismiss()
-      Rectangle { anchors.fill: parent; color: root.view === "menu" ? "transparent" : root.scrim }
+      Rectangle { anchors.fill: parent; color: (root.view === "menu" || root.view === "supermenu") ? "transparent" : root.scrim }
     }
 
     Item {
@@ -265,7 +266,7 @@ Item {
       Keys.onPressed: function(event) {
         if (event.key === Qt.Key_Escape) {
           if (root.confirmHide) root.confirmHide = false
-          else if (root.view !== "drawer" && root.view !== "menu" && root.rows.length > 0) root.switchView("drawer")
+          else if (root.view !== "drawer" && root.view !== "menu" && root.view !== "supermenu" && root.rows.length > 0) root.switchView("drawer")
           else root.dismiss()
           event.accepted = true; return
         }
@@ -610,6 +611,29 @@ Item {
       OverlayDashboard {
         id: dashUi
         anchors.fill: parent
+        onCloseRequested: root.dismiss()
+      }
+    }
+
+    // --------------------------------------------------------- super menu
+    Rectangle {
+      id: superMenuCard
+      visible: root.view === "supermenu"
+      width: Math.min(900, panel.width - Style.gapsOut * 2)
+      height: Math.min(620, panel.height - Style.gapsOut * 2)
+      anchors.horizontalCenter: parent.horizontalCenter
+      y: Style.gapsOut + Style.space(8)
+      radius: 18
+      color: root.background
+      border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.45)
+      border.width: 1
+      MouseArea { anchors.fill: parent; onClicked: function(m) { m.accepted = true } }
+      SuperMenu {
+        id: superMenuUi
+        anchors.fill: parent
+        shell: root.shell
+        service: root.service
+        moduleName: root.pluginId
         onCloseRequested: root.dismiss()
       }
     }
