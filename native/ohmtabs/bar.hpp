@@ -124,6 +124,7 @@ class COhmTabsDeco : public IHyprWindowDecoration {
 
     bool                       effectiveEnabled();
     bool                       inputIsValid();
+    bool                       popupAtCursor();
     Vector2D                   cursorRelativeToBar();
     std::vector<SButtonSlot>   layoutButtons(double barW, double barH);
     eOhmTabsButton             buttonAt(const Vector2D& rel);

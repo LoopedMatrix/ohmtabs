@@ -7,6 +7,7 @@
 #include <hyprland/src/desktop/state/LayerState.hpp>
 #include <hyprland/src/desktop/state/ViewHitTester.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
+#include <hyprland/src/desktop/view/Popup.hpp>
 #include <hyprland/src/desktop/view/LayerSurface.hpp>
 #include <hyprland/src/helpers/MiscFunctions.hpp>
 #include <hyprland/src/managers/SeatManager.hpp>
@@ -662,6 +663,33 @@ bool COhmTabsDeco::inputIsValid() {
     return true;
 }
 
+// A popup overlapping the strip keeps its clicks: an app's own context menu
+// (an xdg_popup of this window) and our Quickshell menus (popups of the
+// layer surface) are separate surfaces that the hit tester above does not
+// report, so the strip must yield to them by hand. Everything else in the
+// title region is the window's to drag.
+bool COhmTabsDeco::popupAtCursor() {
+    const auto MOUSE = g_pInputManager->getMouseCoordsInternal();
+
+    if (const auto PWINDOW = m_window.lock(); validMapped(PWINDOW) && PWINDOW->m_popupHead && PWINDOW->m_popupHead->at(MOUSE, true))
+        return true;
+
+    const auto PMONITOR = Desktop::focusState()->monitor();
+    if (!PMONITOR)
+        return false;
+
+    for (auto layer : {ZWLR_LAYER_SHELL_V1_LAYER_TOP, ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY}) {
+        for (const auto& LS : PMONITOR->m_layerSurfaceLayers[layer]) {
+            if (!LS || !LS->m_mapped || !LS->m_popupHead)
+                continue;
+            if (LS->m_popupHead->at(MOUSE, true))
+                return true;
+        }
+    }
+
+    return false;
+}
+
 void COhmTabsDeco::onMouseButton(Event::SCallbackInfo& info, IPointer::SButtonEvent e) {
     if (e.button != BTN_LEFT) {
         // A drag in progress ends on any release so a stray button cannot
@@ -735,7 +763,8 @@ void COhmTabsDeco::handleDownEvent(Event::SCallbackInfo& info) {
     }
 
     // Tab segment: a click activates the tab, its close affordance closes just
-    // that window, and dragging a non-active segment tears it out of the group.
+    // that window, dragging a non-active segment tears it out of the group,
+    // and double-clicking the active segment toggles Maximize / Restore.
     if (const int TAB = tabAt(COORDS); TAB >= 0) {
         const auto& TB      = m_tabBoxes[TAB];
         info.cancelled      = true;
@@ -744,6 +773,24 @@ void COhmTabsDeco::handleDownEvent(Event::SCallbackInfo& info) {
         m_pressedTabClose   = TB.closeBox.containsPoint(COORDS);
         m_pressToken        = TB.token;
         m_lastPressWasTitle = false;
+
+        const auto NOW = Time::steadyNow();
+        const bool DOUBLE =
+            TB.active && !m_pressedTabClose && m_lastPressWasTitle && std::chrono::duration_cast<std::chrono::milliseconds>(NOW - m_lastTitlePress).count() < 400;
+        m_lastTitlePress    = NOW;
+        m_lastPressWasTitle = true;
+
+        if (DOUBLE) {
+            m_pressedTab        = -1;
+            m_pressedTabClose   = false;
+            m_lastPressWasTitle = false;
+            m_dragPending       = false;
+            std::string err;
+            g_pBackend->setMaximized(TB.token, std::nullopt, err);
+            damageEntire();
+            return;
+        }
+
         m_tabTearOff        = !TB.active && !m_pressedTabClose;
         m_tearToken         = m_tabTearOff ? TB.token : "";
         m_dragPending       = !m_pressedTabClose;
@@ -753,9 +800,37 @@ void COhmTabsDeco::handleDownEvent(Event::SCallbackInfo& info) {
         return;
     }
 
-    // Empty strip area: let the click pass through to the window below so that
-    // context menus and other popups overlapping the strip remain clickable.
-    // Window dragging is still available via Super+drag or by dragging tabs.
+    // A popup over the strip (an app menu, or one of our own) owns its clicks.
+    if (popupAtCursor()) {
+        m_dragPending       = false;
+        m_pressedButton     = BTN_NONE;
+        m_lastPressWasTitle = false;
+        return;
+    }
+
+    // Title region: double-click toggles Maximize / Restore size, otherwise a
+    // drag may start once the pointer travels past the threshold.
+    const auto NOW      = Time::steadyNow();
+    const bool DOUBLE   = m_lastPressWasTitle && std::chrono::duration_cast<std::chrono::milliseconds>(NOW - m_lastTitlePress).count() < 400;
+
+    m_lastTitlePress    = NOW;
+    m_lastPressWasTitle = true;
+    m_pressedButton     = BTN_NONE;
+    m_pressToken        = TOKEN;
+
+    if (DOUBLE) {
+        m_lastPressWasTitle = false;
+        m_dragPending       = false;
+        std::string err;
+        g_pBackend->setMaximized(TOKEN, std::nullopt, err);
+        return;
+    }
+
+    info.cancelled = true;
+    m_cancelledDown = true;
+    m_pressPos     = g_pInputManager->getMouseCoordsInternal();
+    m_pressOffset  = COORDS;
+    m_dragPending  = true;
 }
 
 void COhmTabsDeco::handleUpEvent(Event::SCallbackInfo& info) {
