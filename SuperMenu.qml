@@ -104,6 +104,17 @@ Item {
   readonly property var recentAppsModel: root.recentApps.slice(0, 6)
 
   // ---- icon resolution ----
+  function colorForString(s) {
+    var hash = 0
+    s = String(s || "?")
+    for (var i = 0; i < s.length; i++) {
+      hash = ((hash << 5) - hash) + s.charCodeAt(i)
+      hash = hash & hash
+    }
+    var hue = Math.abs(hash) % 360
+    return Qt.hsla(hue / 360.0, 0.65, 0.45, 1.0)
+  }
+
   function resolveIcon(appId) {
     var key = String(appId || "")
     if (!key) return ""
@@ -327,6 +338,12 @@ Item {
                     width: 20; height: 20
                     anchors.verticalCenter: parent.verticalCenter
                     property string iconSrc: root.resolveIcon(modelData.appId)
+                    Rectangle {
+                      anchors.fill: parent
+                      radius: 4
+                      color: root.colorForString(modelData.name || modelData.appId || "?")
+                      visible: parent.iconSrc === ""
+                    }
                     Image {
                       anchors.fill: parent
                       source: parent.iconSrc
@@ -337,7 +354,7 @@ Item {
                       anchors.centerIn: parent
                       visible: parent.iconSrc === ""
                       text: modelData.name.charAt(0).toUpperCase()
-                      color: root.fg
+                      color: "white"
                       font.family: root.fontFamily
                       font.pixelSize: 12
                       font.weight: Font.DemiBold
@@ -412,6 +429,12 @@ Item {
                     width: 32; height: 32
                     anchors.horizontalCenter: parent.horizontalCenter
                     property string iconSrc: root.resolveIcon(modelData.appId)
+                    Rectangle {
+                      anchors.fill: parent
+                      radius: 7
+                      color: root.colorForString(modelData.name || modelData.appId || "?")
+                      visible: parent.iconSrc === ""
+                    }
                     Image {
                       anchors.fill: parent
                       source: parent.iconSrc
@@ -422,7 +445,7 @@ Item {
                       anchors.centerIn: parent
                       visible: parent.iconSrc === ""
                       text: modelData.name.charAt(0).toUpperCase()
-                      color: root.fg
+                      color: "white"
                       font.family: root.fontFamily
                       font.pixelSize: 18
                       font.weight: Font.DemiBold
@@ -496,6 +519,12 @@ Item {
                       width: 18; height: 18
                       anchors.verticalCenter: parent.verticalCenter
                       property string iconSrc: root.resolveIcon(modelData.appId)
+                      Rectangle {
+                        anchors.fill: parent
+                        radius: 4
+                        color: root.colorForString(modelData.name || modelData.appId || "?")
+                        visible: parent.iconSrc === ""
+                      }
                       Image {
                         anchors.fill: parent
                         source: parent.iconSrc
@@ -506,7 +535,7 @@ Item {
                         anchors.centerIn: parent
                         visible: parent.iconSrc === ""
                         text: modelData.name.charAt(0).toUpperCase()
-                        color: root.fg
+                        color: "white"
                         font.family: root.fontFamily
                         font.pixelSize: 11
                         font.weight: Font.DemiBold

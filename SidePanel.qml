@@ -234,6 +234,19 @@ Item {
   // at shell startup, so by the time a window is minimized it is populated.)
   property var iconCache: ({})
 
+  // Deterministic colour for a fallback tile, derived from the app name so the
+  // same app always gets the same colour across sessions.
+  function colorForString(s) {
+    var hash = 0
+    s = String(s || "?")
+    for (var i = 0; i < s.length; i++) {
+      hash = ((hash << 5) - hash) + s.charCodeAt(i)
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    var hue = Math.abs(hash) % 360
+    return Qt.hsla(hue / 360.0, 0.65, 0.45, 1.0)
+  }
+
   function resolveIcon(cls) {
     var key = String(cls || "")
     if (key === "") return ""
@@ -1111,11 +1124,17 @@ Item {
             tinted: root.tintIcons && btn.iconSource !== ""
             ink: root.foreground
           }
+          Rectangle {
+            anchors.fill: parent
+            radius: Math.round(Math.min(btn.length, btn.thickness) / 4)
+            color: root.colorForString(btn.badge || "?")
+            visible: btn.iconSource === ""
+          }
           Text {
             anchors.centerIn: parent
             visible: btn.iconSource === ""
             text: btn.badge
-            color: root.foreground
+            color: "white"
             font.family: root.fontFamily
             font.pixelSize: 12
             font.weight: Font.DemiBold
@@ -1235,12 +1254,12 @@ Item {
       Rectangle {
         anchors.fill: parent
         radius: 4
-        color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
+        color: root.colorForString(frow.badge || "?")
         visible: frow.iconSource === ""
         Text {
           anchors.centerIn: parent
           text: frow.badge
-          color: root.foreground
+          color: "white"
           font.family: root.fontFamily
           font.pixelSize: 9
           font.weight: Font.DemiBold

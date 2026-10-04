@@ -36,9 +36,12 @@
 #include <cctype>
 #include <climits>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <functional>
+#include <sstream>
 #include <string>
 #include <system_error>
 #include <unistd.h>
@@ -272,9 +275,16 @@ static std::string findIconFile(const std::string& cls) {
     const char* sizes[] = {"48x48", "32x32", "64x64", "128x128", "24x24", "256x256", "scalable"};
     const char* exts[]  = {".png", ".svg"};
     auto searchName = [&](const std::string& n) -> std::string {
-        const std::string pix = "/usr/share/pixmaps/" + n + ".png";
-        if (readableFile(pix))
-            return pix;
+        // User-installed icons take priority (Hermes and other apps install here)
+        const std::string userBase = std::string(std::getenv("HOME") ? std::getenv("HOME") : "") + "/.local/share/icons";
+        for (auto sz : sizes) {
+            for (auto ext : exts) {
+                const std::string p = userBase + "/hicolor/" + sz + "/apps/" + n + ext;
+                if (readableFile(p))
+                    return p;
+            }
+        }
+        // System hicolor
         for (auto sz : sizes) {
             for (auto ext : exts) {
                 const std::string p = std::string("/usr/share/icons/hicolor/") + sz + "/apps/" + n + ext;
@@ -282,6 +292,72 @@ static std::string findIconFile(const std::string& cls) {
                     return p;
             }
         }
+        // Active theme (Yaru-magenta, Breeze, etc.) — search the theme's own dirs
+        // by reading index.theme's Directories= list and checking each.
+        static std::vector<std::string> themeDirs;
+        static bool themeDirsLoaded = false;
+        if (!themeDirsLoaded) {
+            themeDirsLoaded = true;
+            // Walk the theme chain: start with the configured theme, follow Inherits=
+            std::string themeDir;
+            const char* themeName = std::getenv("QT_ICON_THEME");
+            if (themeName && *themeName) themeDir = std::string("/usr/share/icons/") + themeName;
+            else {
+                // Default to hicolor fallback — check common themes
+                const char* commonThemes[] = {"Yaru-magenta", "Yaru", "Adwaita", "breeze", "breeze-dark", "elementary"};
+                for (auto t : commonThemes) {
+                    std::string d = std::string("/usr/share/icons/") + t;
+                    if (readableFile(d + "/index.theme")) { themeDir = d; break; }
+                }
+            }
+            if (!themeDir.empty()) {
+                // Parse index.theme for Directories= and Inherits=
+                std::ifstream idx(themeDir + "/index.theme");
+                if (idx.is_open()) {
+                    std::string line;
+                    bool inMain = false;
+                    while (std::getline(idx, line)) {
+                        // Strip whitespace
+                        auto s = line.find_first_not_of(" \t\r\n");
+                        if (s == std::string::npos) continue;
+                        auto e = line.find_last_not_of(" \t\r\n");
+                        line = line.substr(s, e - s + 1);
+                        if (line.empty() || line[0] == '#') continue;
+                        if (line[0] == '[') { inMain = (line == "[Icon Theme]"); continue; }
+                        if (!inMain) continue;
+                        auto eq = line.find('=');
+                        if (eq == std::string::npos) continue;
+                        auto key = line.substr(0, eq);
+                        auto val = line.substr(eq + 1);
+                        // Trim
+                        auto ts = val.find_first_not_of(" \t");
+                        if (ts != std::string::npos) val = val.substr(ts);
+                        if (key == "Directories") {
+                            // Comma-separated list
+                            std::stringstream ss(val);
+                            std::string dir;
+                            while (std::getline(ss, dir, ',')) {
+                                auto ts2 = dir.find_first_not_of(" \t");
+                                if (ts2 != std::string::npos) dir = dir.substr(ts2);
+                                if (!dir.empty() && dir.back() == '/') dir.pop_back();
+                                if (!dir.empty()) themeDirs.push_back(themeDir + "/" + dir);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (const auto& tdir : themeDirs) {
+            for (auto ext : exts) {
+                const std::string p = tdir + "/apps/" + n + ext;
+                if (readableFile(p)) return p;
+            }
+        }
+        // Pixmaps
+        const std::string pix = "/usr/share/pixmaps/" + n + ".png";
+        if (readableFile(pix)) return pix;
+        const std::string pixSvg = "/usr/share/pixmaps/" + n + ".svg";
+        if (readableFile(pixSvg)) return pixSvg;
         return "";
     };
     // The owning entry's Icon= name first: it is the app's canonical icon and
@@ -1207,9 +1283,26 @@ void COhmTabsDeco::renderTabs(float a, const CBox& titleBarBox, float SCALE, int
                 }
             }
             if (!drew) {
-                auto ic = xc;
-                ic.a *= tb.active ? 0.28 : 0.14;
-                g_pHyprOpenGL->renderRect(ib, ic, {.round = (int)std::round(ib.w / 2.0), .roundingPower = 2.F});
+                // Colored initial tile: derive a stable color from the class name
+                // so the same app always gets the same color across sessions.
+                std::string tileCls = w ? (w->m_class.empty() ? w->m_initialClass : w->m_class) : "?";
+                std::hash<std::string> hasher;
+                auto hash = hasher(tileCls);
+                float hue = static_cast<float>(hash % 360) / 360.0f;
+                // Convert HSL (s=0.65, l=0.45) to RGB
+                float s = 0.65f, l = 0.45f;
+                float c = (1.0f - std::fabs(2.0f * l - 1.0f)) * s;
+                float x = c * (1.0f - std::fabs(std::fmod(hue * 6.0f, 2.0f) - 1.0f));
+                float m = l - c / 2.0f;
+                float r, g, b;
+                if (hue < 1.0f/6.0f) { r = c; g = x; b = 0; }
+                else if (hue < 2.0f/6.0f) { r = x; g = c; b = 0; }
+                else if (hue < 3.0f/6.0f) { r = 0; g = c; b = x; }
+                else if (hue < 4.0f/6.0f) { r = 0; g = x; b = c; }
+                else if (hue < 5.0f/6.0f) { r = x; g = 0; b = c; }
+                else { r = c; g = 0; b = x; }
+                CHyprColor bg(r + m, g + m, b + m, 1.0f);
+                g_pHyprOpenGL->renderRect(ib, bg, {.round = (int)std::round(ib.w / 2.0), .roundingPower = 2.F});
                 std::string letter = "?";
                 if (w) {
                     std::string cls = w->m_class.empty() ? w->m_initialClass : w->m_class;
@@ -1223,7 +1316,7 @@ void COhmTabsDeco::renderTabs(float a, const CBox& titleBarBox, float SCALE, int
                         }
                     }
                 }
-                auto ltex = g_pHyprRenderer->renderText(letter, xc, std::round(ib.h * 0.52), true, FONT, (int)std::round(ib.w));
+                auto ltex = g_pHyprRenderer->renderText(letter, CHyprColor(1, 1, 1, 1), std::round(ib.h * 0.52), true, FONT, (int)std::round(ib.w));
                 if (ltex && ltex->m_texID != 0) {
                     CBox lp = {ib.x + (ib.w - ltex->m_size.x) / 2.0, ib.y + (ib.h - ltex->m_size.y) / 2.0, (double)ltex->m_size.x, (double)ltex->m_size.y};
                     lp.round();
