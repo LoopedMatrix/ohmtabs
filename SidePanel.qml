@@ -93,6 +93,11 @@ Item {
   readonly property int buttonLength: root.iconSize + 16
   // Pixels of the parked surface left on screen so the pointer can find it.
   readonly property int revealSliver: 4
+  // Gap kept between the strip and the screen edge on the long axis. The
+  // rounded ends of the pill (and the accent ring the border repeater draws
+  // just outside it) are clipped when the band runs edge to edge, so the band
+  // is always inset by this much. Tune this one number to taste.
+  readonly property int edgeInset: 36
 
   readonly property var rows: (service && service.rows) ? service.rows : []
   readonly property int count: rows.length
@@ -685,21 +690,21 @@ Item {
         id: dockBand
         width: {
           if (root.vertical) return root.panelSize
-          if (root.fullLength) return parent.width
+          if (root.fullLength) return Math.max(root.panelSize, parent.width - root.edgeInset * 2)
           var n = Math.max(1, root.items.length)
           var extra = (root.showWorkspaces ? (root.workspaceCount * 14 + 12) : 0) + (root.showClock ? 56 : 0) + (root.showActiveWindow ? 120 : 0) + (root.showStatus ? 78 : 0)
-          return Math.min(parent.width - 48, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
+          return Math.min(parent.width - root.edgeInset * 2, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
         }
         height: {
           if (!root.vertical) return root.panelSize
-          if (root.fullLength) return parent.height
+          if (root.fullLength) return Math.max(root.panelSize, parent.height - root.edgeInset * 2)
           var n = Math.max(1, root.items.length)
           var extra = (root.showWorkspaces ? (root.workspaceCount * 14 + 12) : 0) + (root.showClock ? 56 : 0) + (root.showActiveWindow ? 120 : 0) + (root.showStatus ? 78 : 0)
-          return Math.min(parent.height - 48, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
+          return Math.min(parent.height - root.edgeInset * 2, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
         }
         x: root.vertical ? (root.panelPosition === "right" ? parent.width - width : 0)
-                         : (root.fullLength ? 0 : Math.round((parent.width - width) / 2))
-        y: root.vertical ? (root.fullLength ? 0 : Math.round((parent.height - height) / 2))
+                         : Math.round((parent.width - width) / 2)
+        y: root.vertical ? Math.round((parent.height - height) / 2)
                          : (root.panelPosition === "top" ? 0 : parent.height - height)
         radius: root.dockRadius
         color: Qt.rgba(root.background.r, root.background.g, root.background.b, root.panelBgOpacity)
