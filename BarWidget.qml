@@ -105,40 +105,7 @@ BarWidget {
     if ("settingsWriter" in service) service.settingsWriter = root.writeSettings
     root.pushTheme()
   }
-  Component.onCompleted: {
-    declareRestoreHost()
-    debugGeometry()
-  }
-
-  function debugGeometry() {
-    console.log("=== BarWidget geometry ===")
-    console.log("  implicitWidth:", implicitWidth)
-    console.log("  implicitHeight:", implicitHeight)
-    console.log("  width:", width)
-    console.log("  height:", height)
-    console.log("  visible:", visible)
-    console.log("  bar:", bar ? "set" : "null")
-    console.log("  vertical:", vertical)
-    console.log("  barSize:", barSize)
-    var btn = startMenuButton
-    if (btn) {
-      console.log("  startMenuButton: visible:", btn.visible,
-        "w:", btn.width, "h:", btn.height,
-        "x:", btn.x, "y:", btn.y,
-        "implicitW:", btn.implicitWidth,
-        "hasVisualContent:", btn.hasVisualContent,
-        "opacity:", btn.opacity)
-    } else {
-      console.log("  startMenuButton: NOT FOUND")
-    }
-    var flow = layout
-    if (flow) {
-      console.log("  layout: visible:", flow.visible,
-        "w:", flow.width, "h:", flow.height,
-        "x:", flow.x, "y:", flow.y,
-        "implicitW:", flow.implicitWidth)
-    }
-  }
+  Component.onCompleted: declareRestoreHost()
   onServiceChanged: declareRestoreHost()
   Component.onDestruction: {
     if (!service) return
@@ -283,38 +250,11 @@ BarWidget {
   }
   Timer { id: pulseTimer; interval: 1200; repeat: false; onTriggered: root.pulse = false }
 
-  function openSuperMenu() {
-    if (service && service.openSuperMenu) { service.openSuperMenu(); return }
-    if (bar) bar.run("omarchy-shell shell toggle " + moduleName + ' \'{"view":"supermenu"}\'')
-  }
-
   Flow {
     id: layout
     anchors.centerIn: parent
     flow: root.vertical ? Flow.TopToBottom : Flow.LeftToRight
     spacing: 0
-
-    // Start menu button — Windows-style, opens the Super Menu
-    Item {
-      id: startMenuButton
-      implicitWidth: 40
-      implicitHeight: barSize
-
-      Text {
-        anchors.centerIn: parent
-        text: "S"
-        color: root.bar ? root.bar.barForeground : "#c0caf5"
-        font.family: root.bar ? root.bar.fontFamily : "sans-serif"
-        font.pixelSize: Style.font.body
-        visible: true
-      }
-
-      MouseArea {
-        anchors.fill: parent
-        onClicked: function(mouse) { if (mouse.button === Qt.LeftButton) root.openSuperMenu() }
-        cursorShape: Qt.PointingHandCursor
-      }
-    }
 
     WidgetButton {
       bar: root.bar

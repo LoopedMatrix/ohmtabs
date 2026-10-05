@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Super Menu
+
+- Start button on the dock opens a Windows-style Super Menu (apps, search, pins, Matrix rain, accent ring).
+- Separate Super Menu settings overlay (gear): widget toggles, coins, currency, RSS/news URLs, calendar ICS, 12/24, date order, extra time zones, flip clock.
+- Widgets stay off until enabled (Recommended files stays on). Calendar is local JSON; Google is a browser link plus optional ICS, not OAuth.
+
 ### Taskbar: one tile per window when a window is minimized
 
 - Minimizing a window no longer adds a second taskbar icon for it. The dock's

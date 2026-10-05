@@ -553,8 +553,441 @@ function normalizeSettings(raw) {
       if (!(n >= 1)) n = 5
       if (n > 10) n = 10
       return n
-    })()
+    })(),
+    superMenuRecommended: (r.superMenuRecommended === false || r.superMenuRecommended === "0" || r.superMenuRecommended === "off" || r.superMenuRecommended === "false") ? false : true,
+    superMenuWeather: (r.superMenuWeather === true || r.superMenuWeather === "1" || r.superMenuWeather === "on" || r.superMenuWeather === "true") ? true : false,
+    superMenuCalendar: (r.superMenuCalendar === true || r.superMenuCalendar === "1" || r.superMenuCalendar === "on" || r.superMenuCalendar === "true") ? true : false,
+    superMenuRss: (r.superMenuRss === true || r.superMenuRss === "1" || r.superMenuRss === "on" || r.superMenuRss === "true") ? true : false,
+    superMenuNews: (r.superMenuNews === true || r.superMenuNews === "1" || r.superMenuNews === "on" || r.superMenuNews === "true") ? true : false,
+    superMenuCrypto: (r.superMenuCrypto === true || r.superMenuCrypto === "1" || r.superMenuCrypto === "on" || r.superMenuCrypto === "true") ? true : false,
+    superMenuAlerts: (r.superMenuAlerts === true || r.superMenuAlerts === "1" || r.superMenuAlerts === "on" || r.superMenuAlerts === "true") ? true : false,
+    superMenuWorldClock: (r.superMenuWorldClock === true || r.superMenuWorldClock === "1" || r.superMenuWorldClock === "on" || r.superMenuWorldClock === "true") ? true : false,
+    superMenuRssUrl: sanitizeHttpUrl(r.superMenuRssUrl, "https://hnrss.org/frontpage"),
+    superMenuNewsUrl: sanitizeHttpUrl(r.superMenuNewsUrl, "https://feeds.bbci.co.uk/news/rss.xml"),
+    superMenuCryptoIds: sanitizeCsvIds(r.superMenuCryptoIds, "bitcoin,ethereum,solana"),
+    superMenuRssFeeds: sanitizeUrlList(r.superMenuRssFeeds != null ? r.superMenuRssFeeds : r.superMenuRssUrl, ["https://hnrss.org/frontpage"], 8),
+    superMenuNewsFeeds: sanitizeUrlList(r.superMenuNewsFeeds != null ? r.superMenuNewsFeeds : r.superMenuNewsUrl, ["https://feeds.bbci.co.uk/news/rss.xml"], 8),
+    superMenuCurrency: sanitizeCurrency(r.superMenuCurrency),
+    superMenuWeekStart: sanitizeWeekStart(r.superMenuWeekStart),
+    superMenuCalIcsUrl: sanitizeHttpUrl(r.superMenuCalIcsUrl, ""),
+    superMenuHourCycle: sanitizeHourCycle(r.superMenuHourCycle),
+    superMenuDateOrder: sanitizeDateOrder(r.superMenuDateOrder),
+    superMenuTimeZones: sanitizeTimeZones(r.superMenuTimeZones),
+    superMenuFlipClock: (r.superMenuFlipClock === false || r.superMenuFlipClock === "0" || r.superMenuFlipClock === "off" || r.superMenuFlipClock === "false") ? false : true
   }
+}
+
+function sanitizeHttpUrl(s, fallback) {
+  var u = String(s || "").trim()
+  if (u.indexOf("https://") === 0 || u.indexOf("http://") === 0) {
+    if (u.length > 300) u = u.slice(0, 300)
+    return u
+  }
+  return fallback || ""
+}
+
+function sanitizeCsvIds(s, fallback) {
+  var t = String(s || "").toLowerCase().replace(/[^a-z0-9,_-]/g, "")
+  while (t.indexOf(",,") >= 0) t = t.replace(",,", ",")
+  if (t.charAt(0) === ",") t = t.slice(1)
+  if (t.charAt(t.length - 1) === ",") t = t.slice(0, -1)
+  if (t.length > 120) t = t.slice(0, 120)
+  return t || (fallback || "")
+}
+
+function sanitizeUrlList(raw, fallbackList, maxN) {
+  var cap = maxN > 0 ? maxN : 8
+  var src = []
+  if (Object.prototype.toString.call(raw) === "[object Array]") src = raw
+  else if (typeof raw === "string" && raw.trim()) src = raw.split(/[\n,]+/)
+  var out = []
+  for (var i = 0; i < src.length && out.length < cap; i++) {
+    var u = sanitizeHttpUrl(src[i], "")
+    if (u && out.indexOf(u) < 0) out.push(u)
+  }
+  if (out.length === 0 && fallbackList && fallbackList.length) {
+    var fb = []
+    for (var j = 0; j < fallbackList.length && fb.length < cap; j++) {
+      var fu = sanitizeHttpUrl(fallbackList[j], "")
+      if (fu && fb.indexOf(fu) < 0) fb.push(fu)
+    }
+    return fb
+  }
+  return out
+}
+
+function sanitizeCurrency(s) {
+  var t = String(s || "").toLowerCase()
+  if (t === "usd" || t === "eur" || t === "gbp" || t === "aud" || t === "jpy" || t === "cad" || t === "nzd") return t
+  return "usd"
+}
+
+function sanitizeWeekStart(s) {
+  return String(s || "").toLowerCase() === "monday" ? "monday" : "sunday"
+}
+
+function listWithout(list, value) {
+  var src = Object.prototype.toString.call(list) === "[object Array]" ? list : []
+  var v = String(value || "")
+  var out = []
+  for (var i = 0; i < src.length; i++) if (String(src[i]) !== v) out.push(src[i])
+  return out
+}
+
+function csvToggleId(csv, id, maxN) {
+  var cap = maxN > 0 ? maxN : 8
+  var want = sanitizeCsvIds(id, "")
+  if (!want || want.indexOf(",") >= 0) return sanitizeCsvIds(csv, "")
+  var cur = sanitizeCsvIds(csv, "")
+  var parts = cur ? cur.split(",") : []
+  var next = []
+  var found = false
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i] === want) { found = true; continue }
+    next.push(parts[i])
+  }
+  if (!found && next.length < cap) next.push(want)
+  return next.join(",")
+}
+
+function csvAddId(csv, id, maxN) {
+  var cap = maxN > 0 ? maxN : 8
+  var want = sanitizeCsvIds(id, "")
+  var cur = sanitizeCsvIds(csv, "")
+  if (!want || want.indexOf(",") >= 0) return cur
+  var parts = cur ? cur.split(",") : []
+  if (parts.indexOf(want) >= 0) return cur
+  if (parts.length >= cap) return cur
+  parts.push(want)
+  return parts.join(",")
+}
+
+function calendarMonth(nowMs, weekStart, appointments) {
+  var now = nowMs ? new Date(nowMs) : new Date()
+  if (isNaN(now.getTime())) now = new Date()
+  var y = now.getFullYear()
+  var m = now.getMonth()
+  var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+  var monday = sanitizeWeekStart(weekStart) === "monday"
+  var first = new Date(y, m, 1)
+  var start = first.getDay()
+  if (monday) start = (start + 6) % 7
+  var days = new Date(y, m + 1, 0).getDate()
+  var today = now.getDate()
+  var cells = []
+  var i
+  function pad(n) { return (n < 10 ? "0" : "") + n }
+  var marks = {}
+  var apps = Object.prototype.toString.call(appointments) === "[object Array]" ? appointments : []
+  for (var a = 0; a < apps.length; a++) {
+    var dt = apps[a] && apps[a].date ? String(apps[a].date) : ""
+    if (dt) marks[dt] = true
+  }
+  for (i = 0; i < start; i++) cells.push({ d: "", on: false, has: false, date: "" })
+  for (i = 1; i <= days; i++) {
+    var iso = y + "-" + pad(m + 1) + "-" + pad(i)
+    cells.push({ d: String(i), on: i === today, has: !!marks[iso], date: iso })
+  }
+  return {
+    title: months[m] + " " + y,
+    year: y,
+    month: m + 1,
+    headers: monday ? ["M", "T", "W", "T", "F", "S", "S"] : ["S", "M", "T", "W", "T", "F", "S"],
+    cells: cells
+  }
+}
+
+function padTime(s) {
+  var t = String(s || "").trim()
+  var m = t.match(/^(\d{1,2}):(\d{2})$/)
+  if (!m) return ""
+  var hh = parseInt(m[1], 10)
+  var mm = parseInt(m[2], 10)
+  if (!(hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59)) return ""
+  return (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm
+}
+
+function normalizeAppointment(raw) {
+  var o = raw && typeof raw === "object" ? raw : {}
+  var title = String(o.title || "").replace(/[\r\n]/g, " ").trim()
+  if (title.length > 80) title = title.slice(0, 80)
+  var date = String(o.date || "").trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+  var id = String(o.id || "").replace(/[^a-zA-Z0-9_-]/g, "")
+  if (!id) id = "a" + date.replace(/-/g, "") + String(title.length)
+  return {
+    id: id,
+    title: title || "Appointment",
+    date: date,
+    start: padTime(o.start),
+    end: padTime(o.end),
+    notes: String(o.notes || "").replace(/[\r\n]+/g, " ").trim().slice(0, 200),
+    source: o.source === "ics" ? "ics" : "local"
+  }
+}
+
+function normalizeAppointments(list) {
+  var src = Object.prototype.toString.call(list) === "[object Array]" ? list : []
+  var out = []
+  var seen = {}
+  for (var i = 0; i < src.length && out.length < 200; i++) {
+    var a = normalizeAppointment(src[i])
+    if (!a || seen[a.id]) continue
+    seen[a.id] = true
+    out.push(a)
+  }
+  out.sort(function(x, y) {
+    if (x.date !== y.date) return x.date < y.date ? -1 : 1
+    if (x.start !== y.start) return x.start < y.start ? -1 : 1
+    return x.title < y.title ? -1 : 1
+  })
+  return out
+}
+
+function appointmentsOnDate(list, date) {
+  var d = String(date || "")
+  var src = normalizeAppointments(list)
+  var out = []
+  for (var i = 0; i < src.length; i++) if (src[i].date === d) out.push(src[i])
+  return out
+}
+
+function upsertAppointment(list, raw) {
+  var a = normalizeAppointment(raw)
+  if (!a) return normalizeAppointments(list)
+  var src = normalizeAppointments(list)
+  var out = []
+  var found = false
+  for (var i = 0; i < src.length; i++) {
+    if (src[i].id === a.id) { out.push(a); found = true }
+    else out.push(src[i])
+  }
+  if (!found) out.push(a)
+  return normalizeAppointments(out)
+}
+
+function removeAppointment(list, id) {
+  var want = String(id || "")
+  var src = normalizeAppointments(list)
+  var out = []
+  for (var i = 0; i < src.length; i++) if (src[i].id !== want) out.push(src[i])
+  return out
+}
+
+function icsField(block, name) {
+  var re = new RegExp("(?:^|\\r?\\n)" + name + "(?:;[^:\\n]*)?:([^\\r\\n]+)", "i")
+  var m = String(block || "").match(re)
+  return m ? m[1].trim() : ""
+}
+
+function icsDate(raw) {
+  var s = String(raw || "").replace(/[^0-9T]/g, "")
+  if (s.length < 8) return ""
+  return s.slice(0, 4) + "-" + s.slice(4, 6) + "-" + s.slice(6, 8)
+}
+
+function icsTime(raw) {
+  var s = String(raw || "")
+  var t = s.indexOf("T")
+  if (t < 0) return ""
+  return padTime(s.slice(t + 1, t + 3) + ":" + (s.slice(t + 3, t + 5) || "00"))
+}
+
+function parseIcsEvents(text, maxN) {
+  var cap = maxN > 0 ? maxN : 80
+  var parts = String(text || "").split(/BEGIN:VEVENT/i)
+  var out = []
+  for (var i = 1; i < parts.length && out.length < cap; i++) {
+    var b = parts[i].split(/END:VEVENT/i)[0]
+    var date = icsDate(icsField(b, "DTSTART"))
+    if (!date) continue
+    var title = icsField(b, "SUMMARY").replace(/\\,/g, ",").replace(/\\n/gi, " ")
+    out.push({
+      id: "ics-" + date + "-" + out.length,
+      title: title || "Event",
+      date: date,
+      start: icsTime(icsField(b, "DTSTART")),
+      end: icsTime(icsField(b, "DTEND")),
+      source: "ics"
+    })
+  }
+  return normalizeAppointments(out)
+}
+
+function mergeAppointments(localList, icsList) {
+  var local = normalizeAppointments(localList)
+  var ics = normalizeAppointments(icsList)
+  var out = local.slice()
+  var seen = {}
+  var i
+  for (i = 0; i < local.length; i++) seen[local[i].date + "|" + local[i].title] = true
+  for (i = 0; i < ics.length; i++) {
+    var k = ics[i].date + "|" + ics[i].title
+    if (seen[k]) continue
+    seen[k] = true
+    out.push(ics[i])
+  }
+  return normalizeAppointments(out)
+}
+
+function sanitizeHourCycle(s) {
+  var t = String(s || "").toLowerCase()
+  if (t === "12" || t === "12h" || t === "h12") return "12"
+  return "24"
+}
+
+function sanitizeDateOrder(s) {
+  var t = String(s || "").toLowerCase().replace(/[^a-z]/g, "")
+  if (t === "mdy" || t === "mmddyy" || t === "mmddyyyy") return "mdy"
+  return "dmy"
+}
+
+function sanitizeTimeZone(s) {
+  var t = String(s || "").trim()
+  if (!t) return ""
+  if (/^(utc|gmt|etc\/utc)$/i.test(t)) return "UTC"
+  if (/^local$/i.test(t)) return "Local"
+  if (/^[A-Za-z]+(?:[_-][A-Za-z0-9]+)*(?:\/[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)*)+$/.test(t)) return t
+  return ""
+}
+
+function sanitizeTimeZones(raw) {
+  var src = []
+  if (Object.prototype.toString.call(raw) === "[object Array]") src = raw
+  else if (typeof raw === "string" && raw.trim()) src = raw.split(/[\n,]+/)
+  var out = []
+  for (var i = 0; i < src.length && out.length < 8; i++) {
+    var z = sanitizeTimeZone(src[i])
+    if (z && out.indexOf(z) < 0) out.push(z)
+  }
+  if (out.length === 0) return ["Local"]
+  return out
+}
+
+function clockRow(nowMs, zone, hourCycle, dateOrder) {
+  var d = new Date(nowMs || Date.now())
+  if (isNaN(d.getTime())) d = new Date()
+  var z = sanitizeTimeZone(zone) || "Local"
+  var h12 = sanitizeHourCycle(hourCycle) === "12"
+  var order = sanitizeDateOrder(dateOrder)
+  var hour = 0
+  var min = 0
+  var year = 1970
+  var month = 1
+  var day = 1
+  function pad(n) { return (n < 10 ? "0" : "") + n }
+  if (z === "Local") {
+    hour = d.getHours(); min = d.getMinutes()
+    year = d.getFullYear(); month = d.getMonth() + 1; day = d.getDate()
+  } else if (z === "UTC") {
+    hour = d.getUTCHours(); min = d.getUTCMinutes()
+    year = d.getUTCFullYear(); month = d.getUTCMonth() + 1; day = d.getUTCDate()
+  } else {
+    try {
+      var fmt = new Intl.DateTimeFormat("en-GB", {
+        timeZone: z, hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+        year: "numeric", month: "2-digit", day: "2-digit"
+      })
+      var parts = fmt.formatToParts(d)
+      var map = {}
+      for (var i = 0; i < parts.length; i++) map[parts[i].type] = parts[i].value
+      hour = parseInt(map.hour, 10)
+      min = parseInt(map.minute, 10)
+      year = parseInt(map.year, 10)
+      month = parseInt(map.month, 10)
+      day = parseInt(map.day, 10)
+      if (isNaN(hour) || isNaN(min)) throw new Error("bad zone")
+    } catch (e) {
+      return clockRow(nowMs, "Local", hourCycle, dateOrder)
+    }
+  }
+  var ap = ""
+  var displayH = hour
+  if (h12) {
+    ap = hour >= 12 ? "PM" : "AM"
+    displayH = hour % 12
+    if (displayH === 0) displayH = 12
+  }
+  var hh = pad(displayH)
+  var mm = pad(min)
+  var yy = String(year).slice(-2)
+  var date = order === "mdy" ? (pad(month) + "/" + pad(day) + "/" + yy) : (pad(day) + "/" + pad(month) + "/" + yy)
+  var label = z
+  if (z === "Local") label = "Local"
+  else if (z === "UTC") label = "UTC"
+  else {
+    var bits = z.split("/")
+    label = bits[bits.length - 1].replace(/_/g, " ")
+  }
+  return { zone: z, label: label, hh: hh, mm: mm, ap: ap, digits: [hh.charAt(0), hh.charAt(1), mm.charAt(0), mm.charAt(1)], date: date }
+}
+
+function currencyPrefix(code) {
+  var t = sanitizeCurrency(code)
+  if (t === "eur") return "€"
+  if (t === "gbp") return "£"
+  if (t === "jpy") return "¥"
+  if (t === "aud") return "A$"
+  if (t === "cad") return "C$"
+  if (t === "nzd") return "NZ$"
+  return "$"
+}
+
+function parseRssItems(xml, maxN) {
+  var text = String(xml || "")
+  var cap = maxN > 0 ? maxN : 5
+  var out = []
+  function decode(s) {
+    var t = String(s || "")
+    t = t.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    t = t.replace(/<[^>]+>/g, "")
+    t = t.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#39;/g, "'").replace(/&apos;/g, "'")
+    t = t.replace(/\s+/g, " ").trim()
+    if (t.length > 96) t = t.slice(0, 93) + "..."
+    return t
+  }
+  function pull(block, tag) {
+    var m = block.match(new RegExp("<" + tag + "\\b[^>]*>([\\s\\S]*?)</" + tag + ">", "i"))
+    return m ? decode(m[1]) : ""
+  }
+  var re = /<item\b[\s\S]*?<\/item>/gi
+  var m
+  while ((m = re.exec(text)) && out.length < cap) {
+    var block = m[0]
+    var title = pull(block, "title")
+    var link = pull(block, "link")
+    if (!link) {
+      var al = block.match(/<link\b[^>]*href=["']([^"']+)["']/i)
+      if (al) link = al[1]
+    }
+    if (title) out.push({ title: title, link: link || "" })
+  }
+  if (out.length === 0) {
+    re = /<entry\b[\s\S]*?<\/entry>/gi
+    while ((m = re.exec(text)) && out.length < cap) {
+      var eblock = m[0]
+      var etitle = pull(eblock, "title")
+      var elink = ""
+      var ea = eblock.match(/<link\b[^>]*href=["']([^"']+)["']/i)
+      if (ea) elink = ea[1]
+      if (etitle) out.push({ title: etitle, link: elink })
+    }
+  }
+  return out
+}
+
+function weatherLabel(code) {
+  var n = parseInt(code, 10)
+  if (!(n >= 0)) return "—"
+  if (n === 0) return "Clear"
+  if (n <= 3) return "Cloudy"
+  if (n <= 48) return "Fog"
+  if (n <= 57) return "Drizzle"
+  if (n <= 67) return "Rain"
+  if (n <= 77) return "Snow"
+  if (n <= 82) return "Showers"
+  if (n <= 99) return "Storm"
+  return "—"
 }
 
 function sanitizeAppId(id) {
@@ -603,6 +1036,171 @@ function desktopEntryIdFor(appId, entries) {
     if (byId && byClass) break
   }
   return byId || byClass
+}
+
+function appLetter(name) {
+  var c = String(name || "").replace(/^\s+/, "").charAt(0).toUpperCase()
+  if (c >= "A" && c <= "Z") return c
+  return "#"
+}
+
+function decodeFileUrl(href) {
+  var s = String(href || "")
+  if (s.indexOf("file://") === 0) s = s.slice(7)
+  try { s = decodeURIComponent(s) } catch (e) {}
+  return s
+}
+
+function fileBasename(p) {
+  var s = String(p || "").replace(/\/+$/, "")
+  var i = s.lastIndexOf("/")
+  return i >= 0 ? s.slice(i + 1) : s
+}
+
+// Freedesktop icon-name ladder for a filesystem path. Super Menu Recommended
+// rows use the same theme the dock already loads (folder, image-*, pdf, …).
+function fileIconNames(path) {
+  var p = String(path || "")
+  var names = []
+  function add(n) {
+    n = String(n || "")
+    if (!n) return
+    if (names.indexOf(n) < 0) names.push(n)
+  }
+  if (!p) {
+    add("text-x-generic")
+    add("unknown")
+    return names
+  }
+  var trailed = p.charAt(p.length - 1) === "/"
+  var base = fileBasename(p)
+  var dot = base.lastIndexOf(".")
+  var ext = (!trailed && dot > 0) ? base.slice(dot + 1).toLowerCase() : ""
+  if (!ext) {
+    add("inode-directory")
+    add("folder")
+    add("system-file-manager")
+    add("org.gnome.Nautilus")
+    add("folder-documents")
+    return names
+  }
+  var byExt = {
+    png: ["image-png", "image-x-generic"],
+    jpg: ["image-jpeg", "image-x-generic"],
+    jpeg: ["image-jpeg", "image-x-generic"],
+    gif: ["image-gif", "image-x-generic"],
+    webp: ["image-webp", "image-x-generic"],
+    svg: ["image-svg+xml", "image-x-generic"],
+    bmp: ["image-bmp", "image-x-generic"],
+    ico: ["image-x-ico", "image-x-generic"],
+    mp3: ["audio-x-mpeg", "audio-x-generic"],
+    wav: ["audio-x-wav", "audio-x-generic"],
+    flac: ["audio-x-flac", "audio-x-generic"],
+    ogg: ["audio-x-generic"],
+    mp4: ["video-mp4", "video-x-generic"],
+    mkv: ["video-x-matroska", "video-x-generic"],
+    webm: ["video-webm", "video-x-generic"],
+    avi: ["video-x-generic"],
+    pdf: ["application-pdf", "x-office-document"],
+    zip: ["application-zip", "package-x-generic"],
+    tar: ["application-x-tar", "package-x-generic"],
+    gz: ["application-gzip", "package-x-generic"],
+    "7z": ["application-x-7z-compressed", "package-x-generic"],
+    html: ["text-html"],
+    htm: ["text-html"],
+    md: ["text-markdown", "text-x-generic"],
+    txt: ["text-x-generic"],
+    json: ["application-json", "text-x-generic"],
+    xml: ["text-xml", "text-x-generic"],
+    js: ["text-javascript", "text-x-generic"],
+    ts: ["text-x-generic"],
+    py: ["text-x-python", "text-x-generic"],
+    qml: ["text-x-qml", "text-x-generic"],
+    css: ["text-css", "text-x-generic"],
+    sh: ["application-x-shellscript", "text-x-script"],
+    desktop: ["application-x-desktop"],
+    doc: ["x-office-document"],
+    docx: ["x-office-document"],
+    odt: ["x-office-document"],
+    xls: ["x-office-spreadsheet"],
+    xlsx: ["x-office-spreadsheet"],
+    ods: ["x-office-spreadsheet"],
+    ppt: ["x-office-presentation"],
+    pptx: ["x-office-presentation"]
+  }
+  var list = byExt[ext] || ["text-x-generic"]
+  for (var i = 0; i < list.length; i++) add(list[i])
+  add("text-x-generic")
+  add("unknown")
+  return names
+}
+
+function parseRecentlyUsed(xml, maxN) {
+  var text = String(xml || "")
+  var cap = maxN > 0 ? maxN : 8
+  var found = []
+  var re = /<bookmark\s+href="([^"]+)"([^>]*)>/g
+  var m
+  while ((m = re.exec(text))) {
+    var href = m[1]
+    if (href.indexOf("file://") !== 0) continue
+    var attrs = m[2] || ""
+    var vis = ""
+    var vm = attrs.match(/visited="([^"]+)"/)
+    if (vm) vis = vm[1]
+    var path = decodeFileUrl(href)
+    if (!path) continue
+    found.push({ href: href, path: path, title: fileBasename(path) || path, visited: vis })
+  }
+  found.reverse()
+  var seen = {}
+  var out = []
+  for (var i = 0; i < found.length; i++) {
+    var item = found[i]
+    if (seen[item.path]) continue
+    seen[item.path] = true
+    out.push(item)
+    if (out.length >= cap) break
+  }
+  return out
+}
+
+function relativeTime(iso, nowMs) {
+  var t = Date.parse(String(iso || ""))
+  if (!(t > 0)) return ""
+  var d = Math.max(0, (nowMs || Date.now()) - t)
+  if (d < 60000) return "just now"
+  if (d < 3600000) return Math.floor(d / 60000) + "m ago"
+  if (d < 86400000) return Math.floor(d / 3600000) + "h ago"
+  return Math.floor(d / 86400000) + "d ago"
+}
+
+function recordLaunch(state, appId, nowMs) {
+  var id = sanitizeAppId(appId)
+  var next = { launches: {} }
+  var src = state && state.launches && typeof state.launches === "object" ? state.launches : {}
+  for (var k in src) next.launches[k] = src[k]
+  if (!id) return next
+  var cur = next.launches[id] || { n: 0, last: 0 }
+  next.launches[id] = { n: (Number(cur.n) || 0) + 1, last: nowMs || Date.now() }
+  return next
+}
+
+function frecencyRank(launches, nowMs, limit) {
+  var now = nowMs || Date.now()
+  var cap = limit > 0 ? limit : 8
+  var src = launches && typeof launches === "object" ? launches : {}
+  var items = []
+  for (var k in src) {
+    var e = src[k]
+    if (!e) continue
+    var n = Number(e.n) || 0
+    var last = Number(e.last) || 0
+    var ageDays = last ? (now - last) / 86400000 : 999
+    items.push({ appId: k, n: n, last: last, score: n * Math.pow(0.5, ageDays / 14) })
+  }
+  items.sort(function(a, b) { return b.score - a.score })
+  return items.slice(0, cap)
 }
 
 function normalizePinned(list) {
@@ -1055,6 +1653,16 @@ if (typeof module !== "undefined" && module.exports) {
  statusSummary: statusSummary, normalizeSettings: normalizeSettings, readOwnEntry: readOwnEntry,
  sanitizeAppId: sanitizeAppId, dockAppId: dockAppId, normalizePinned: normalizePinned, togglePinned: togglePinned, isPinned: isPinned,
  desktopEntryIdFor: desktopEntryIdFor,
+ appLetter: appLetter, decodeFileUrl: decodeFileUrl, fileBasename: fileBasename, fileIconNames: fileIconNames,
+ parseRecentlyUsed: parseRecentlyUsed, relativeTime: relativeTime,
+ parseRssItems: parseRssItems, weatherLabel: weatherLabel, sanitizeHttpUrl: sanitizeHttpUrl, sanitizeCsvIds: sanitizeCsvIds,
+ sanitizeUrlList: sanitizeUrlList, sanitizeCurrency: sanitizeCurrency, sanitizeWeekStart: sanitizeWeekStart,
+ listWithout: listWithout, csvToggleId: csvToggleId, csvAddId: csvAddId, calendarMonth: calendarMonth, currencyPrefix: currencyPrefix,
+ sanitizeHourCycle: sanitizeHourCycle, sanitizeDateOrder: sanitizeDateOrder, sanitizeTimeZone: sanitizeTimeZone,
+ sanitizeTimeZones: sanitizeTimeZones, clockRow: clockRow,
+ normalizeAppointment: normalizeAppointment, normalizeAppointments: normalizeAppointments, appointmentsOnDate: appointmentsOnDate,
+ upsertAppointment: upsertAppointment, removeAppointment: removeAppointment, parseIcsEvents: parseIcsEvents, mergeAppointments: mergeAppointments,
+ recordLaunch: recordLaunch, frecencyRank: frecencyRank,
  normalizeAddress: normalizeAddress, isParkedWorkspace: isParkedWorkspace, buildDockItems: buildDockItems,
  parseWpctlVolume: parseWpctlVolume, parseBrightness: parseBrightness, notifMatchesApp: notifMatchesApp,
     TAB_CYCLE_FALLTHROUGH: TAB_CYCLE_FALLTHROUGH,

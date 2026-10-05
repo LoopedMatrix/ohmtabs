@@ -163,11 +163,12 @@ Item {
       onToggled: ui.save({ tintIcons: !ui.settings.tintIcons })
     }
     DockToggle {
-      title: "Apps button"
-      hint: "Grid icon that opens the Omarchy menu."
+      title: "Start button"
+      hint: "Windows-style Start tile on the dock. Opens Super Menu."
       checked: ui.settings.showAppsButton !== false
       onToggled: ui.save({ showAppsButton: ui.settings.showAppsButton === false })
     }
+
     DockToggle {
       title: "Running apps"
       hint: "Show open windows on the dock."

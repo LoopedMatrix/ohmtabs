@@ -1,6 +1,6 @@
 # User guide — OhmTabs
 
-OhmTabs is the window chrome plugin for Omarchy: a title strip on each app, a pill taskbar, and an Alt+Tab HUD. This page is the day-to-day guide. Architecture and the on-wire protocol live in [ARCHITECTURE.md](ARCHITECTURE.md) and [PROTOCOL.md](PROTOCOL.md).
+OhmTabs is the window chrome plugin for Omarchy: a title strip on each app, a pill taskbar, a Super Menu, and an Alt+Tab HUD. This page is the day-to-day guide. Architecture and the on-wire protocol live in [ARCHITECTURE.md](ARCHITECTURE.md) and [PROTOCOL.md](PROTOCOL.md).
 
 ---
 
@@ -8,8 +8,9 @@ OhmTabs is the window chrome plugin for Omarchy: a title strip on each app, a pi
 
 1. **Title strip** on ordinary application windows (menu, minimize, maximize, close, drag).
 2. **Pill taskbar** on the bottom edge (open windows, minimized windows, pins). Compact by default; it still reserves **62 px** so tiled windows are not clipped.
-3. **Alt+Tab HUD** when you bind `ohmtabs alttab`.
-4. **Dock Settings** from a right-click on empty dock (or the bar widget).
+3. **Super Menu** from the Start button on the dock (apps, search, pins, optional widgets).
+4. **Alt+Tab HUD** when you bind `ohmtabs alttab`.
+5. **Dock Settings** from a right-click on empty dock (or the bar widget). **Super Menu settings** are a separate overlay (gear on the Super Menu).
 
 Optional extras (all **off** unless you turn them on): workspace pips, focused-window title, clock, mute/Wi-Fi/Bluetooth chips, notification drawer, window overview, volume/brightness OSD, − □ × on the Omarchy top bar, window tab groups.
 
@@ -47,6 +48,27 @@ Minimizing parks the window on `special:ohmtabs-minimized`. The dock is a **cent
 | Right-click empty dock | Dock Settings |
 | Hover | Name card when *Icon name on hover* is on; icons magnify when *Icon magnify* is on |
 | Restore-all chip | Appears when two or more windows are minimized |
+| Start (four squares) | Super Menu. Hover ~450 ms also opens it; click Start again, Escape, the ×, or the backdrop to close. |
+
+---
+
+## Super Menu
+
+Windows-style Start, anchored to the Start button. Same glass and accent as the dock. Matrix rain uses Omarchy's screensaver glyph file when present.
+
+| Part | What it does |
+| --- | --- |
+| App list | Installed apps, A–Z, search |
+| Pinned / Agents | Pins and running agents |
+| Recommended | Recent files (on by default) |
+| Widgets | Off until you enable them in Super Menu settings: weather (Open-Meteo), calendar, clocks, crypto (CoinGecko), RSS, news, alerts |
+| Calendar | Local appointments in `~/.local/state/ohmtabs/calendar.json`. Click a day to add/edit; optional read-only ICS URL; Google Calendar opens in the browser |
+| Clocks | Local only unless you add IANA zones. 12/24 hour, DDMMYY/MMDDYY, optional flip-clock digits |
+| Gear | Super Menu settings — **not** Dock Settings |
+
+IPC: `omarchy-shell tech.loopedmatrix.ohmtabs openSuperMenu` · `openSuperMenuSettings` · `closeSuperMenu`. Pass a monitor name (`DP-2`) to pin the overlay.
+
+---
 
 Pinned id and running class are the same dock identity: `com.vendor.app`, `app`, and `app.desktop` collapse to one icon.
 

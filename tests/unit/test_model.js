@@ -229,8 +229,8 @@ test("originLabel and statusSummary", () => {
 
 test("normalizeSettings validates and bounds; readOwnEntry finds the plugin entry", () => {
   const s = M.normalizeSettings({ enabled: false, buttonsLeft: true, controlSize: "huge", excludedClasses: ["chromium", "bad class; rm", "chromium", 42] })
-  assert.deepStrictEqual(s, { enabled: false, buttonsLeft: true, showOnHover: false, controlSize: "standard", excludedClasses: ["chromium", "badclassrm", "42"], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: false, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill", pinnedApps: [], showAppsButton: true, dockDodge: false, showRunning: true, showWorkspaces: false, showClock: false, showNotifs: false, showDashboard: false, showOsd: false, showStatus: false, showActiveWindow: false, workspaceCount: 5 })
-  assert.deepStrictEqual(M.normalizeSettings(null), { enabled: true, buttonsLeft: false, showOnHover: false, controlSize: "standard", excludedClasses: [], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: false, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill", pinnedApps: [], showAppsButton: true, dockDodge: false, showRunning: true, showWorkspaces: false, showClock: false, showNotifs: false, showDashboard: false, showOsd: false, showStatus: false, showActiveWindow: false, workspaceCount: 5 })
+  assert.deepStrictEqual(s, { enabled: false, buttonsLeft: true, showOnHover: false, controlSize: "standard", excludedClasses: ["chromium", "badclassrm", "42"], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: false, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill", pinnedApps: [], showAppsButton: true, dockDodge: false, showRunning: true, showWorkspaces: false, showClock: false, showNotifs: false, showDashboard: false, showOsd: false, showStatus: false, showActiveWindow: false, workspaceCount: 5, superMenuRecommended: true, superMenuWeather: false, superMenuCalendar: false, superMenuRss: false, superMenuNews: false, superMenuCrypto: false, superMenuAlerts: false, superMenuWorldClock: false, superMenuRssUrl: "https://hnrss.org/frontpage", superMenuNewsUrl: "https://feeds.bbci.co.uk/news/rss.xml", superMenuCryptoIds: "bitcoin,ethereum,solana", superMenuRssFeeds: ["https://hnrss.org/frontpage"], superMenuNewsFeeds: ["https://feeds.bbci.co.uk/news/rss.xml"], superMenuCurrency: "usd", superMenuWeekStart: "sunday", superMenuCalIcsUrl: "", superMenuHourCycle: "24", superMenuDateOrder: "dmy", superMenuTimeZones: ["Local"], superMenuFlipClock: true })
+  assert.deepStrictEqual(M.normalizeSettings(null), { enabled: true, buttonsLeft: false, showOnHover: false, controlSize: "standard", excludedClasses: [], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: false, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill", pinnedApps: [], showAppsButton: true, dockDodge: false, showRunning: true, showWorkspaces: false, showClock: false, showNotifs: false, showDashboard: false, showOsd: false, showStatus: false, showActiveWindow: false, workspaceCount: 5, superMenuRecommended: true, superMenuWeather: false, superMenuCalendar: false, superMenuRss: false, superMenuNews: false, superMenuCrypto: false, superMenuAlerts: false, superMenuWorldClock: false, superMenuRssUrl: "https://hnrss.org/frontpage", superMenuNewsUrl: "https://feeds.bbci.co.uk/news/rss.xml", superMenuCryptoIds: "bitcoin,ethereum,solana", superMenuRssFeeds: ["https://hnrss.org/frontpage"], superMenuNewsFeeds: ["https://feeds.bbci.co.uk/news/rss.xml"], superMenuCurrency: "usd", superMenuWeekStart: "sunday", superMenuCalIcsUrl: "", superMenuHourCycle: "24", superMenuDateOrder: "dmy", superMenuTimeZones: ["Local"], superMenuFlipClock: true })
   const doc = JSON.stringify({ bar: { layout: { left: [{ id: "x" }], right: [{ id: "tech.loopedmatrix.ohmtabs", controlSize: "large", excludedClasses: ["foot"] }] } } })
   assert.deepStrictEqual(M.readOwnEntry(doc, "tech.loopedmatrix.ohmtabs"), { controlSize: "large", excludedClasses: ["foot"] })
   assert.strictEqual(M.readOwnEntry(doc, "nope"), null)
@@ -467,6 +467,122 @@ test("normalizeSettings empty object includes pinnedApps, showAppsButton, dockDo
   assert.deepStrictEqual(s.pinnedApps, [])
   assert.strictEqual(s.showAppsButton, true)
   assert.strictEqual(s.dockDodge, false)
+  assert.strictEqual(s.superMenuWeather, false)
+  assert.strictEqual(s.superMenuCalendar, false)
+  assert.strictEqual(s.superMenuRss, false)
+  assert.strictEqual(s.superMenuRecommended, true)
+  assert.strictEqual(s.superMenuRssUrl, "https://hnrss.org/frontpage")
+  assert.strictEqual(s.superMenuCryptoIds, "bitcoin,ethereum,solana")
+  assert.deepStrictEqual(s.superMenuRssFeeds, ["https://hnrss.org/frontpage"])
+  assert.strictEqual(s.superMenuCurrency, "usd")
+  assert.strictEqual(s.superMenuWeekStart, "sunday")
+  assert.strictEqual(s.superMenuHourCycle, "24")
+  assert.strictEqual(s.superMenuDateOrder, "dmy")
+  assert.deepStrictEqual(s.superMenuTimeZones, ["Local"])
+  assert.strictEqual(s.superMenuFlipClock, true)
+})
+
+test("sanitizeHttpUrl and parseRssItems", () => {
+  assert.strictEqual(M.sanitizeHttpUrl("https://a.test/x", "https://fallback"), "https://a.test/x")
+  assert.strictEqual(M.sanitizeHttpUrl("javascript:alert(1)", "https://fallback"), "https://fallback")
+  assert.strictEqual(M.sanitizeCsvIds("BTC,ETH!!", "bitcoin"), "btc,eth")
+  const rss = `<rss><channel>
+    <item><title><![CDATA[Hello &amp; World]]></title><link>https://ex.test/1</link></item>
+    <item><title>Second</title><link>https://ex.test/2</link></item>
+  </channel></rss>`
+  const items = M.parseRssItems(rss, 8)
+  assert.strictEqual(items[0].title, "Hello & World")
+  assert.strictEqual(items[0].link, "https://ex.test/1")
+  assert.strictEqual(items.length, 2)
+  assert.strictEqual(M.weatherLabel(0), "Clear")
+  assert.strictEqual(M.weatherLabel(61), "Rain")
+  assert.strictEqual(M.weatherLabel("nope"), "—")
+})
+
+test("super menu feed lists, currency, calendar week start", () => {
+  assert.deepStrictEqual(M.sanitizeUrlList("javascript:x,https://a.test/rss", ["https://fallback"], 8), ["https://a.test/rss"])
+  assert.deepStrictEqual(M.sanitizeUrlList(["https://a.test/1", "https://a.test/1", "ftp://no"], ["https://fallback"], 8), ["https://a.test/1"])
+  assert.deepStrictEqual(M.sanitizeUrlList("", ["https://fallback.test/x"], 8), ["https://fallback.test/x"])
+  assert.strictEqual(M.sanitizeCurrency("AUD"), "aud")
+  assert.strictEqual(M.sanitizeCurrency("xyz"), "usd")
+  assert.strictEqual(M.sanitizeWeekStart("Monday"), "monday")
+  assert.strictEqual(M.csvToggleId("bitcoin,ethereum", "solana", 8), "bitcoin,ethereum,solana")
+  assert.strictEqual(M.csvToggleId("bitcoin,ethereum", "bitcoin", 8), "ethereum")
+  assert.strictEqual(M.csvAddId("bitcoin,ethereum", "bitcoin", 8), "bitcoin,ethereum")
+  assert.strictEqual(M.csvAddId("bitcoin", "dogecoin", 8), "bitcoin,dogecoin")
+  assert.deepStrictEqual(M.listWithout(["https://a", "https://b"], "https://a"), ["https://b"])
+  const oct = Date.UTC(2026, 9, 5, 12, 0, 0) // 5 Oct 2026 is a Monday
+  const sun = M.calendarMonth(oct, "sunday")
+  assert.strictEqual(sun.title, "October 2026")
+  assert.strictEqual(sun.headers[0], "S")
+  assert.strictEqual(sun.cells[0].d, "") // Oct 1 2026 is Thursday = 4 blanks on Sunday-start
+  assert.strictEqual(sun.cells[4].d, "1")
+  const mon = M.calendarMonth(oct, "monday")
+  assert.strictEqual(mon.headers[0], "M")
+  assert.strictEqual(mon.cells[3].d, "1")
+  const n = M.normalizeSettings({ superMenuRssFeeds: ["javascript:alert(1)", "https://hnrss.org/frontpage", "https://hnrss.org/frontpage"], superMenuCurrency: "aud", superMenuWeekStart: "monday", superMenuCryptoIds: "dogecoin" })
+  assert.deepStrictEqual(n.superMenuRssFeeds, ["https://hnrss.org/frontpage"])
+  assert.strictEqual(n.superMenuCurrency, "aud")
+  assert.strictEqual(n.superMenuWeekStart, "monday")
+  assert.strictEqual(n.superMenuCryptoIds, "dogecoin")
+  assert.strictEqual(M.currencyPrefix("aud"), "A$")
+})
+
+test("appointments upsert, day filter, ICS parse", () => {
+  assert.strictEqual(M.normalizeAppointment({ title: "x" }), null)
+  const a = M.normalizeAppointment({ id: "e1", title: "Dentist", date: "2026-10-05", start: "9:30", end: "10:00" })
+  assert.strictEqual(a.start, "09:30")
+  assert.strictEqual(a.title, "Dentist")
+  const list = M.upsertAppointment([], a)
+  assert.strictEqual(list.length, 1)
+  const edited = M.upsertAppointment(list, { id: "e1", title: "Dentist (moved)", date: "2026-10-05", start: "11:00" })
+  assert.strictEqual(edited[0].title, "Dentist (moved)")
+  assert.strictEqual(edited[0].start, "11:00")
+  assert.strictEqual(M.appointmentsOnDate(edited, "2026-10-05").length, 1)
+  assert.strictEqual(M.appointmentsOnDate(edited, "2026-10-06").length, 0)
+  assert.strictEqual(M.removeAppointment(edited, "e1").length, 0)
+  const ics = "BEGIN:VCALENDAR\nBEGIN:VEVENT\nDTSTART:20261007T140000Z\nDTEND:20261007T150000Z\nSUMMARY:Standup\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART;VALUE=DATE:20261008\nSUMMARY:All day\nEND:VEVENT\nEND:VCALENDAR"
+  const ev = M.parseIcsEvents(ics, 10)
+  assert.strictEqual(ev.length, 2)
+  assert.strictEqual(ev[0].date, "2026-10-07")
+  assert.strictEqual(ev[0].title, "Standup")
+  assert.strictEqual(ev[0].start, "14:00")
+  assert.strictEqual(ev[0].source, "ics")
+  assert.strictEqual(ev[1].date, "2026-10-08")
+  const marked = M.calendarMonth(Date.UTC(2026, 9, 5, 12, 0, 0), "sunday", [{ date: "2026-10-01" }])
+  const day1 = marked.cells.find((c) => c.d === "1")
+  assert.strictEqual(day1.has, true)
+  assert.strictEqual(day1.date, "2026-10-01")
+  const merged = M.mergeAppointments([{ id: "l1", title: "Local", date: "2026-10-05" }], ev)
+  assert.ok(merged.length >= 3)
+})
+
+test("clock 12/24, date order, time zones", () => {
+  assert.strictEqual(M.sanitizeHourCycle("12h"), "12")
+  assert.strictEqual(M.sanitizeHourCycle("nope"), "24")
+  assert.strictEqual(M.sanitizeDateOrder("mmddyy"), "mdy")
+  assert.strictEqual(M.sanitizeDateOrder("ddmmyy"), "dmy")
+  assert.strictEqual(M.sanitizeTimeZone("America/New_York"), "America/New_York")
+  assert.strictEqual(M.sanitizeTimeZone("not a zone"), "")
+  assert.deepStrictEqual(M.sanitizeTimeZones("UTC,Australia/Melbourne,javascript"), ["UTC", "Australia/Melbourne"])
+  const utc = Date.UTC(2026, 9, 5, 14, 5, 0)
+  const row24 = M.clockRow(utc, "UTC", "24", "dmy")
+  assert.strictEqual(row24.hh, "14")
+  assert.strictEqual(row24.mm, "05")
+  assert.strictEqual(row24.ap, "")
+  assert.strictEqual(row24.date, "05/10/26")
+  const row12 = M.clockRow(utc, "UTC", "12", "mdy")
+  assert.strictEqual(row12.hh, "02")
+  assert.strictEqual(row12.ap, "PM")
+  assert.strictEqual(row12.date, "10/05/26")
+  const ny = M.clockRow(utc, "America/New_York", "24", "mdy")
+  assert.strictEqual(ny.label, "New York")
+  assert.strictEqual(ny.hh, "10")
+  const n = M.normalizeSettings({ superMenuHourCycle: "12", superMenuDateOrder: "mmddyy", superMenuTimeZones: ["Europe/London"], superMenuFlipClock: false })
+  assert.strictEqual(n.superMenuHourCycle, "12")
+  assert.strictEqual(n.superMenuDateOrder, "mdy")
+  assert.deepStrictEqual(n.superMenuTimeZones, ["Europe/London"])
+  assert.strictEqual(n.superMenuFlipClock, false)
 })
 
 test("notifMatchesApp ties Omarchy popup rows to a dock app id", () => {
@@ -585,6 +701,59 @@ test("dock items: electron/chromium shells are not dock apps; a missing class st
 test("dock items: tolerate missing/odd input", () => {
   assert.deepStrictEqual(M.buildDockItems(), [])
   assert.deepStrictEqual(M.buildDockItems({ showRunning: true, rows: [null], live: [null] }), [{ key: "m0", kind: "minimized", appId: "__min0", pinned: false, members: [null], toplevel: null, liveCount: 0, minCount: 1 }])
+})
+
+test("appLetter groups names", () => {
+  assert.strictEqual(M.appLetter("Claude"), "C")
+  assert.strictEqual(M.appLetter("7-Zip"), "#")
+  assert.strictEqual(M.appLetter(""), "#")
+})
+
+test("fileIconNames uses theme names the dock already loads", () => {
+  assert.strictEqual(M.fileIconNames("/home/loop/Docs/")[0], "inode-directory")
+  assert.ok(M.fileIconNames("/home/loop/Projects").indexOf("inode-directory") === 0)
+  assert.ok(M.fileIconNames("/home/loop/Projects").indexOf("folder") >= 0)
+  assert.strictEqual(M.fileIconNames("/tmp/old.txt")[0], "text-x-generic")
+  assert.strictEqual(M.fileIconNames("/home/a.pdf")[0], "application-pdf")
+  assert.strictEqual(M.fileIconNames("/home/pic.jpg")[0], "image-jpeg")
+  assert.strictEqual(M.fileIconNames("/home/clip.mp4")[0], "video-mp4")
+  assert.strictEqual(M.fileIconNames("")[0], "text-x-generic")
+})
+
+test("parseRecentlyUsed newest-first, file:// only, cap", () => {
+  const xml = `<?xml version="1.0"?>
+<xbel>
+  <bookmark href="https://example.com" visited="2026-01-01T00:00:00Z"></bookmark>
+  <bookmark href="file:///tmp/old.txt" visited="2026-01-01T00:00:00Z"></bookmark>
+  <bookmark href="file:///home/loop/Docs/New%20File.pdf" visited="2026-10-01T00:00:00Z"></bookmark>
+  <bookmark href="file:///tmp/old.txt" visited="2026-10-02T00:00:00Z"></bookmark>
+</xbel>`
+  const rows = M.parseRecentlyUsed(xml, 8)
+  assert.strictEqual(rows[0].title, "old.txt")
+  assert.strictEqual(rows[1].title, "New File.pdf")
+  assert.strictEqual(rows.length, 2)
+  assert.deepStrictEqual(M.parseRecentlyUsed("", 8), [])
+})
+
+test("relativeTime buckets", () => {
+  const now = Date.parse("2026-10-05T12:00:00Z")
+  assert.strictEqual(M.relativeTime("2026-10-05T11:59:30Z", now), "just now")
+  assert.strictEqual(M.relativeTime("2026-10-05T11:50:00Z", now), "10m ago")
+  assert.strictEqual(M.relativeTime("2026-10-05T09:00:00Z", now), "3h ago")
+  assert.strictEqual(M.relativeTime("2026-10-03T12:00:00Z", now), "2d ago")
+  assert.strictEqual(M.relativeTime("nope", now), "")
+})
+
+test("recordLaunch and frecencyRank half-life", () => {
+  const t0 = 1000000
+  let s = M.recordLaunch(null, "claude", t0)
+  s = M.recordLaunch(s, "claude", t0 + 1000)
+  s = M.recordLaunch(s, "brave-browser", t0)
+  const ranked = M.frecencyRank(s.launches, t0 + 1000, 8)
+  assert.strictEqual(ranked[0].appId, "claude")
+  assert.strictEqual(ranked[0].n, 2)
+  const old = M.frecencyRank({ a: { n: 10, last: t0 }, b: { n: 2, last: t0 + 42 * 86400000 } }, t0 + 42 * 86400000, 2)
+  assert.strictEqual(old[0].appId, "b")
 })
 
 console.log("test_model: " + passed + " passed")

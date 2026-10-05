@@ -15,13 +15,14 @@
 
 - a **glass pill title strip** on each app (− □ ×, drag, double-click maximize; matches the dock)
 - a **glassy pill taskbar** for open, minimized, and pinned apps (one icon per window)
+- a **Windows-style Super Menu** (Start on the dock: apps, pins, widgets, settings)
 - a **macOS-style Alt+Tab HUD**
 - optional **window tabs** (drop one window onto another)
 
-The store card is [`preview.png`](preview.png). Title strip, dock, and desktop crops are **live grim** of a blank Brave window — no bookmarks, no pages, no Omarchy stats bar. Alt+Tab / settings / hover stay as diagrams so window titles never leak.
+The store card is [`preview.png`](preview.png). Title strip, dock, Super Menu, and desktop crops are **live grim** of a private Brave `about:blank` window — no bookmarks, no pages, no Omarchy stats bar. Alt+Tab / hover stay as diagrams so window titles never leak.
 
 <p align="center">
-  <img src="preview.png" alt="OhmTabs: title strip, Alt+Tab cards, pill taskbar" width="100%">
+  <img src="preview.png" alt="OhmTabs: Super Menu, settings, pill taskbar" width="100%">
 </p>
 
 ---
@@ -36,6 +37,7 @@ The store card is [`preview.png`](preview.png). Title strip, dock, and desktop c
 | **Left-click a dock icon** | Focus a running app, restore a minimized one, or launch a pin |
 | **Right-click a dock icon** | Pin / unpin, launch, restore, minimize, maximize, float, close |
 | **Right-click empty dock** | Dock Settings |
+| **Start (four squares)** | Super Menu — apps, pins, search, widgets. Gear opens Super Menu settings (separate from Dock Settings). |
 | **Hover an icon** | Glassy name card (when *Icon name on hover* is on) |
 | **Alt+Tab** | HUD over the focused monitor (bind it — see [User guide](docs/USAGE.md#alttab)) |
 
@@ -62,6 +64,14 @@ Full walkthrough: **[docs/USAGE.md](docs/USAGE.md)**.
 <p align="center">
   <img src="docs/screenshots/alttab.png" alt="Alt+Tab window switcher HUD" width="90%">
 </p>
+<p align="center">
+  <img src="docs/screenshots/supermenu.png" alt="OhmTabs Super Menu" width="100%">
+</p>
+<p align="center"><sub>Super Menu over a private Brave window: app list, pins, Matrix rain, flip clock, calendar, crypto.</sub></p>
+<p align="center">
+  <img src="docs/screenshots/supermenu-settings.png" alt="Super Menu settings" width="40%">
+</p>
+<p align="center"><sub>Super Menu settings — widgets, clocks, feeds, coins. Not mixed into Dock Settings.</sub></p>
 <p align="center">
   <img src="docs/screenshots/settings.png" alt="Dock Settings" width="40%">
 </p>
@@ -116,7 +126,7 @@ Right-click the dock → **Dock Settings**, or edit the plugin entry in `~/.conf
 | `fullLength` | `false` | Span the whole edge. Compact pill still **reserves 62 px**. |
 | `cornerShape` | `"pill"` | `pill` / `rounded` / `square`. |
 | `pinnedApps` | `[]` | App ids kept on the dock with no window. Reverse-DNS classes (`com.vendor.app`) merge with the short id. |
-| `showAppsButton` | `true` | Grid button → Omarchy menu. |
+| `showAppsButton` | `true` | Start button on the dock → Super Menu. |
 | `showRunning` | `true` | Open windows on the dock. |
 | `dockDodge` | `false` | Park if a window covers the dock. Off keeps the reserved strip. |
 | `showWorkspaces` | `false` | Workspace pips. |

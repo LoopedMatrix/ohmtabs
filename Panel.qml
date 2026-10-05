@@ -31,6 +31,7 @@ Item {
   property var menuTarget: null       // live window snapshot the menu acts on
   property real menuX: 0
   property real menuY: 0
+  property bool menuAnchored: false
   property bool confirmHide: false
   property bool confirmClose: false
   property bool showTechnical: false
@@ -43,6 +44,20 @@ Item {
   readonly property color selectedText: Color.menu.selectedText
   readonly property color muted: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.55)
   readonly property color accent: Color.accent
+  readonly property color barBackground: Color.bar.background
+  readonly property color barForeground: Color.bar.text
+  readonly property real glass: {
+    var n = settings && settings.panelBgOpacity !== undefined ? Number(settings.panelBgOpacity) : 0.78
+    if (!(n >= 0.15)) n = 0.78
+    if (n > 1) n = 1
+    return n
+  }
+  readonly property real barBorderOpacity: {
+    var n = settings && settings.panelBorderOpacity !== undefined ? Number(settings.panelBorderOpacity) : 0.95
+    if (!(n >= 0)) n = 0.95
+    if (n > 1) n = 1
+    return n
+  }
   readonly property int cornerRadius: Style.cornerRadius
   readonly property string fontFamily: Style.font.menuFamily
   readonly property int contentMargin: Style.spacing.panelPadding
@@ -83,7 +98,7 @@ Item {
     var payload = {}
     try { payload = JSON.parse(String(payloadJson || "{}")) || {} } catch (e) {}
     var wanted = String(payload.view || "drawer")
-    if (wanted !== "menu" && wanted !== "settings" && wanted !== "notifs" && wanted !== "dashboard" && wanted !== "supermenu") wanted = "drawer"
+    if (wanted !== "menu" && wanted !== "settings" && wanted !== "notifs" && wanted !== "dashboard" && wanted !== "supermenu" && wanted !== "supermenu-settings") wanted = "drawer"
     root.confirmHide = false
     root.confirmClose = false
     root.selectedIndex = 0
@@ -97,6 +112,9 @@ Item {
       var at = root.screenAt(Number(payload.x) || 0, Number(payload.y) || 0)
       if (at) panel.screen = at
     }
+    root.menuAnchored = !!(payload.x || payload.y)
+    root.menuX = Number(payload.x) || 0
+    root.menuY = Number(payload.y) || 0
     if (wanted === "menu") {
       var token = String(payload.token || "")
       var live = service && service.liveWindow ? service.liveWindow(token) : null
@@ -106,8 +124,6 @@ Item {
       }
       if (!live) { wanted = "settings" } else {
         root.menuTarget = live
-        root.menuX = Number(payload.x) || 0
-        root.menuY = Number(payload.y) || 0
         var s = root.screenAt(root.menuX, root.menuY)
         if (s) panel.screen = s
       }
@@ -250,7 +266,11 @@ Item {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "ohmtabs-overlay"
-    WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: {
+      if (!root.opened) return WlrKeyboardFocus.None
+      if (root.view === "supermenu") return WlrKeyboardFocus.OnDemand
+      return WlrKeyboardFocus.Exclusive
+    }
     anchors { top: true; bottom: true; left: true; right: true }
 
     MouseArea {
@@ -577,6 +597,32 @@ Item {
     }
 
     Rectangle {
+      id: superMenuSettingsCard
+      visible: root.view === "supermenu-settings"
+      width: 400
+      height: Math.min(panel.height - Style.gapsOut * 2, superMenuSettings.implicitHeight)
+      anchors.horizontalCenter: parent.horizontalCenter
+      y: Style.gapsOut + Style.space(8)
+      radius: 18
+      color: "transparent"
+      MouseArea { anchors.fill: parent; onClicked: function(m) { m.accepted = true } }
+      Flickable {
+        anchors.fill: parent
+        contentWidth: width
+        contentHeight: superMenuSettings.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        SuperMenuSettings {
+          id: superMenuSettings
+          width: 400
+          service: root.service
+          settings: root.settings
+          onCloseRequested: root.dismiss()
+        }
+      }
+    }
+
+    Rectangle {
       id: notifsCard
       visible: root.view === "notifs"
       width: 360
@@ -616,17 +662,37 @@ Item {
     }
 
     // --------------------------------------------------------- super menu
-    Rectangle {
+    // Windows Start flyout: sit just above (or beside) the Start tile.
+    // Overlay coords are global; convert to this PanelWindow's screen.
+    Item {
       id: superMenuCard
       visible: root.view === "supermenu"
-      width: Math.min(900, panel.width - Style.gapsOut * 2)
-      height: Math.min(620, panel.height - Style.gapsOut * 2)
-      anchors.horizontalCenter: parent.horizontalCenter
-      y: Style.gapsOut + Style.space(8)
-      radius: 18
-      color: root.background
-      border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.45)
-      border.width: 1
+      width: Math.min(1100, panel.width - Style.gapsOut * 2)
+      height: Math.min(640, panel.height - 96)
+      x: {
+        var gap = Style.gapsOut
+        var w = width
+        if (!root.menuAnchored)
+          return Math.max(gap, Math.round((panel.width - w) / 2))
+        var sx = panel.screen ? panel.screen.x : 0
+        var localX = root.menuX - sx
+        var x = localX - 28
+        return Math.max(gap, Math.min(x, panel.width - w - gap))
+      }
+      y: {
+        var gap = 12
+        var h = height
+        var ph = panel.height
+        if (!root.menuAnchored)
+          return Math.max(gap, ph - h - 80)
+        var sy = panel.screen ? panel.screen.y : 0
+        var localY = root.menuY - sy
+        var yAbove = localY - h - gap
+        if (yAbove >= gap) return yAbove
+        var yBelow = localY + 32 + gap
+        if (yBelow + h <= ph - gap) return yBelow
+        return Math.max(gap, Math.min(localY - Math.round(h / 2), ph - h - gap))
+      }
       MouseArea { anchors.fill: parent; onClicked: function(m) { m.accepted = true } }
       SuperMenu {
         id: superMenuUi
@@ -634,7 +700,15 @@ Item {
         shell: root.shell
         service: root.service
         moduleName: root.pluginId
+        bg: root.barBackground
+        fg: root.barForeground
+        accent: root.accent
+        fontFamily: root.fontFamily
+        radius: Math.max(root.cornerRadius, 14)
+        glass: 0.92
+        borderOpacity: Math.max(0.85, root.barBorderOpacity)
         onCloseRequested: root.dismiss()
+        onRequestSettings: root.switchView("supermenu-settings")
       }
     }
 
