@@ -410,24 +410,7 @@ def save_rgb(im, path, size=None):
 
 
 def main():
-    save_rgb(desktop(), OUT / "desktop.png")
-    save_rgb(strip_only(), OUT / "title-strip.png")
-    save_rgb(taskbar_only(), OUT / "taskbar.png")
-    save_rgb(hover_card(), OUT / "hover.png")
-    save_rgb(alttab(), OUT / "alttab.png")
-    save_rgb(settings_card(), OUT / "settings.png")
-    save_rgb(supermenu(), OUT / "supermenu.png")
-    save_rgb(supermenu_settings(), OUT / "supermenu-settings.png")
-    save_rgb(preview(), PREVIEW)
-    im = new(560, 220, BG)
-    d = ImageDraw.Draw(im)
-    rr(d, (12, 12, 548, 208), 16, fill=(16, 12, 28), outline=ACCENT, width=2)
-    d.text((32, 28), "Minimized windows", font=font(16, bold=True), fill=TEXT)
-    for i, name in enumerate(["Terminal  ·  workspace 1", "Notes  ·  workspace 2"]):
-        y = 72 + i * 48
-        rr(d, (32, y, 528, y + 40), 10, fill=(24, 16, 36))
-        d.text((48, y + 10), name, font=font(14), fill=TEXT)
-    save_rgb(im, OUT / "drawer.png")
+    print("live grim files are the gallery; not overwriting docs/screenshots")
 
 
 if __name__ == "__main__":

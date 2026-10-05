@@ -1,10 +1,6 @@
 # OhmTabs
 
 <p align="center">
-  <img src="docs/brand/ohmtabs-banner.png" alt="OhmTabs — familiar window controls for Omarchy" width="100%">
-</p>
-
-<p align="center">
   <a href="https://github.com/LoopedMatrix/ohmtabs/actions/workflows/test.yml"><img alt="tests" src="https://github.com/LoopedMatrix/ohmtabs/actions/workflows/test.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="MIT + BSD-3" src="https://img.shields.io/badge/license-MIT%20%2B%20BSD--3-aab3bc?labelColor=0b0f14"></a>
   <img alt="Omarchy 4" src="https://img.shields.io/badge/Omarchy-4-fda52b?labelColor=0b0f14">
@@ -19,7 +15,7 @@
 - a **macOS-style Alt+Tab HUD**
 - optional **window tabs** (drop one window onto another)
 
-The store card is [`preview.png`](preview.png). Title strip, dock, Super Menu, and desktop crops are **live grim** of a private Brave `about:blank` window — no bookmarks, no pages, no Omarchy stats bar. Alt+Tab / hover stay as diagrams so window titles never leak.
+The store card is [`preview.png`](preview.png). All gallery shots below are **live grim** of Super Menu, the dock, and a private Brave `about:blank` window — no bookmarks, no other apps, no Omarchy stats bar.
 
 <p align="center">
   <img src="preview.png" alt="OhmTabs: Super Menu, settings, pill taskbar" width="100%">
@@ -48,35 +44,25 @@ Full walkthrough: **[docs/USAGE.md](docs/USAGE.md)**.
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/desktop.png" alt="Title strip and centered pill taskbar" width="100%">
+  <img src="docs/screenshots/supermenu.png" alt="OhmTabs Super Menu" width="100%">
 </p>
-<p align="center"><sub>Live glass title strip + pill dock on a blank Brave window.</sub></p>
+<p align="center"><sub>Super Menu: apps, pins, Matrix rain, flip clock, calendar, crypto.</sub></p>
+
+<p align="center">
+  <img src="docs/screenshots/supermenu-settings.png" alt="Super Menu settings" width="40%">
+</p>
+<p align="center"><sub>Super Menu settings — widgets, clocks, feeds, coins. Separate from Dock Settings.</sub></p>
+
+<p align="center">
+  <img src="docs/screenshots/desktop.png" alt="Title strip and pill taskbar on a private Brave window" width="100%">
+</p>
+<p align="center"><sub>Glass title strip + pill dock on a private about:blank window.</sub></p>
 
 <p align="center">
   <img src="docs/screenshots/title-strip.png" alt="OhmTabs title strip" width="100%">
 </p>
 <p align="center">
   <img src="docs/screenshots/taskbar.png" alt="OhmTabs pill taskbar" width="70%">
-</p>
-<p align="center">
-  <img src="docs/screenshots/hover.png" alt="Hover name card on a dock icon" width="70%">
-</p>
-<p align="center">
-  <img src="docs/screenshots/alttab.png" alt="Alt+Tab window switcher HUD" width="90%">
-</p>
-<p align="center">
-  <img src="docs/screenshots/supermenu.png" alt="OhmTabs Super Menu" width="100%">
-</p>
-<p align="center"><sub>Super Menu over a private Brave window: app list, pins, Matrix rain, flip clock, calendar, crypto.</sub></p>
-<p align="center">
-  <img src="docs/screenshots/supermenu-settings.png" alt="Super Menu settings" width="40%">
-</p>
-<p align="center"><sub>Super Menu settings — widgets, clocks, feeds, coins. Not mixed into Dock Settings.</sub></p>
-<p align="center">
-  <img src="docs/screenshots/settings.png" alt="Dock Settings" width="40%">
-</p>
-<p align="center">
-  <img src="docs/screenshots/drawer.png" alt="Minimized-windows drawer" width="55%">
 </p>
 
 ## Requirements
