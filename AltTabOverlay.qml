@@ -56,6 +56,18 @@ PanelWindow {
     return 0
   }
 
+  // Deterministic colour for a fallback tile, derived from the app name.
+  function colorForString(s) {
+    var hash = 0
+    s = String(s || "?")
+    for (var i = 0; i < s.length; i++) {
+      hash = ((hash << 5) - hash) + s.charCodeAt(i)
+      hash = hash & hash
+    }
+    var hue = Math.abs(hash) % 360
+    return Qt.hsla(hue / 360.0, 0.65, 0.45, 1.0)
+  }
+
   function iconSource(appId) {
     var key = String(appId || "")
     if (!key) return ""
@@ -212,6 +224,14 @@ PanelWindow {
             fillMode: Image.PreserveAspectFit
             cache: true
 
+            Rectangle {
+              anchors.centerIn: parent
+              width: root.iconSize * 0.8
+              height: root.iconSize * 0.8
+              radius: root.iconSize * 0.2
+              color: root.colorForString(slot.modelData.name || "?")
+              visible: parent.status !== Image.Ready
+            }
             Text {
               textFormat: Text.PlainText
               anchors.centerIn: parent
@@ -220,7 +240,7 @@ PanelWindow {
                 var n = String(slot.modelData.name || "?")
                 return n.charAt(0).toUpperCase()
               }
-              color: Color.menu.text
+              color: "white"
               font.pixelSize: root.iconSize * 0.42
             }
           }

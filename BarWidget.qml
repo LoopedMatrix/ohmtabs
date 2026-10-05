@@ -152,6 +152,18 @@ BarWidget {
     return n
   }
 
+  // Deterministic colour for a fallback tile, derived from the app name.
+  function colorForString(s) {
+    var hash = 0
+    s = String(s || "?")
+    for (var i = 0; i < s.length; i++) {
+      hash = ((hash << 5) - hash) + s.charCodeAt(i)
+      hash = hash & hash
+    }
+    var hue = Math.abs(hash) % 360
+    return Qt.hsla(hue / 360.0, 0.65, 0.45, 1.0)
+  }
+
   function resolveStripIcon(cls) {
     var key = String(cls || "")
     if (!key) return ""

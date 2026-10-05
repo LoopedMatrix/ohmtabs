@@ -93,6 +93,11 @@ Item {
   readonly property int buttonLength: root.iconSize + 16
   // Pixels of the parked surface left on screen so the pointer can find it.
   readonly property int revealSliver: 4
+  // Gap kept between the strip and the screen edge on the long axis. The
+  // rounded ends of the pill (and the accent ring the border repeater draws
+  // just outside it) are clipped when the band runs edge to edge, so the band
+  // is always inset by this much. Tune this one number to taste.
+  readonly property int edgeInset: 36
 
   readonly property var rows: (service && service.rows) ? service.rows : []
   readonly property int count: rows.length
@@ -233,6 +238,19 @@ Item {
   // unknown classes are not re-probed on every re-evaluation. (The scan runs
   // at shell startup, so by the time a window is minimized it is populated.)
   property var iconCache: ({})
+
+  // Deterministic colour for a fallback tile, derived from the app name so the
+  // same app always gets the same colour across sessions.
+  function colorForString(s) {
+    var hash = 0
+    s = String(s || "?")
+    for (var i = 0; i < s.length; i++) {
+      hash = ((hash << 5) - hash) + s.charCodeAt(i)
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    var hue = Math.abs(hash) % 360
+    return Qt.hsla(hue / 360.0, 0.65, 0.45, 1.0)
+  }
 
   function resolveIcon(cls) {
     var key = String(cls || "")
@@ -408,9 +426,9 @@ Item {
     root.activateItem(group, original)
   }
 
-  function activateItem(item, original) {
+  function activateItem(item, original, source) {
     if (!item) return
-    if (item.kind === "apps") { root.openAppsMenu(); root.selectedIndex = -1; return }
+    if (item.kind === "apps") { root.openAppsMenu(source); root.selectedIndex = -1; return }
     if (item.kind === "notifs") { root.openNotifs(); root.selectedIndex = -1; return }
     if (item.kind === "dashboard") { root.openDashboard(); root.selectedIndex = -1; return }
     if (item.kind === "clock") { root.selectedIndex = -1; return }
@@ -436,8 +454,12 @@ Item {
     root.restoreRow(item.members[0], original)
   }
 
-  function openAppsMenu() {
-    try { Quickshell.execDetached(["omarchy-menu", "toggle", "root"]) } catch (e) {}
+  function openAppsMenu(source) {
+    if (!service) return
+    startHoverTimer.stop()
+    var pt = root.pointOnScreen(source)
+    var name = panel.screen ? String(panel.screen.name) : ""
+    service.openOverlay({ view: "supermenu", x: pt.x, y: pt.y, monitor: name })
   }
 
   function openNotifs() {
@@ -527,6 +549,16 @@ Item {
     if (root.hoverButton) hoverHideDelay.restart()
   }
 
+  property var startHoverButton: null
+  function startMenuHoverArm(button) {
+    root.startHoverButton = button
+    startHoverTimer.restart()
+  }
+  function startMenuHoverCancel() {
+    startHoverTimer.stop()
+    root.startHoverButton = null
+  }
+
   Timer {
     id: flyoutHideDelay
     interval: 240
@@ -544,6 +576,14 @@ Item {
     repeat: false
     onTriggered: {
       if (!root.hoverCardHovered) root.hoverButton = null
+    }
+  }
+  Timer {
+    id: startHoverTimer
+    interval: 450
+    repeat: false
+    onTriggered: {
+      if (root.startHoverButton) root.openAppsMenu(root.startHoverButton)
     }
   }
 
@@ -672,27 +712,48 @@ Item {
         id: dockBand
         width: {
           if (root.vertical) return root.panelSize
-          if (root.fullLength) return parent.width
+          if (root.fullLength) return Math.max(root.panelSize, parent.width - root.edgeInset * 2)
           var n = Math.max(1, root.items.length)
           var extra = (root.showWorkspaces ? (root.workspaceCount * 14 + 12) : 0) + (root.showClock ? 56 : 0) + (root.showActiveWindow ? 120 : 0) + (root.showStatus ? 78 : 0)
-          return Math.min(parent.width - 48, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
+          return Math.min(parent.width - root.edgeInset * 2, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
         }
         height: {
           if (!root.vertical) return root.panelSize
-          if (root.fullLength) return parent.height
+          if (root.fullLength) return Math.max(root.panelSize, parent.height - root.edgeInset * 2)
           var n = Math.max(1, root.items.length)
           var extra = (root.showWorkspaces ? (root.workspaceCount * 14 + 12) : 0) + (root.showClock ? 56 : 0) + (root.showActiveWindow ? 120 : 0) + (root.showStatus ? 78 : 0)
-          return Math.min(parent.height - 48, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
+          return Math.min(parent.height - root.edgeInset * 2, Math.max(root.panelSize, n * (root.iconSize + 14) + extra + 28))
         }
         x: root.vertical ? (root.panelPosition === "right" ? parent.width - width : 0)
-                         : (root.fullLength ? 0 : Math.round((parent.width - width) / 2))
-        y: root.vertical ? (root.fullLength ? 0 : Math.round((parent.height - height) / 2))
+                         : Math.round((parent.width - width) / 2)
+        y: root.vertical ? Math.round((parent.height - height) / 2)
                          : (root.panelPosition === "top" ? 0 : parent.height - height)
         radius: root.dockRadius
-        color: Qt.rgba(root.background.r, root.background.g, root.background.b, root.panelBgOpacity)
+        color: "#000000"
         border.color: root.panelBorder ? Qt.rgba(root.dockAccent.r, root.dockAccent.g, root.dockAccent.b, root.panelBorderOpacity) : "transparent"
         border.width: root.panelBorder ? 2 : 0
+        clip: true
         z: 1
+
+        MatrixRain {
+          id: dockRain
+          anchors.fill: parent
+          anchors.leftMargin: root.vertical ? 4 : Math.round(root.dockRadius * 0.85)
+          anchors.rightMargin: root.vertical ? 4 : Math.round(root.dockRadius * 0.85)
+          anchors.topMargin: root.vertical ? Math.round(root.dockRadius * 0.85) : 4
+          anchors.bottomMargin: root.vertical ? Math.round(root.dockRadius * 0.85) : 4
+          running: root.live && !root.parked
+          ink: "#00ff41"
+          fontPx: 13
+          fps: 12
+          trail: 0.28
+        }
+
+        Rectangle {
+          anchors.fill: parent
+          radius: parent.radius
+          color: Qt.rgba(root.background.r, root.background.g, root.background.b, Math.min(0.58, root.panelBgOpacity))
+        }
       }
 
       Repeater {
@@ -1005,7 +1066,7 @@ Item {
     // Grouped buttons name the app; a lone window keeps its own title so the
     // button still says something useful before the flyout exists.
     readonly property string title: {
-      if (btn.entry && btn.entry.kind === "apps") return "Apps"
+      if (btn.entry && btn.entry.kind === "apps") return "Start"
       if (btn.entry && btn.entry.kind === "clock") return root.clockText
       if (btn.entry && btn.entry.kind === "notifs") return "Notifs"
       if (btn.entry && btn.entry.kind === "dashboard") return "Overview"
@@ -1018,7 +1079,7 @@ Item {
       return String(btn.first.label || btn.first.title || btn.first.class || "Window")
     }
     readonly property string badge: {
-      if (btn.entry && btn.entry.kind === "apps") return "▦"
+      if (btn.entry && btn.entry.kind === "apps") return "S"
       if (btn.entry && btn.entry.kind === "clock") return root.clockText
       if (btn.entry && btn.entry.kind === "notifs") return "🔔"
       if (btn.entry && btn.entry.kind === "dashboard") return "▣"
@@ -1069,15 +1130,28 @@ Item {
       acceptedButtons: Qt.LeftButton | Qt.RightButton
       onEntered: {
         btn.hovered()
+        if (btn.entry && btn.entry.kind === "apps") {
+          root.startMenuHoverArm(btn)
+          return
+        }
         if (btn.grouped) root.flyoutOpen(btn.entry, btn)
         else root.hoverOpen(btn)
       }
       onExited: {
+        if (btn.entry && btn.entry.kind === "apps") {
+          root.startMenuHoverCancel()
+          return
+        }
         if (btn.grouped) root.flyoutMaybeClose()
         else root.hoverMaybeClose()
       }
       onClicked: function(m) {
         if (m.button === Qt.RightButton) { m.accepted = true; root.openEntryMenu(btn.entry, btn); return }
+        if (btn.entry && btn.entry.kind === "apps") {
+          root.openAppsMenu(btn)
+          root.selectedIndex = -1
+          return
+        }
         btn.activated(false)
       }
     }
@@ -1111,14 +1185,38 @@ Item {
             tinted: root.tintIcons && btn.iconSource !== ""
             ink: root.foreground
           }
+          Rectangle {
+            anchors.fill: parent
+            radius: Math.round(Math.min(btn.length, btn.thickness) / 4)
+            color: (btn.entry && btn.entry.kind === "apps") ? root.dockAccent : root.colorForString(btn.badge || "?")
+            visible: btn.iconSource === ""
+          }
           Text {
             anchors.centerIn: parent
-            visible: btn.iconSource === ""
+            visible: btn.iconSource === "" && !(btn.entry && btn.entry.kind === "apps")
             text: btn.badge
-            color: root.foreground
+            color: "white"
             font.family: root.fontFamily
             font.pixelSize: 12
             font.weight: Font.DemiBold
+          }
+          Item {
+            visible: btn.entry && btn.entry.kind === "apps"
+            anchors.centerIn: parent
+            width: Math.round(root.iconSize * 0.58)
+            height: width
+            Repeater {
+              model: 4
+              Rectangle {
+                required property int index
+                width: parent.width * 0.42
+                height: width
+                radius: 1.5
+                color: "white"
+                x: (index % 2) * (parent.width * 0.58)
+                y: Math.floor(index / 2) * (parent.width * 0.58)
+              }
+            }
           }
         }
 
@@ -1235,12 +1333,12 @@ Item {
       Rectangle {
         anchors.fill: parent
         radius: 4
-        color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.16)
+        color: root.colorForString(frow.badge || "?")
         visible: frow.iconSource === ""
         Text {
           anchors.centerIn: parent
           text: frow.badge
-          color: root.foreground
+          color: "white"
           font.family: root.fontFamily
           font.pixelSize: 9
           font.weight: Font.DemiBold

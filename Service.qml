@@ -632,6 +632,22 @@ Item {
   }
 
   function openSettings() { root.openOverlay({ view: "settings" }) }
+  function openSuperMenu(monitor) {
+    var p = { view: "supermenu" }
+    if (monitor && String(monitor).length) p.monitor = String(monitor)
+    root.openOverlay(p)
+  }
+  function openSuperMenuSettings(monitor) {
+    var p = { view: "supermenu-settings" }
+    if (monitor && String(monitor).length) p.monitor = String(monitor)
+    root.openOverlay(p)
+  }
+  function closeSuperMenu() {
+    try {
+      if (root.shell && typeof root.shell.hide === "function")
+        root.shell.hide(root.pluginId)
+    } catch (e) {}
+  }
 
   // --------------------------------------------------------- tab groups
 
@@ -1040,6 +1056,9 @@ Item {
     function openSettings(): string { root.openSettings(); return "ok" }
     function openNotifs(): string { root.openOverlay({ view: "notifs" }); return "ok" }
     function openDashboard(): string { root.openOverlay({ view: "dashboard" }); return "ok" }
+    function openSuperMenu(monitor: string): string { root.openSuperMenu(monitor); return "ok" }
+    function openSuperMenuSettings(monitor: string): string { root.openSuperMenuSettings(monitor); return "ok" }
+    function closeSuperMenu(): string { root.closeSuperMenu(); return "ok" }
     function reconcile(): string {
       root.journalConsumed = false
       root.snapshotDone = false
