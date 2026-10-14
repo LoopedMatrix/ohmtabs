@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "id": "tech.loopedmatrix.ohmtabs",
   "name": "OhmTabs",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "author": "LoopedMatrix",
   "license": "MIT",
   "homepage": "https://github.com/LoopedMatrix/ohmtabs",
-  "description": "Windows-style title strips and a glassy pill taskbar for Omarchy: open, minimized, and pinned apps, plus an Alt+Tab HUD.",
+  "description": "Glass title bars, a pill dock, and a Super Menu for Omarchy. Minimize, pin, and Alt+Tab without a second shell.",
   "kinds": [
     "service",
     "overlay",
@@ -20,7 +20,7 @@
   },
   "barWidget": {
     "displayName": "OhmTabs",
-    "description": "Pill taskbar for open, minimized, and pinned apps. Right-click for Dock Settings.",
+    "description": "Pill dock and Start menu. Right-click the empty dock for settings.",
     "category": "System",
     "allowMultiple": false,
     "defaultSection": "right"

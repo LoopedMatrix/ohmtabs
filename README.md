@@ -7,19 +7,46 @@
   <img alt="Hyprland 0.56.2" src="https://img.shields.io/badge/Hyprland-0.56.2-38c8e8?labelColor=0b0f14">
 </p>
 
-**OhmTabs** is a [Quickshell](https://github.com/outfoxxed/quickshell) + Hyprland plugin for [Omarchy](https://omarchy.org/). It adds the window chrome Omarchy does not ship:
+**Title bars, a dock, and a Start menu for Omarchy.**
 
-- a **glass pill title strip** on each app (− □ ×, drag, double-click maximize; matches the dock)
-- a **glassy pill taskbar** for open, minimized, and pinned apps (one icon per window)
-- a **Windows-style Super Menu** (Start on the dock: apps, pins, widgets, settings)
-- a **macOS-style Alt+Tab HUD**
-- optional **window tabs** (drop one window onto another)
+Minimize a window and it stays on a glass pill dock. Pin an app and launch it from the icon. Open a Super Menu from Start. Switch windows with an Alt+Tab HUD. Drop one window onto another if you want tabs.
 
-The store card is [`preview.png`](preview.png). All gallery shots below are **live grim** of Super Menu, the dock, and a private Brave `about:blank` window — no bookmarks, no other apps, no Omarchy stats bar.
+One plugin — not a second shell. Do not run Grabbar, omadock, macos.dock, animated.dock, or caelestia-shell beside it.
+
+[Install from the Omarchy store](https://omarchyplugins.com/plugin.html?id=tech.loopedmatrix.ohmtabs) · card image [`preview.png`](preview.png)
+
+Gallery shots are live captures of Super Menu, the dock, and a private blank browser window.
 
 <p align="center">
   <img src="preview.png" alt="OhmTabs: Super Menu, settings, pill taskbar" width="100%">
 </p>
+
+## Install
+
+Dock, Super Menu, and settings:
+
+```sh
+omarchy plugin add https://github.com/LoopedMatrix/ohmtabs.git --enable
+```
+
+Title strips and Minimize need one native build (Omarchy does not load this for you — that is why the store says manual setup):
+
+```sh
+cd ~/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs
+make -C native/ohmtabs CXX=g++
+hyprctl plugin load ./native/ohmtabs/ohmtabs.so
+ohmtabs autoload enable    # strips survive a compositor restart
+```
+
+Without the `.so` the dock still works. Minimize stays off and there are no title bars.
+
+## Remove
+
+```sh
+ohmtabs uninstall
+```
+
+That returns minimized windows, turns autoload off, and runs `omarchy plugin remove tech.loopedmatrix.ohmtabs`. The native plugin unloads at the next login. State under `~/.local/state/ohmtabs` is left in place.
 
 ---
 
@@ -69,26 +96,9 @@ Full walkthrough: **[docs/USAGE.md](docs/USAGE.md)**.
 
 - Omarchy 4 (Arch + Hyprland **0.56.2** — native half uses the Lua dispatcher API)
 - Quickshell (shipped with Omarchy), Qt 6, a C++17 compiler and `make`
-- Optional: `bin/ohmtabs` on `PATH`
+- Optional: `ln -s "$(pwd)/bin/ohmtabs" ~/.local/bin/ohmtabs` from the plugin directory. [`docs/AUTOLOAD.md`](docs/AUTOLOAD.md) covers the boot guard.
 
 Do **not** run another minimize/taskbar/dock plugin next to OhmTabs (Grabbar, omarchy-minimize, omadock, macos.dock, animated.dock, caelestia-shell). Those fight the same workspace and the same bottom edge.
-
-## Install
-
-Two parts: the **shell plugin** and the **native strip backend**.
-
-```sh
-omarchy plugin add https://github.com/LoopedMatrix/ohmtabs.git --enable
-cd ~/.config/omarchy/plugins/tech.loopedmatrix.ohmtabs
-make -C native/ohmtabs CXX=g++
-hyprctl plugin load ./native/ohmtabs/ohmtabs.so
-ln -s "$(pwd)/bin/ohmtabs" ~/.local/bin/ohmtabs   # optional
-ohmtabs autoload enable                           # survive compositor restarts
-```
-
-Without the `.so` there are no title strips and Minimize stays off; the dock, settings, and IPC still mount.
-
-[`docs/AUTOLOAD.md`](docs/AUTOLOAD.md) covers the boot guard.
 
 ## Configuration
 
@@ -134,6 +144,7 @@ ohmtabs restore-all
 ohmtabs doctor               read-only diagnostics
 ohmtabs autoload status|enable|disable|retry
 ohmtabs enable|disable
+ohmtabs uninstall            return windows, drop autoload, remove the plugin
 ohmtabs alttab next|prev     window-switcher HUD
 ```
 
