@@ -19,6 +19,9 @@ Column {
   property string fontFamily: "sans-serif"
   property bool active: false
 
+  property string only: ""
+  function wants(id) { return root.only === "" || root.only === id }
+
   readonly property bool showWeather: !!(settings && settings.superMenuWeather)
   readonly property bool showCalendar: !!(settings && settings.superMenuCalendar)
   readonly property bool showRss: !!(settings && settings.superMenuRss)
@@ -26,12 +29,15 @@ Column {
   readonly property bool showCrypto: !!(settings && settings.superMenuCrypto)
   readonly property bool showAlerts: !!(settings && settings.superMenuAlerts)
   readonly property bool showClocks: !!(settings && settings.superMenuWorldClock)
-  readonly property bool anyOn: showWeather || showCalendar || showRss || showNews || showCrypto || showAlerts || showClocks
+  readonly property bool anyOn: (wants("weather") && showWeather) || (wants("calendar") && showCalendar) || (wants("rss") && showRss) || (wants("news") && showNews) || (wants("crypto") && showCrypto) || (wants("alerts") && showAlerts) || (wants("clocks") && showClocks)
 
   width: parent ? parent.width : 256
   visible: root.anyOn
 
-  property string weatherText: "Weather…"
+  property string weatherText: "Loading…"
+  property bool cryptoLoaded: false
+  property bool rssLoaded: false
+  property bool newsLoaded: false
   property var cryptoRows: []
   property var rssRows: []
   property var newsRows: []
@@ -53,14 +59,23 @@ Column {
   readonly property var dayEvents: Model.appointmentsOnDate(root.shownAppointments, root.selectedDate)
   readonly property bool flipClock: !(settings && settings.superMenuFlipClock === false)
 
-  function getUrl(url, cb) {
+  function getUrl(url, cb, timeoutMs) {
     var u = String(url || "")
     if (u.indexOf("https://") !== 0 && u.indexOf("http://") !== 0) return
-    var xhr = new XMLHttpRequest()
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState === 4) cb(xhr.status, xhr.responseText)
+    var done = false
+    function finish(status, body) {
+      if (done) return
+      done = true
+      cb(status, body || "")
     }
-    try { xhr.open("GET", u); xhr.send() } catch (e) { cb(0, "") }
+    var xhr = new XMLHttpRequest()
+    xhr.timeout = timeoutMs > 0 ? timeoutMs : 8000
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === 4) finish(xhr.status, xhr.responseText)
+    }
+    xhr.ontimeout = function() { finish(0, "") }
+    xhr.onerror = function() { finish(0, "") }
+    try { xhr.open("GET", u); xhr.send() } catch (e) { finish(0, "") }
   }
 
   function refreshClocks() {
@@ -116,29 +131,21 @@ Column {
 
   function refreshWeather() {
     if (!root.showWeather) return
+    root.weatherText = "Loading…"
     root.getUrl("https://ipwho.is/", function(st, body) {
-      var lat = -33.87
-      var lon = 151.21
-      var city = ""
-      if (st === 200) {
-        try {
-          var j = JSON.parse(body)
-          if (j && j.latitude) { lat = Number(j.latitude); lon = Number(j.longitude); city = String(j.city || "") }
-        } catch (e) {}
-      }
-      var url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=temperature_2m,weather_code&timezone=auto"
+      var geo = Model.parseGeo(st === 200 ? body : "")
+      if (!geo) { root.weatherText = "Weather unavailable"; return }
+      var url = "https://api.open-meteo.com/v1/forecast?latitude=" + geo.lat
+        + "&longitude=" + geo.lon + "&current=temperature_2m,weather_code&timezone=auto"
       root.getUrl(url, function(st2, body2) {
         if (st2 !== 200) { root.weatherText = "Weather unavailable"; return }
         try {
           var w = JSON.parse(body2)
           var cur = w && w.current ? w.current : {}
-          var t = cur.temperature_2m
-          var label = Model.weatherLabel(cur.weather_code)
-          var where = city ? city : ""
-          root.weatherText = (where ? where + " · " : "") + (t !== undefined ? Math.round(t) + "° · " : "") + label
+          root.weatherText = Model.formatWeatherLine(geo.city, cur.temperature_2m, cur.weather_code)
         } catch (e2) { root.weatherText = "Weather unavailable" }
-      })
-    })
+      }, 8000)
+    }, 4000)
   }
 
   function refreshCrypto() {
@@ -148,7 +155,7 @@ Column {
     var prefix = Model.currencyPrefix(vs)
     var url = "https://api.coingecko.com/api/v3/simple/price?ids=" + ids + "&vs_currencies=" + vs + "&include_24hr_change=true"
     root.getUrl(url, function(st, body) {
-      if (st !== 200) { root.cryptoRows = []; return }
+      if (st !== 200) { root.cryptoLoaded = true; root.cryptoRows = []; return }
       try {
         var j = JSON.parse(body)
         var out = []
@@ -166,8 +173,9 @@ Column {
             up: ch >= 0
           })
         }
+        root.cryptoLoaded = true
         root.cryptoRows = out
-      } catch (e) { root.cryptoRows = [] }
+      } catch (e) { root.cryptoLoaded = true; root.cryptoRows = [] }
     })
   }
 
@@ -183,8 +191,8 @@ Column {
       if ((!feeds || !feeds.length) && root.settings && root.settings.superMenuNewsUrl) feeds = [root.settings.superMenuNewsUrl]
     }
     if (!feeds || !feeds.length) {
-      if (kind === "rss") root.rssRows = []
-      else root.newsRows = []
+      if (kind === "rss") { root.rssLoaded = true; root.rssRows = [] }
+      else { root.newsLoaded = true; root.newsRows = [] }
       return
     }
     var pending = feeds.length
@@ -196,8 +204,8 @@ Column {
         pending -= 1
         if (pending <= 0) {
           if (acc.length > 6) acc = acc.slice(0, 6)
-          if (kind === "rss") root.rssRows = acc
-          else root.newsRows = acc
+          if (kind === "rss") { root.rssLoaded = true; root.rssRows = acc }
+          else { root.newsLoaded = true; root.newsRows = acc }
         }
       })
     }
@@ -222,16 +230,23 @@ Column {
     root.alertRows = out
   }
 
+  function feedLine(loaded, rows) {
+    if (!loaded) return "Loading…"
+    return (rows && rows.length) ? "" : "Nothing yet"
+  }
+
   function refreshAll() {
     if (!root.active || !root.anyOn) return
-    root.refreshClocks()
-    root.refreshCalendar()
-    root.refreshIcs()
-    root.refreshWeather()
-    root.refreshCrypto()
-    root.refreshFeed("rss")
-    root.refreshFeed("news")
-    root.refreshAlerts()
+    if (root.wants("clocks")) root.refreshClocks()
+    if (root.wants("calendar")) {
+      root.refreshCalendar()
+      root.refreshIcs()
+    }
+    if (root.wants("weather")) root.refreshWeather()
+    if (root.wants("crypto")) root.refreshCrypto()
+    if (root.wants("rss")) root.refreshFeed("rss")
+    if (root.wants("news")) root.refreshFeed("news")
+    if (root.wants("alerts")) root.refreshAlerts()
   }
 
   onActiveChanged: if (root.active) root.refreshAll()
@@ -243,37 +258,38 @@ Column {
     running: root.active && root.anyOn
     repeat: true
     onTriggered: {
-      root.refreshClocks()
-      root.refreshAlerts()
+      if (root.wants("clocks")) root.refreshClocks()
+      if (root.wants("alerts")) root.refreshAlerts()
     }
   }
   Timer {
     interval: 60000
-    running: root.active && root.showCrypto
+    running: root.active && root.wants("crypto") && root.showCrypto
     repeat: true
     onTriggered: root.refreshCrypto()
   }
   Timer {
     interval: 900000
-    running: root.active && (root.showWeather || root.showRss || root.showNews)
+    running: root.active && ((root.wants("weather") && root.showWeather) || (root.wants("rss") && root.showRss) || (root.wants("news") && root.showNews))
     repeat: true
     onTriggered: {
-      root.refreshWeather()
-      root.refreshFeed("rss")
-      root.refreshFeed("news")
+      if (root.wants("weather")) root.refreshWeather()
+      if (root.wants("rss")) root.refreshFeed("rss")
+      if (root.wants("news")) root.refreshFeed("news")
     }
   }
 
   Text {
-    visible: root.showClocks
+    visible: root.wants("clocks") && root.showClocks
     text: "Clocks"
-    color: root.fg
+    color: root.muted
     font.family: root.fontFamily
     font.pixelSize: 11
     font.weight: Font.DemiBold
+    font.letterSpacing: 0.8
   }
   Repeater {
-    model: root.showClocks ? root.clockRows : []
+    model: (root.wants("clocks") && root.showClocks) ? root.clockRows : []
     delegate: Column {
       required property var modelData
       width: root.width
@@ -289,6 +305,9 @@ Column {
         digits: modelData.digits
         ap: modelData.ap
         tile: 24
+        ink: root.fg
+        plate: Qt.rgba(0, 0, 0, 0.55)
+        seam: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.55)
       }
       Text {
         visible: !root.flipClock
@@ -302,33 +321,47 @@ Column {
   }
 
   Text {
-    visible: root.showWeather
+    visible: root.wants("weather") && root.showWeather
     text: "Weather"
-    color: root.fg
+    color: root.muted
     font.family: root.fontFamily
     font.pixelSize: 11
     font.weight: Font.DemiBold
+    font.letterSpacing: 0.8
   }
-  Text {
-    visible: root.showWeather
-    width: root.width
-    text: root.weatherText
-    elide: Text.ElideRight
-    color: root.fg
-    font.family: root.fontFamily
-    font.pixelSize: 13
+  Rectangle {
+    visible: root.wants("weather") && root.showWeather
+    width: Math.min(root.width, weatherLine.implicitWidth + 22)
+    height: 26
+    radius: 13
+    color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
+    border.width: 1
+    border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.10)
+    Text {
+      id: weatherLine
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      anchors.leftMargin: 11
+      width: Math.max(0, parent.width - 22)
+      text: root.weatherText
+      elide: Text.ElideRight
+      color: root.fg
+      font.family: root.fontFamily
+      font.pixelSize: 12
+    }
   }
 
   Text {
-    visible: root.showCalendar
+    visible: root.wants("calendar") && root.showCalendar
     text: root.calTitle || "Calendar"
-    color: root.fg
+    color: root.muted
     font.family: root.fontFamily
     font.pixelSize: 11
     font.weight: Font.DemiBold
+    font.letterSpacing: 0.8
   }
   Grid {
-    visible: root.showCalendar
+    visible: root.wants("calendar") && root.showCalendar
     columns: 7
     rowSpacing: 2
     columnSpacing: 2
@@ -353,10 +386,11 @@ Column {
         height: 20
         radius: 4
         color: {
-          if (modelData.date && modelData.date === root.selectedDate) return Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.55)
-          if (modelData.on) return Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.28)
+          if (modelData.date && modelData.date === root.selectedDate) return Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.32)
           return "transparent"
         }
+        border.width: modelData.on ? 1 : 0
+        border.color: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.8)
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
           y: 1
@@ -383,7 +417,7 @@ Column {
     }
   }
   Item {
-    visible: root.showCalendar && root.selectedDate !== ""
+    visible: root.wants("calendar") && root.showCalendar && root.selectedDate !== ""
     width: root.width
     height: 22
     Text {
@@ -411,7 +445,7 @@ Column {
     }
   }
   Repeater {
-    model: (root.showCalendar && root.selectedDate !== "") ? root.dayEvents : []
+    model: (root.wants("calendar") && root.showCalendar && root.selectedDate !== "") ? root.dayEvents : []
     delegate: Row {
       required property var modelData
       width: root.width
@@ -435,13 +469,13 @@ Column {
     }
   }
   Text {
-    visible: root.showCalendar && root.dayEvents.length === 0 && root.selectedDate !== ""
+    visible: root.wants("calendar") && root.showCalendar && root.dayEvents.length === 0 && root.selectedDate !== ""
     text: "No appointments"
     color: root.muted
     font.pixelSize: 10
   }
   Row {
-    visible: root.showCalendar && root.selectedDate !== ""
+    visible: root.wants("calendar") && root.showCalendar && root.selectedDate !== ""
     spacing: 6
     width: root.width
     Rectangle {
@@ -481,7 +515,7 @@ Column {
     }
   }
   Row {
-    visible: root.showCalendar && root.selectedDate !== ""
+    visible: root.wants("calendar") && root.showCalendar && root.selectedDate !== ""
     spacing: 6
     Rectangle {
       width: 72
@@ -521,15 +555,24 @@ Column {
   }
 
   Text {
-    visible: root.showCrypto
+    visible: root.wants("crypto") && root.showCrypto
     text: "Crypto"
-    color: root.fg
+    color: root.muted
     font.family: root.fontFamily
     font.pixelSize: 11
     font.weight: Font.DemiBold
+    font.letterSpacing: 0.8
+  }
+  Text {
+    visible: root.wants("crypto") && root.showCrypto && root.feedLine(root.cryptoLoaded, root.cryptoRows) !== ""
+    width: root.width
+    text: root.feedLine(root.cryptoLoaded, root.cryptoRows)
+    color: root.muted
+    font.family: root.fontFamily
+    font.pixelSize: 11
   }
   Repeater {
-    model: root.showCrypto ? root.cryptoRows : []
+    model: (root.wants("crypto") && root.showCrypto) ? root.cryptoRows : []
     delegate: Row {
       required property var modelData
       width: root.width
@@ -541,15 +584,24 @@ Column {
   }
 
   Text {
-    visible: root.showRss
+    visible: root.wants("rss") && root.showRss
     text: "RSS"
-    color: root.fg
+    color: root.muted
     font.family: root.fontFamily
     font.pixelSize: 11
     font.weight: Font.DemiBold
+    font.letterSpacing: 0.8
+  }
+  Text {
+    visible: root.wants("rss") && root.showRss && root.feedLine(root.rssLoaded, root.rssRows) !== ""
+    width: root.width
+    text: root.feedLine(root.rssLoaded, root.rssRows)
+    color: root.muted
+    font.family: root.fontFamily
+    font.pixelSize: 11
   }
   Repeater {
-    model: root.showRss ? root.rssRows : []
+    model: (root.wants("rss") && root.showRss) ? root.rssRows : []
     delegate: Text {
       required property var modelData
       width: root.width
@@ -570,15 +622,24 @@ Column {
   }
 
   Text {
-    visible: root.showNews
+    visible: root.wants("news") && root.showNews
     text: "News"
-    color: root.fg
+    color: root.muted
     font.family: root.fontFamily
     font.pixelSize: 11
     font.weight: Font.DemiBold
+    font.letterSpacing: 0.8
+  }
+  Text {
+    visible: root.wants("news") && root.showNews && root.feedLine(root.newsLoaded, root.newsRows) !== ""
+    width: root.width
+    text: root.feedLine(root.newsLoaded, root.newsRows)
+    color: root.muted
+    font.family: root.fontFamily
+    font.pixelSize: 11
   }
   Repeater {
-    model: root.showNews ? root.newsRows : []
+    model: (root.wants("news") && root.showNews) ? root.newsRows : []
     delegate: Text {
       required property var modelData
       width: root.width
@@ -599,21 +660,22 @@ Column {
   }
 
   Text {
-    visible: root.showAlerts
+    visible: root.wants("alerts") && root.showAlerts
     text: "Alerts"
-    color: root.fg
+    color: root.muted
     font.family: root.fontFamily
     font.pixelSize: 11
     font.weight: Font.DemiBold
+    font.letterSpacing: 0.8
   }
   Text {
-    visible: root.showAlerts && root.alertRows.length === 0
+    visible: root.wants("alerts") && root.showAlerts && root.alertRows.length === 0
     text: "No notifications"
     color: root.muted
     font.pixelSize: 11
   }
   Repeater {
-    model: root.showAlerts ? root.alertRows : []
+    model: (root.wants("alerts") && root.showAlerts) ? root.alertRows : []
     delegate: Text {
       required property var modelData
       width: root.width

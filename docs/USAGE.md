@@ -58,13 +58,16 @@ Windows-style Start, anchored to the Start button. Same glass and accent as the 
 
 | Part | What it does |
 | --- | --- |
-| App list | Installed apps, A–Z, search |
-| Pinned / Agents | Pins and running agents |
+| App list | Installed apps, A–Z. Type to search (names that start with the query rank first). Up/Down and Enter launch the highlighted row. |
+| Pinned / Agents | Pins and running agents. Right-click an app to pin or unpin it. |
+| Power | Labeled Power control. Opens Lock, Suspend, Reboot, and Shut down. Lock runs immediately; the others ask first. |
+| Session | Nightlight, Focus, and Stay awake show accent when on. Click toggles. |
 | Recommended | Recent files (on by default) |
 | Widgets | Off until you enable them in Super Menu settings: weather (Open-Meteo), calendar, clocks, crypto (CoinGecko), RSS, news, alerts |
 | Calendar | Local appointments in `~/.local/state/ohmtabs/calendar.json`. Click a day to add/edit; optional read-only ICS URL; Google Calendar opens in the browser |
 | Clocks | Local only unless you add IANA zones. 12/24 hour, DDMMYY/MMDDYY, optional flip-clock digits |
-| Gear | Super Menu settings — **not** Dock Settings |
+| Gear | Super Menu settings — **not** Dock Settings. Menu returns to the Super Menu. |
+| Arrange | Drag a section by its ⋮⋮ handle into another column. Same moves live in Super Menu settings → Layout. |
 
 IPC: `omarchy-shell tech.loopedmatrix.ohmtabs openSuperMenu` · `openSuperMenuSettings` · `closeSuperMenu`. Pass a monitor name (`DP-2`) to pin the overlay.
 

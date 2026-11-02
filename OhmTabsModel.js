@@ -573,7 +573,8 @@ function normalizeSettings(raw) {
     superMenuHourCycle: sanitizeHourCycle(r.superMenuHourCycle),
     superMenuDateOrder: sanitizeDateOrder(r.superMenuDateOrder),
     superMenuTimeZones: sanitizeTimeZones(r.superMenuTimeZones),
-    superMenuFlipClock: (r.superMenuFlipClock === false || r.superMenuFlipClock === "0" || r.superMenuFlipClock === "off" || r.superMenuFlipClock === "false") ? false : true
+    superMenuFlipClock: (r.superMenuFlipClock === false || r.superMenuFlipClock === "0" || r.superMenuFlipClock === "off" || r.superMenuFlipClock === "false") ? false : true,
+    superMenuLayout: normalizeMenuLayout(r.superMenuLayout)
   }
 }
 
@@ -624,6 +625,91 @@ function sanitizeCurrency(s) {
 
 function sanitizeWeekStart(s) {
   return String(s || "").toLowerCase() === "monday" ? "monday" : "sunday"
+}
+
+// Super Menu columns. Each section id appears once. Missing ids return to
+// their default column so a partial save cannot hide All / Pinned / Agents.
+var MENU_COLUMNS = ["left", "center", "right"]
+var MENU_SECTION_IDS = ["apps", "pinned", "agents", "clocks", "weather", "calendar", "files", "crypto", "rss", "news", "alerts"]
+
+function defaultMenuLayout() {
+  return {
+    left: ["apps"],
+    center: ["pinned", "agents"],
+    right: ["clocks", "weather", "calendar", "files", "crypto", "rss", "news", "alerts"]
+  }
+}
+
+function normalizeMenuLayout(raw) {
+  var def = defaultMenuLayout()
+  var known = {}
+  var i
+  for (i = 0; i < MENU_SECTION_IDS.length; i++) known[MENU_SECTION_IDS[i]] = true
+  var out = { left: [], center: [], right: [] }
+  var seen = {}
+  var src = raw && typeof raw === "object" ? raw : {}
+  var c, col, list, id
+  for (c = 0; c < MENU_COLUMNS.length; c++) {
+    col = MENU_COLUMNS[c]
+    list = Object.prototype.toString.call(src[col]) === "[object Array]" ? src[col] : []
+    for (i = 0; i < list.length; i++) {
+      id = String(list[i] || "")
+      if (!known[id] || seen[id]) continue
+      seen[id] = true
+      out[col].push(id)
+    }
+  }
+  for (c = 0; c < MENU_COLUMNS.length; c++) {
+    col = MENU_COLUMNS[c]
+    list = def[col]
+    for (i = 0; i < list.length; i++) {
+      id = list[i]
+      if (seen[id]) continue
+      seen[id] = true
+      out[col].push(id)
+    }
+  }
+  return out
+}
+
+function moveMenuSection(layout, id, column, index) {
+  var cur = normalizeMenuLayout(layout)
+  id = String(id || "")
+  if (MENU_SECTION_IDS.indexOf(id) < 0) return cur
+  if (MENU_COLUMNS.indexOf(column) < 0) return cur
+  var c, i, list, next
+  for (c = 0; c < MENU_COLUMNS.length; c++) {
+    list = cur[MENU_COLUMNS[c]]
+    next = []
+    for (i = 0; i < list.length; i++) if (list[i] !== id) next.push(list[i])
+    cur[MENU_COLUMNS[c]] = next
+  }
+  var dest = cur[column].slice()
+  var idx = parseInt(index, 10)
+  if (!(idx >= 0)) idx = dest.length
+  if (idx > dest.length) idx = dest.length
+  dest.splice(idx, 0, id)
+  cur[column] = dest
+  return cur
+}
+
+function menuSectionColumn(layout, id) {
+  var cur = normalizeMenuLayout(layout)
+  id = String(id || "")
+  var c
+  for (c = 0; c < MENU_COLUMNS.length; c++) {
+    if (cur[MENU_COLUMNS[c]].indexOf(id) >= 0) return MENU_COLUMNS[c]
+  }
+  return ""
+}
+
+function menuSectionTitle(id) {
+  var titles = {
+    apps: "All apps", pinned: "Pinned", agents: "Agents", clocks: "Clocks",
+    weather: "Weather", calendar: "Calendar", files: "Recommended",
+    crypto: "Crypto", rss: "RSS", news: "News", alerts: "Alerts"
+  }
+  return titles[String(id || "")] || ""
 }
 
 function listWithout(list, value) {
@@ -990,6 +1076,39 @@ function weatherLabel(code) {
   return "—"
 }
 
+function parseGeo(body) {
+  var j = null
+  try { j = JSON.parse(String(body === undefined || body === null ? "" : body)) } catch (e) { j = null }
+  if (!j || typeof j !== "object" || j.success === false) return null
+  var lat = Number(j.latitude)
+  var lon = Number(j.longitude)
+  if (!isFinite(lat) || !isFinite(lon)) return null
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null
+  var city = String(j.city || "").replace(/[\r\n\t]/g, " ").trim()
+  if (city.length > 40) city = city.slice(0, 40)
+  return { lat: lat, lon: lon, city: city }
+}
+
+function formatWeatherLine(city, temp, code) {
+  var t = Number(temp)
+  if (!isFinite(t)) return "Weather unavailable"
+  var label = weatherLabel(code)
+  var cityText = String(city || "").replace(/[\r\n\t]/g, " ").trim()
+  var head = Math.round(t) + "°"
+  if (label && label !== "—") head += " · " + label
+  if (cityText) head += " · " + cityText
+  return head
+}
+
+function parseToggleStatus(kind, text, exitCode) {
+  var k = String(kind || "")
+  if (k === "focus") return { on: Number(exitCode) === 0 }
+  var j = null
+  try { j = JSON.parse(String(text === undefined || text === null ? "" : text)) } catch (e) { j = null }
+  var on = !!(j && typeof j === "object" && j.enabled === true)
+  return { on: on }
+}
+
 function sanitizeAppId(id) {
   var s = String(id || "").trim()
   if (s.slice(-8).toLowerCase() === ".desktop") s = s.slice(0, -8)
@@ -1201,6 +1320,73 @@ function frecencyRank(launches, nowMs, limit) {
   }
   items.sort(function(a, b) { return b.score - a.score })
   return items.slice(0, cap)
+}
+
+// Start-menu search: a name or id that starts with the query ranks above one
+// that merely contains it. An empty query keeps the caller's order.
+function rankMenuApps(apps, query) {
+  var list = apps && typeof apps.length === "number" ? apps : []
+  var q = String(query || "").toLowerCase().trim()
+  var same = []
+  var i
+  if (!q) {
+    for (i = 0; i < list.length; i++) {
+      if (list[i]) same.push(list[i])
+    }
+    return same
+  }
+  var prefix = []
+  var contains = []
+  for (i = 0; i < list.length; i++) {
+    var a = list[i]
+    if (!a) continue
+    var name = String(a.name || "").toLowerCase()
+    var id = String(a.appId || "").toLowerCase()
+    var nameHit = name.indexOf(q)
+    var idHit = id.indexOf(q)
+    if (nameHit < 0 && idHit < 0) continue
+    if (nameHit === 0 || idHit === 0) prefix.push(a)
+    else contains.push(a)
+  }
+  return prefix.concat(contains)
+}
+
+// Keyboard cursor for the visible app list. Wraps. An empty list has no row.
+function stepMenuIndex(index, delta, count) {
+  var n = Number(count) || 0
+  if (n <= 0) return -1
+  var i = Number(index)
+  if (!isFinite(i)) i = 0
+  var d = Number(delta) || 0
+  var next = i + d
+  return ((next % n) + n) % n
+}
+
+// Power flyout. Lock runs immediately; the rest need the confirm sheet.
+function powerActions() {
+  return [
+    { id: "lock", label: "Lock", confirm: false },
+    { id: "suspend", label: "Suspend", confirm: true },
+    { id: "reboot", label: "Reboot", confirm: true },
+    { id: "shutdown", label: "Shut down", confirm: true }
+  ]
+}
+
+// Pinned tile grid: height follows the row count so a handful of pins does
+// not reserve a 360 px hole. Zero pins collapse the grid.
+function pinnedGridHeight(count, cols, cellH, minH, maxH) {
+  var n = Number(count) || 0
+  if (n <= 0) return 0
+  var c = Number(cols) || 1
+  if (c < 1) c = 1
+  var h = Number(cellH) || 0
+  var min = Number(minH) || 0
+  var max = Number(maxH)
+  if (!(max > 0)) max = 100000
+  var px = Math.ceil(n / c) * h
+  if (px < min) px = min
+  if (px > max) px = max
+  return px
 }
 
 function normalizePinned(list) {
@@ -1655,14 +1841,17 @@ if (typeof module !== "undefined" && module.exports) {
  desktopEntryIdFor: desktopEntryIdFor,
  appLetter: appLetter, decodeFileUrl: decodeFileUrl, fileBasename: fileBasename, fileIconNames: fileIconNames,
  parseRecentlyUsed: parseRecentlyUsed, relativeTime: relativeTime,
- parseRssItems: parseRssItems, weatherLabel: weatherLabel, sanitizeHttpUrl: sanitizeHttpUrl, sanitizeCsvIds: sanitizeCsvIds,
- sanitizeUrlList: sanitizeUrlList, sanitizeCurrency: sanitizeCurrency, sanitizeWeekStart: sanitizeWeekStart,
- listWithout: listWithout, csvToggleId: csvToggleId, csvAddId: csvAddId, calendarMonth: calendarMonth, currencyPrefix: currencyPrefix,
+ parseRssItems: parseRssItems, weatherLabel: weatherLabel, parseGeo: parseGeo, formatWeatherLine: formatWeatherLine, parseToggleStatus: parseToggleStatus, sanitizeHttpUrl: sanitizeHttpUrl, sanitizeCsvIds: sanitizeCsvIds,
+ sanitizeUrlList: sanitizeUrlList, sanitizeCurrency: sanitizeCurrency,    sanitizeWeekStart: sanitizeWeekStart,
+    defaultMenuLayout: defaultMenuLayout, normalizeMenuLayout: normalizeMenuLayout, moveMenuSection: moveMenuSection,
+    menuSectionColumn: menuSectionColumn, menuSectionTitle: menuSectionTitle,
+    listWithout: listWithout, csvToggleId: csvToggleId, csvAddId: csvAddId, calendarMonth: calendarMonth, currencyPrefix: currencyPrefix,
  sanitizeHourCycle: sanitizeHourCycle, sanitizeDateOrder: sanitizeDateOrder, sanitizeTimeZone: sanitizeTimeZone,
  sanitizeTimeZones: sanitizeTimeZones, clockRow: clockRow,
  normalizeAppointment: normalizeAppointment, normalizeAppointments: normalizeAppointments, appointmentsOnDate: appointmentsOnDate,
  upsertAppointment: upsertAppointment, removeAppointment: removeAppointment, parseIcsEvents: parseIcsEvents, mergeAppointments: mergeAppointments,
  recordLaunch: recordLaunch, frecencyRank: frecencyRank,
+ rankMenuApps: rankMenuApps, stepMenuIndex: stepMenuIndex, powerActions: powerActions, pinnedGridHeight: pinnedGridHeight,
  normalizeAddress: normalizeAddress, isParkedWorkspace: isParkedWorkspace, buildDockItems: buildDockItems,
  parseWpctlVolume: parseWpctlVolume, parseBrightness: parseBrightness, notifMatchesApp: notifMatchesApp,
     TAB_CYCLE_FALLTHROUGH: TAB_CYCLE_FALLTHROUGH,

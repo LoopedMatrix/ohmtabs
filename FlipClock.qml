@@ -7,6 +7,9 @@ Item {
   property var digits: ["0", "0", "0", "0"]
   property string ap: ""
   property int tile: 26
+  property color ink: "#f4e4b8"
+  property color plate: "#16130f"
+  property color seam: "#4a4034"
   implicitWidth: row.implicitWidth
   implicitHeight: tile
 
@@ -15,22 +18,22 @@ Item {
     spacing: 3
     height: root.tile
 
-    FlipTile { digit: (root.digits && root.digits[0]) ? root.digits[0] : "0"; size: root.tile }
-    FlipTile { digit: (root.digits && root.digits[1]) ? root.digits[1] : "0"; size: root.tile }
+    FlipTile { digit: (root.digits && root.digits[0]) ? root.digits[0] : "0"; size: root.tile; ink: root.ink; plate: root.plate; seam: root.seam }
+    FlipTile { digit: (root.digits && root.digits[1]) ? root.digits[1] : "0"; size: root.tile; ink: root.ink; plate: root.plate; seam: root.seam }
     Text {
       text: ":"
-      color: "#e6d3a3"
+      color: root.ink
       font.pixelSize: Math.round(root.tile * 0.7)
       font.family: "monospace"
       font.weight: Font.DemiBold
       anchors.verticalCenter: parent.verticalCenter
     }
-    FlipTile { digit: (root.digits && root.digits[2]) ? root.digits[2] : "0"; size: root.tile }
-    FlipTile { digit: (root.digits && root.digits[3]) ? root.digits[3] : "0"; size: root.tile }
+    FlipTile { digit: (root.digits && root.digits[2]) ? root.digits[2] : "0"; size: root.tile; ink: root.ink; plate: root.plate; seam: root.seam }
+    FlipTile { digit: (root.digits && root.digits[3]) ? root.digits[3] : "0"; size: root.tile; ink: root.ink; plate: root.plate; seam: root.seam }
     Text {
       visible: root.ap !== ""
       text: root.ap
-      color: "#e6d3a3"
+      color: root.ink
       font.pixelSize: 9
       font.family: "monospace"
       font.weight: Font.DemiBold
@@ -42,16 +45,19 @@ Item {
   component FlipTile: Rectangle {
     property string digit: "0"
     property int size: 26
+    property color ink: "#f4e4b8"
+    property color plate: "#16130f"
+    property color seam: "#4a4034"
     width: Math.round(size * 0.72)
     height: size
-    radius: 3
-    color: "#16130f"
-    border.color: "#4a4034"
+    radius: 4
+    color: plate
+    border.color: seam
     border.width: 1
     Text {
       anchors.centerIn: parent
       text: parent.digit
-      color: "#f4e4b8"
+      color: parent.ink
       font.family: "monospace"
       font.pixelSize: Math.round(parent.size * 0.62)
       font.weight: Font.DemiBold

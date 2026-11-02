@@ -11,11 +11,12 @@ Item {
   property var settings: ({})
 
   signal closeRequested()
+  signal backRequested()
 
-  readonly property color fg: Color.menu.text
+  readonly property color fg: Color.menu ? Color.menu.text : "#c0caf5"
   readonly property color muted: Qt.rgba(fg.r, fg.g, fg.b, 0.55)
-  readonly property color card: Color.menu.background
-  readonly property color stroke: Color.accent
+  readonly property color card: Color.menu ? Color.menu.background : "#1a1b26"
+  readonly property color stroke: Color.accent !== undefined ? Color.accent : "#7aa2f7"
   readonly property color groupFill: Qt.rgba(fg.r, fg.g, fg.b, 0.06)
   readonly property string fontFamily: Style.font.menuFamily
   readonly property int radius: Math.max(12, Style.cornerRadius)
@@ -23,6 +24,29 @@ Item {
   function save(patch) {
     if (ui.service && typeof ui.service.saveSettings === "function")
       ui.service.saveSettings(patch)
+  }
+
+  function layoutOf() {
+    return Model.normalizeMenuLayout(ui.settings && ui.settings.superMenuLayout)
+  }
+
+  function moveToColumn(id, column) {
+    var layout = ui.layoutOf()
+    if (Model.menuSectionColumn(layout, id) === column) return
+    var dest = layout[column] || []
+    ui.save({ superMenuLayout: Model.moveMenuSection(layout, id, column, dest.length) })
+  }
+
+  function nudgeSection(id, dir) {
+    var layout = ui.layoutOf()
+    var col = Model.menuSectionColumn(layout, id)
+    var list = layout[col] || []
+    var index = list.indexOf(id)
+    if (index < 0) return
+    if (dir === "up" && index > 0)
+      ui.save({ superMenuLayout: Model.moveMenuSection(layout, id, col, index - 1) })
+    else if (dir === "down" && index < list.length - 1)
+      ui.save({ superMenuLayout: Model.moveMenuSection(layout, id, col, index + 1) })
   }
 
   function feeds(kind) {
@@ -80,6 +104,19 @@ Item {
         font.weight: Font.DemiBold
       }
       Rectangle {
+        id: menuBack
+        anchors.right: closeBtn.left
+        anchors.rightMargin: 6
+        anchors.verticalCenter: parent.verticalCenter
+        width: backLab.implicitWidth + 16
+        height: 28
+        radius: 14
+        color: backArea.containsMouse ? Qt.rgba(ui.fg.r, ui.fg.g, ui.fg.b, 0.12) : "transparent"
+        Text { id: backLab; anchors.centerIn: parent; text: "Menu"; color: ui.fg; font.pixelSize: 11; font.weight: Font.DemiBold }
+        MouseArea { id: backArea; anchors.fill: parent; hoverEnabled: true; onClicked: ui.backRequested() }
+      }
+      Rectangle {
+        id: closeBtn
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         width: 28
@@ -93,14 +130,53 @@ Item {
 
     Text {
       width: parent.width
-      text: "Widgets stay off until you turn them on. Feeds and coins are saved in OhmTabs plugin settings."
+      text: "This panel is Super Menu only. Dock settings stay in the other menu. Arrange in the menu, or move a section here."
       wrapMode: Text.WordWrap
       color: ui.muted
       font.family: ui.fontFamily
       font.pixelSize: Style.font.caption
     }
 
-    SmToggle { title: "Recommended files"; hint: "Recent files in the right column."; checked: ui.settings.superMenuRecommended !== false; onToggled: ui.save({ superMenuRecommended: ui.settings.superMenuRecommended === false }) }
+    Text { text: "Layout"; color: ui.fg; font.family: ui.fontFamily; font.pixelSize: 12; font.weight: Font.DemiBold }
+    Repeater {
+      model: ["apps", "pinned", "agents", "clocks", "weather", "calendar", "files", "crypto", "rss", "news", "alerts"]
+      delegate: Rectangle {
+        id: layRow
+        required property string modelData
+        readonly property string sectionCol: Model.menuSectionColumn(ui.layoutOf(), modelData)
+        width: col.width
+        implicitHeight: layCol.implicitHeight + 12
+        height: implicitHeight
+        radius: 10
+        color: ui.groupFill
+        Column {
+          id: layCol
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.margins: 8
+          spacing: 4
+          Text {
+            text: Model.menuSectionTitle(layRow.modelData)
+            color: ui.fg
+            font.family: ui.fontFamily
+            font.pixelSize: 12
+            font.weight: Font.DemiBold
+          }
+          Row {
+            spacing: 4
+            SmChip { label: "Left"; on: layRow.sectionCol === "left"; onPicked: ui.moveToColumn(layRow.modelData, "left") }
+            SmChip { label: "Center"; on: layRow.sectionCol === "center"; onPicked: ui.moveToColumn(layRow.modelData, "center") }
+            SmChip { label: "Right"; on: layRow.sectionCol === "right"; onPicked: ui.moveToColumn(layRow.modelData, "right") }
+            SmChip { label: "Up"; on: false; onPicked: ui.nudgeSection(layRow.modelData, "up") }
+            SmChip { label: "Down"; on: false; onPicked: ui.nudgeSection(layRow.modelData, "down") }
+          }
+        }
+      }
+    }
+    SmChip { label: "Reset layout"; on: false; onPicked: ui.save({ superMenuLayout: Model.defaultMenuLayout() }) }
+
+    SmToggle { title: "Recommended files"; hint: "Recent files. Move the section in Layout."; checked: ui.settings.superMenuRecommended !== false; onToggled: ui.save({ superMenuRecommended: ui.settings.superMenuRecommended === false }) }
     SmToggle { title: "Calendar"; hint: "Month grid for today."; checked: ui.settings.superMenuCalendar === true; onToggled: ui.save({ superMenuCalendar: !ui.settings.superMenuCalendar }) }
     SmToggle { title: "Weather"; hint: "Local temperature via Open-Meteo."; checked: ui.settings.superMenuWeather === true; onToggled: ui.save({ superMenuWeather: !ui.settings.superMenuWeather }) }
     SmToggle { title: "World clock"; hint: "Local time and UTC."; checked: ui.settings.superMenuWorldClock === true; onToggled: ui.save({ superMenuWorldClock: !ui.settings.superMenuWorldClock }) }

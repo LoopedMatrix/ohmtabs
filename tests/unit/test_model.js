@@ -229,8 +229,8 @@ test("originLabel and statusSummary", () => {
 
 test("normalizeSettings validates and bounds; readOwnEntry finds the plugin entry", () => {
   const s = M.normalizeSettings({ enabled: false, buttonsLeft: true, controlSize: "huge", excludedClasses: ["chromium", "bad class; rm", "chromium", 42] })
-  assert.deepStrictEqual(s, { enabled: false, buttonsLeft: true, showOnHover: false, controlSize: "standard", excludedClasses: ["chromium", "badclassrm", "42"], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: false, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill", pinnedApps: [], showAppsButton: true, dockDodge: false, showRunning: true, showWorkspaces: false, showClock: false, showNotifs: false, showDashboard: false, showOsd: false, showStatus: false, showActiveWindow: false, workspaceCount: 5, superMenuRecommended: true, superMenuWeather: false, superMenuCalendar: false, superMenuRss: false, superMenuNews: false, superMenuCrypto: false, superMenuAlerts: false, superMenuWorldClock: false, superMenuRssUrl: "https://hnrss.org/frontpage", superMenuNewsUrl: "https://feeds.bbci.co.uk/news/rss.xml", superMenuCryptoIds: "bitcoin,ethereum,solana", superMenuRssFeeds: ["https://hnrss.org/frontpage"], superMenuNewsFeeds: ["https://feeds.bbci.co.uk/news/rss.xml"], superMenuCurrency: "usd", superMenuWeekStart: "sunday", superMenuCalIcsUrl: "", superMenuHourCycle: "24", superMenuDateOrder: "dmy", superMenuTimeZones: ["Local"], superMenuFlipClock: true })
-  assert.deepStrictEqual(M.normalizeSettings(null), { enabled: true, buttonsLeft: false, showOnHover: false, controlSize: "standard", excludedClasses: [], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: false, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill", pinnedApps: [], showAppsButton: true, dockDodge: false, showRunning: true, showWorkspaces: false, showClock: false, showNotifs: false, showDashboard: false, showOsd: false, showStatus: false, showActiveWindow: false, workspaceCount: 5, superMenuRecommended: true, superMenuWeather: false, superMenuCalendar: false, superMenuRss: false, superMenuNews: false, superMenuCrypto: false, superMenuAlerts: false, superMenuWorldClock: false, superMenuRssUrl: "https://hnrss.org/frontpage", superMenuNewsUrl: "https://feeds.bbci.co.uk/news/rss.xml", superMenuCryptoIds: "bitcoin,ethereum,solana", superMenuRssFeeds: ["https://hnrss.org/frontpage"], superMenuNewsFeeds: ["https://feeds.bbci.co.uk/news/rss.xml"], superMenuCurrency: "usd", superMenuWeekStart: "sunday", superMenuCalIcsUrl: "", superMenuHourCycle: "24", superMenuDateOrder: "dmy", superMenuTimeZones: ["Local"], superMenuFlipClock: true })
+  assert.deepStrictEqual(s, { enabled: false, buttonsLeft: true, showOnHover: false, controlSize: "standard", excludedClasses: ["chromium", "badclassrm", "42"], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: false, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill", pinnedApps: [], showAppsButton: true, dockDodge: false, showRunning: true, showWorkspaces: false, showClock: false, showNotifs: false, showDashboard: false, showOsd: false, showStatus: false, showActiveWindow: false, workspaceCount: 5, superMenuRecommended: true, superMenuWeather: false, superMenuCalendar: false, superMenuRss: false, superMenuNews: false, superMenuCrypto: false, superMenuAlerts: false, superMenuWorldClock: false, superMenuRssUrl: "https://hnrss.org/frontpage", superMenuNewsUrl: "https://feeds.bbci.co.uk/news/rss.xml", superMenuCryptoIds: "bitcoin,ethereum,solana", superMenuRssFeeds: ["https://hnrss.org/frontpage"], superMenuNewsFeeds: ["https://feeds.bbci.co.uk/news/rss.xml"], superMenuCurrency: "usd", superMenuWeekStart: "sunday", superMenuCalIcsUrl: "", superMenuHourCycle: "24", superMenuDateOrder: "dmy", superMenuTimeZones: ["Local"], superMenuFlipClock: true, superMenuLayout: { left: ["apps"], center: ["pinned", "agents"], right: ["clocks", "weather", "calendar", "files", "crypto", "rss", "news", "alerts"] } })
+  assert.deepStrictEqual(M.normalizeSettings(null), { enabled: true, buttonsLeft: false, showOnHover: false, controlSize: "standard", excludedClasses: [], tabGroups: false, sidePanel: true, panelPosition: "bottom", panelAutoHide: false, barWindowControls: false, iconSize: 38, tintIcons: false, showIconName: false, magnify: true, iconZoom: 0.48, panelBorder: true, panelBorderOpacity: 0.95, panelBgOpacity: 0.78, fullLength: false, cornerShape: "pill", pinnedApps: [], showAppsButton: true, dockDodge: false, showRunning: true, showWorkspaces: false, showClock: false, showNotifs: false, showDashboard: false, showOsd: false, showStatus: false, showActiveWindow: false, workspaceCount: 5, superMenuRecommended: true, superMenuWeather: false, superMenuCalendar: false, superMenuRss: false, superMenuNews: false, superMenuCrypto: false, superMenuAlerts: false, superMenuWorldClock: false, superMenuRssUrl: "https://hnrss.org/frontpage", superMenuNewsUrl: "https://feeds.bbci.co.uk/news/rss.xml", superMenuCryptoIds: "bitcoin,ethereum,solana", superMenuRssFeeds: ["https://hnrss.org/frontpage"], superMenuNewsFeeds: ["https://feeds.bbci.co.uk/news/rss.xml"], superMenuCurrency: "usd", superMenuWeekStart: "sunday", superMenuCalIcsUrl: "", superMenuHourCycle: "24", superMenuDateOrder: "dmy", superMenuTimeZones: ["Local"], superMenuFlipClock: true, superMenuLayout: { left: ["apps"], center: ["pinned", "agents"], right: ["clocks", "weather", "calendar", "files", "crypto", "rss", "news", "alerts"] } })
   const doc = JSON.stringify({ bar: { layout: { left: [{ id: "x" }], right: [{ id: "tech.loopedmatrix.ohmtabs", controlSize: "large", excludedClasses: ["foot"] }] } } })
   assert.deepStrictEqual(M.readOwnEntry(doc, "tech.loopedmatrix.ohmtabs"), { controlSize: "large", excludedClasses: ["foot"] })
   assert.strictEqual(M.readOwnEntry(doc, "nope"), null)
@@ -754,6 +754,87 @@ test("recordLaunch and frecencyRank half-life", () => {
   assert.strictEqual(ranked[0].n, 2)
   const old = M.frecencyRank({ a: { n: 10, last: t0 }, b: { n: 2, last: t0 + 42 * 86400000 } }, t0 + 42 * 86400000, 2)
   assert.strictEqual(old[0].appId, "b")
+})
+
+test("rankMenuApps puts prefix matches before contains and drops misses", () => {
+  const apps = [
+    { appId: "avahi", name: "Avahi Browser" },
+    { appId: "brave-browser", name: "Brave" },
+    { appId: "files", name: "Files" }
+  ]
+  const ranked = M.rankMenuApps(apps, "br")
+  assert.deepStrictEqual(ranked.map(a => a.appId), ["brave-browser", "avahi"])
+  assert.deepStrictEqual(M.rankMenuApps(apps, "").map(a => a.appId), ["avahi", "brave-browser", "files"])
+  assert.deepStrictEqual(M.rankMenuApps(null, "br"), [])
+  assert.deepStrictEqual(M.rankMenuApps(apps, "   ").map(a => a.name), ["Avahi Browser", "Brave", "Files"])
+})
+
+test("stepMenuIndex wraps and rejects an empty list", () => {
+  assert.strictEqual(M.stepMenuIndex(0, 1, 3), 1)
+  assert.strictEqual(M.stepMenuIndex(2, 1, 3), 0)
+  assert.strictEqual(M.stepMenuIndex(0, -1, 3), 2)
+  assert.strictEqual(M.stepMenuIndex(Number.NaN, 1, 4), 1)
+  assert.strictEqual(M.stepMenuIndex(0, 1, 0), -1)
+})
+
+test("powerActions confirms destructive rows and not lock", () => {
+  const rows = M.powerActions()
+  assert.deepStrictEqual(rows.map(r => r.id), ["lock", "suspend", "reboot", "shutdown"])
+  assert.strictEqual(rows[0].confirm, false)
+  assert.strictEqual(rows[0].label, "Lock")
+  assert.strictEqual(rows[3].confirm, true)
+  assert.strictEqual(rows[3].label, "Shut down")
+})
+
+test("pinnedGridHeight sizes to rows and clamps", () => {
+  assert.strictEqual(M.pinnedGridHeight(0, 4, 88, 0, 264), 0)
+  assert.strictEqual(M.pinnedGridHeight(6, 4, 88, 0, 264), 176)
+  assert.strictEqual(M.pinnedGridHeight(20, 4, 88, 0, 264), 264)
+  assert.strictEqual(M.pinnedGridHeight(1, 0, 88, 40, 264), 88)
+})
+
+test("parseToggleStatus reads nightlight and idle JSON, focus exit code", () => {
+  assert.strictEqual(M.parseToggleStatus("nightlight", "{\"enabled\":false,\"temperature\":6500}", 0).on, false)
+  assert.strictEqual(M.parseToggleStatus("idle", "{\"enabled\":true,\"class\":\"enabled\"}", 0).on, true)
+  assert.strictEqual(M.parseToggleStatus("focus", "", 0).on, true)
+  assert.strictEqual(M.parseToggleStatus("focus", "", 1).on, false)
+  assert.strictEqual(M.parseToggleStatus("nightlight", "not-json", 0).on, false)
+  assert.strictEqual(M.parseToggleStatus("idle", "", 0).on, false)
+})
+
+test("parseGeo accepts a city fix and rejects a failed lookup", () => {
+  const geo = M.parseGeo("{\"success\":true,\"latitude\":-33.87,\"longitude\":151.21,\"city\":\"Sydney\"}")
+  assert.strictEqual(geo.city, "Sydney")
+  assert.strictEqual(geo.lat, -33.87)
+  assert.strictEqual(M.parseGeo("{\"success\":false}"), null)
+  assert.strictEqual(M.parseGeo("nope"), null)
+  assert.strictEqual(M.parseGeo("{\"latitude\":999,\"longitude\":0}"), null)
+})
+
+test("formatWeatherLine never sticks on Loading", () => {
+  assert.strictEqual(M.formatWeatherLine("Sydney", 18.2, 0), "18° · Clear · Sydney")
+  assert.strictEqual(M.formatWeatherLine("", 18, 0), "18° · Clear")
+  assert.strictEqual(M.formatWeatherLine("Sydney", "nope", 0), "Weather unavailable")
+})
+
+test("moveMenuSection drags a widget into another column without losing the rest", () => {
+  const moved = M.moveMenuSection(M.defaultMenuLayout(), "weather", "center", 0)
+  assert.deepStrictEqual(moved.center, ["weather", "pinned", "agents"])
+  assert.ok(moved.right.indexOf("weather") === -1)
+  assert.ok(moved.left.indexOf("apps") === 0)
+  assert.strictEqual(moved.right.length, 7)
+  assert.deepStrictEqual(M.moveMenuSection(moved, "nope", "left", 0), moved)
+  assert.deepStrictEqual(M.moveMenuSection(moved, "weather", "up", 0), moved)
+})
+
+test("normalizeSettings keeps a Super Menu layout and drops unknown sections", () => {
+  const custom = M.moveMenuSection(null, "apps", "right", 0)
+  const n = M.normalizeSettings({ superMenuLayout: { left: ["javascript:alert(1)", "weather"], center: [], right: ["apps", "apps"] } })
+  assert.deepStrictEqual(n.superMenuLayout.left, ["weather"])
+  assert.strictEqual(n.superMenuLayout.right[0], "apps")
+  assert.strictEqual(M.menuSectionColumn(n.superMenuLayout, "pinned"), "center")
+  assert.strictEqual(M.menuSectionTitle("files"), "Recommended")
+  assert.deepStrictEqual(M.normalizeSettings({ superMenuLayout: custom }).superMenuLayout, custom)
 })
 
 console.log("test_model: " + passed + " passed")

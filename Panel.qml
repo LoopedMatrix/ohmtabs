@@ -36,16 +36,20 @@ Item {
   property bool confirmClose: false
   property bool showTechnical: false
 
-  readonly property color background: Color.menu.background
-  readonly property color foreground: Color.menu.text
-  readonly property color border: Color.menu.border
-  readonly property color scrim: Color.menu.scrim
-  readonly property color selectedBackground: Color.menu.selectedBackground
-  readonly property color selectedText: Color.menu.selectedText
+  // Color.menu / Color.bar are undefined for the first evaluation. A thrown
+  // read breaks the binding, and a color property then stays #000000 — the
+  // Super Menu paints a black card with invisible text. Keep the read in this
+  // expression (not a function) so it tracks Color and updates when it loads.
+  readonly property color background: Color.menu ? Color.menu.background : "#1a1b26"
+  readonly property color foreground: Color.menu ? Color.menu.text : "#c0caf5"
+  readonly property color border: Color.menu ? Color.menu.border : "#7aa2f7"
+  readonly property color scrim: Color.menu ? Color.menu.scrim : "#000000"
+  readonly property color selectedBackground: Color.menu ? Color.menu.selectedBackground : "#7aa2f7"
+  readonly property color selectedText: Color.menu ? Color.menu.selectedText : "#c0caf5"
   readonly property color muted: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.55)
-  readonly property color accent: Color.accent
-  readonly property color barBackground: Color.bar.background
-  readonly property color barForeground: Color.bar.text
+  readonly property color accent: Color.accent !== undefined ? Color.accent : "#7aa2f7"
+  readonly property color barBackground: Color.bar ? Color.bar.background : "#1a1b26"
+  readonly property color barForeground: Color.bar ? Color.bar.text : "#c0caf5"
   readonly property real glass: {
     var n = settings && settings.panelBgOpacity !== undefined ? Number(settings.panelBgOpacity) : 0.78
     if (!(n >= 0.15)) n = 0.78
@@ -618,6 +622,7 @@ Item {
           service: root.service
           settings: root.settings
           onCloseRequested: root.dismiss()
+          onBackRequested: root.switchView("supermenu")
         }
       }
     }
