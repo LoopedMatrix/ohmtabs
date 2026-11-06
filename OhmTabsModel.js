@@ -10,6 +10,7 @@ var PROTOCOL = 1
 var JOURNAL_SCHEMA = 1
 var JOURNAL_MAX_BYTES = 262144
 var JOURNAL_MAX_ENTRIES = 256
+var REMOTE_BODY_MAX_BYTES = 1048576
 var OWNED_WORKSPACE = "special:ohmtabs-minimized"
 var LABEL_MAX = 96
 var CLASS_MAX = 128
@@ -1824,10 +1825,29 @@ function notifMatchesApp(notif, appId) {
   return false
 }
 
+// Widget feeds share the shell process. Drop a body before it is parsed.
+function contentLengthOverCeiling(header, maxBytes) {
+  var cap = maxBytes > 0 ? maxBytes : REMOTE_BODY_MAX_BYTES
+  var raw = String(header === undefined || header === null ? "" : header).replace(/^\s+|\s+$/g, "")
+  if (!/^[0-9]+$/.test(raw)) return false
+  var n = parseInt(raw, 10)
+  return isFinite(n) && n > cap
+}
+
+function remoteBodyOverCeiling(text, maxBytes) {
+  var cap = maxBytes > 0 ? maxBytes : REMOTE_BODY_MAX_BYTES
+  return String(text === undefined || text === null ? "" : text).length > cap
+}
+
+function boundedRemoteBody(text, maxBytes) {
+  if (remoteBodyOverCeiling(text, maxBytes)) return ""
+  return String(text === undefined || text === null ? "" : text)
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PLUGIN_ID: PLUGIN_ID, PROTOCOL: PROTOCOL, JOURNAL_SCHEMA: JOURNAL_SCHEMA, JOURNAL_MAX_BYTES: JOURNAL_MAX_BYTES,
-    JOURNAL_MAX_ENTRIES: JOURNAL_MAX_ENTRIES, OWNED_WORKSPACE: OWNED_WORKSPACE,
+    JOURNAL_MAX_ENTRIES: JOURNAL_MAX_ENTRIES, OWNED_WORKSPACE: OWNED_WORKSPACE, REMOTE_BODY_MAX_BYTES: REMOTE_BODY_MAX_BYTES,
     encodeField: encodeField, decodeField: decodeField, buildLine: buildLine, parseLine: parseLine,
     isToken: isToken, isRequestId: isRequestId, normalizeWorkspace: normalizeWorkspace, isSpecialWorkspace: isSpecialWorkspace,
     sanitizeLabel: sanitizeLabel, sanitizeClass: sanitizeClass, clampInt: clampInt, flag: flag,
@@ -1854,6 +1874,7 @@ if (typeof module !== "undefined" && module.exports) {
  rankMenuApps: rankMenuApps, stepMenuIndex: stepMenuIndex, powerActions: powerActions, pinnedGridHeight: pinnedGridHeight,
  normalizeAddress: normalizeAddress, isParkedWorkspace: isParkedWorkspace, buildDockItems: buildDockItems,
  parseWpctlVolume: parseWpctlVolume, parseBrightness: parseBrightness, notifMatchesApp: notifMatchesApp,
+ contentLengthOverCeiling: contentLengthOverCeiling, remoteBodyOverCeiling: remoteBodyOverCeiling, boundedRemoteBody: boundedRemoteBody,
     TAB_CYCLE_FALLTHROUGH: TAB_CYCLE_FALLTHROUGH,
     createGroup: createGroup, removeGroup: removeGroup, addMember: addMember, removeMember: removeMember,
     moveMember: moveMember, getActiveMember: getActiveMember, setActiveMember: setActiveMember,

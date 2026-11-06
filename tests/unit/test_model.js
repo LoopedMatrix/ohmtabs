@@ -817,6 +817,22 @@ test("formatWeatherLine never sticks on Loading", () => {
   assert.strictEqual(M.formatWeatherLine("Sydney", "nope", 0), "Weather unavailable")
 })
 
+test("remote widget bodies are dropped once they pass the receive ceiling", () => {
+  assert.strictEqual(M.REMOTE_BODY_MAX_BYTES, 1048576)
+  assert.strictEqual(M.contentLengthOverCeiling("1048577"), true)
+  assert.strictEqual(M.contentLengthOverCeiling("1048576"), false)
+  assert.strictEqual(M.contentLengthOverCeiling("  12 "), false)
+  assert.strictEqual(M.contentLengthOverCeiling(""), false)
+  assert.strictEqual(M.contentLengthOverCeiling("nope"), false)
+  assert.strictEqual(M.contentLengthOverCeiling(null), false)
+  assert.strictEqual(M.remoteBodyOverCeiling("x".repeat(M.REMOTE_BODY_MAX_BYTES + 1)), true)
+  assert.strictEqual(M.remoteBodyOverCeiling("x".repeat(M.REMOTE_BODY_MAX_BYTES)), false)
+  assert.strictEqual(M.remoteBodyOverCeiling(""), false)
+  assert.strictEqual(M.boundedRemoteBody("x".repeat(M.REMOTE_BODY_MAX_BYTES + 1)), "")
+  assert.strictEqual(M.boundedRemoteBody("<?xml version=\"1.0\"?><rss/>"), "<?xml version=\"1.0\"?><rss/>")
+  assert.strictEqual(M.boundedRemoteBody(null), "")
+})
+
 test("moveMenuSection drags a widget into another column without losing the rest", () => {
   const moved = M.moveMenuSection(M.defaultMenuLayout(), "weather", "center", 0)
   assert.deepStrictEqual(moved.center, ["weather", "pinned", "agents"])

@@ -63,15 +63,36 @@ Column {
     var u = String(url || "")
     if (u.indexOf("https://") !== 0 && u.indexOf("http://") !== 0) return
     var done = false
+    var cap = Model.REMOTE_BODY_MAX_BYTES
     function finish(status, body) {
       if (done) return
       done = true
       cb(status, body || "")
     }
+    function dropOversized(xhr) {
+      if (done) return
+      done = true
+      try { xhr.abort() } catch (e0) {}
+      cb(0, "")
+    }
     var xhr = new XMLHttpRequest()
     xhr.timeout = timeoutMs > 0 ? timeoutMs : 8000
     xhr.onreadystatechange = function() {
-      if (xhr.readyState === 4) finish(xhr.status, xhr.responseText)
+      if (done) return
+      if (xhr.readyState === 2) {
+        var len = ""
+        try { len = xhr.getResponseHeader("Content-Length") } catch (e1) { len = "" }
+        if (Model.contentLengthOverCeiling(len, cap)) dropOversized(xhr)
+        return
+      }
+      if (xhr.readyState !== 3 && xhr.readyState !== 4) return
+      var text = ""
+      try { text = xhr.responseText || "" } catch (e2) { text = "" }
+      if (Model.remoteBodyOverCeiling(text, cap)) {
+        dropOversized(xhr)
+        return
+      }
+      if (xhr.readyState === 4) finish(xhr.status, Model.boundedRemoteBody(text, cap))
     }
     xhr.ontimeout = function() { finish(0, "") }
     xhr.onerror = function() { finish(0, "") }
